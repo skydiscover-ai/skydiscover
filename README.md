@@ -102,7 +102,7 @@ from skydiscover import run_discovery
 result = run_discovery(
     initial_program="initial_program.py",
     evaluator="evaluator.py",
-    search=[algo], # algo can be "adaevolve", "evox", or open-source methods like "openevolve", "gepa", "shinkaevolve"
+    search=[algo], # algo can be "adaevolve", "evox", "openevolve", "gepa", "shinkaevolve"
     model="gpt-5",
     iterations=100,
 )
