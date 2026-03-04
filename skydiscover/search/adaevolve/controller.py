@@ -106,6 +106,7 @@ class AdaEvolveController(DiscoveryController):
     def _load_evaluator_code(self) -> str:
         """Load evaluator source code for paradigm generation context."""
         from skydiscover.search.utils.discovery_utils import load_evaluator_code
+
         return load_evaluator_code(self.evaluation_file)
 
     # =========================================================================

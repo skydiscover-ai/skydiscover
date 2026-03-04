@@ -156,8 +156,7 @@ class ContainerizedEvaluator:
 
         # Inject solution into the container via stdin — no host temp file needed.
         inject = subprocess.run(
-            ["docker", "exec", "-i", self.container_id,
-             "/bin/sh", "-c", f"cat > {candidate_path}"],
+            ["docker", "exec", "-i", self.container_id, "/bin/sh", "-c", f"cat > {candidate_path}"],
             input=program_solution.encode(),
             capture_output=True,
         )
@@ -170,8 +169,14 @@ class ContainerizedEvaluator:
 
         try:
             proc = subprocess.run(
-                ["docker", "exec", self.container_id,
-                 "/benchmark/evaluate.sh", mode, candidate_path],
+                [
+                    "docker",
+                    "exec",
+                    self.container_id,
+                    "/benchmark/evaluate.sh",
+                    mode,
+                    candidate_path,
+                ],
                 capture_output=True,
                 text=True,
             )
@@ -201,9 +206,7 @@ class ContainerizedEvaluator:
         status = data.get("status", "error")
         combined_score = float(data.get("combined_score", 0.0))
         metrics = {
-            k: float(v)
-            for k, v in data.get("metrics", {}).items()
-            if isinstance(v, (int, float))
+            k: float(v) for k, v in data.get("metrics", {}).items() if isinstance(v, (int, float))
         }
         if "combined_score" not in metrics:
             metrics["combined_score"] = combined_score
@@ -217,8 +220,7 @@ class ContainerizedEvaluator:
     def _start_container(self) -> str:
         """Start a persistent container and return its ID."""
         result = subprocess.run(
-            ["docker", "run", "-d", "--rm", "--entrypoint", "sleep",
-             self.image_tag, "infinity"],
+            ["docker", "run", "-d", "--rm", "--entrypoint", "sleep", self.image_tag, "infinity"],
             capture_output=True,
             text=True,
             check=True,
@@ -244,9 +246,7 @@ class ContainerizedEvaluator:
             text=True,
         )
         if result.returncode != 0:
-            raise RuntimeError(
-                f"Docker build failed for {self.benchmark_dir}:\n{result.stderr}"
-            )
+            raise RuntimeError(f"Docker build failed for {self.benchmark_dir}:\n{result.stderr}")
         return tag
 
     def _content_hash(self) -> str:

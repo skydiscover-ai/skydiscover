@@ -287,6 +287,7 @@ class CoEvolutionController(DiscoveryController):
 
         system_message = self.config.context_builder.system_message or ""
         from skydiscover.search.utils.discovery_utils import load_evaluator_code
+
         evaluator_code = load_evaluator_code(self.evaluation_file)
 
         try:
