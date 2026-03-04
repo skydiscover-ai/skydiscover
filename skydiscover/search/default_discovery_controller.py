@@ -106,6 +106,11 @@ class DiscoveryController:
             f"DiscoveryController initialized: num_context_programs={self.num_context_programs}"
         )
 
+    def close(self):
+        """Release resources held by the evaluator (e.g. Docker containers)."""
+        if hasattr(self.evaluator, "close"):
+            self.evaluator.close()
+
     # ------------------------------------------------------------------
     # Initialisation helpers
     # ------------------------------------------------------------------

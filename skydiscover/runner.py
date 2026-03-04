@@ -183,6 +183,8 @@ class Runner:
                 self.discovery_controller is not None
                 and self.discovery_controller.early_stopping_triggered
             )
+            if self.discovery_controller is not None:
+                self.discovery_controller.close()
             self.discovery_controller = None
 
             if monitor_server:
