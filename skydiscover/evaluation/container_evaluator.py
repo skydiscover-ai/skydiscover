@@ -153,7 +153,7 @@ class ContainerizedEvaluator:
 
         # Inject solution into the container via stdin — no host temp file needed.
         inject = subprocess.run(
-            ["docker", "exec", "-i", self.container_id, "/bin/sh", "-c", f"cat > {candidate_path}"],
+            ["docker", "exec", "-i", self.container_id, "tee", candidate_path],
             input=program_solution.encode(),
             capture_output=True,
         )
