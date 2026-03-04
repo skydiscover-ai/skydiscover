@@ -76,9 +76,6 @@ class ContainerizedEvaluator:
             )
             self.container_id = None
 
-    def __del__(self):
-        self.close()
-
     # ------------------------------------------------------------------
     # Public API — mirrors Evaluator's interface
     # ------------------------------------------------------------------
