@@ -22,6 +22,8 @@ _format_previous_attempts, _format_other_context_programs, _format_current_progr
 """
 
 import logging
+import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -34,6 +36,45 @@ logger = logging.getLogger(__name__)
 
 _TEMPLATES_DIR = str(Path(__file__).parent / "templates")
 _TEXT_LANGUAGES = {"text", "prompt", "text/plain"}
+
+_KNOWN_TEMPLATE_VARS = {
+    "current_program", "metrics", "previous_attempts", "other_context_programs",
+    "improvement_areas", "language", "timeout_warning", "search_guidance",
+}
+
+_PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
+
+
+class _EnvFormatDict(dict):
+    def __missing__(self, key):
+        val = os.environ.get(key.upper())
+        if val is not None:
+            return val
+        return f"{{{key}}}"
+
+
+def _substitute_placeholders(system_msg: str) -> str:
+    """Substitute {placeholder} patterns in system message from env vars."""
+    if not system_msg or "{" not in system_msg:
+        return system_msg
+    try:
+        return system_msg.format_map(_EnvFormatDict())
+    except (ValueError, IndexError):
+        return system_msg
+
+
+def _warn_unsubstituted_placeholders(system_msg: str) -> None:
+    if not system_msg:
+        return
+    found = _PLACEHOLDER_RE.findall(system_msg)
+    suspicious = [name for name in found if name not in _KNOWN_TEMPLATE_VARS]
+    if suspicious:
+        logger.warning(
+            "Unsubstituted placeholder(s) in system message: %s. "
+            "Set env vars (e.g. PROBLEM_STATEMENT for {problem_statement}) "
+            "or replace with actual content.",
+            ", ".join(f"{{{s}}}" for s in suspicious),
+        )
 
 
 def _filter_other_metrics(metrics: dict) -> dict:
@@ -161,13 +202,22 @@ class DefaultContextBuilder(ContextBuilder):
             return "full_rewrite_prompt_opt_user_message"
         return "full_rewrite_user_message"
 
+    _system_message_validated = False
+
     def _get_system_message(self) -> str:
-        """Return system message from override, template, or raw config string."""
+        """Substitutes {placeholder} patterns from environment variables."""
         if self.system_template_override:
             return self.template_manager.get_template(self.system_template_override)
         system_msg = self.context_config.system_message
         if system_msg in self.template_manager.templates:
-            return self.template_manager.get_template(system_msg)
+            system_msg = self.template_manager.get_template(system_msg)
+
+        system_msg = _substitute_placeholders(system_msg)
+
+        if not DefaultContextBuilder._system_message_validated:
+            DefaultContextBuilder._system_message_validated = True
+            _warn_unsubstituted_placeholders(system_msg)
+
         return system_msg
 
     # ------------------------------------------------------------------
