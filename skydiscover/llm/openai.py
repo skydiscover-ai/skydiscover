@@ -142,10 +142,14 @@ class OpenAILLM(LLMInterface):
             params = {
                 "model": self.model,
                 "messages": formatted_messages,
-                "temperature": kwargs.get("temperature", self.temperature),
-                "top_p": kwargs.get("top_p", self.top_p),
                 "max_tokens": kwargs.get("max_tokens", self.max_tokens),
             }
+            temperature = kwargs.get("temperature", self.temperature)
+            if temperature is not None:
+                params["temperature"] = temperature
+            top_p = kwargs.get("top_p", self.top_p)
+            if top_p is not None:
+                params["top_p"] = top_p
             reasoning_effort = kwargs.get("reasoning_effort", self.reasoning_effort)
             if reasoning_effort is not None:
                 params["reasoning_effort"] = reasoning_effort
