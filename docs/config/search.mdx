@@ -1,0 +1,320 @@
+---
+title: "Search Configuration"
+description: "Configure evolutionary search algorithms and database settings in SkyDiscover"
+---
+
+## Search Config Structure
+
+The search section of the config defines the algorithm type, context program count, and algorithm-specific database settings:
+
+```yaml
+search:
+  type: "topk"                # Search algorithm name
+  num_context_programs: 4     # Number of context programs in prompts
+  database:                   # Algorithm-specific settings
+    # ... varies by algorithm
+```
+
+| Parameter | Type | Default | Description |
+|:---|:---|:---|:---|
+| `type` | `str` | `"topk"` | Search algorithm name |
+| `num_context_programs` | `int` | `4` | Number of context programs included in LLM prompts |
+| `database` | varies | `{}` | Algorithm-specific database configuration |
+
+---
+
+## TopK
+
+The simplest search algorithm. Maintains all programs and selects the top-K as parents for the next generation.
+
+```yaml
+search:
+  type: "topk"
+  num_context_programs: 4
+  database:
+    db_path: null        # Optional path for persistent database
+    log_prompts: true    # Log prompts to the database
+```
+
+TopK has no algorithm-specific settings beyond the shared database options.
+
+---
+
+## AdaEvolve
+
+Adaptive multi-island evolutionary search with UCB selection, migration, and paradigm breakthroughs.
+
+```yaml
+search:
+  type: "adaevolve"
+  num_context_programs: 4
+  database:
+    # Population
+    population_size: 20
+    num_islands: 2
+
+    # Adaptive search
+    use_adaptive_search: true
+    decay: 0.9
+    intensity_min: 0.15
+    intensity_max: 0.5
+    fixed_intensity: 0.4
+
+    # Selection
+    use_ucb_selection: true
+
+    # Migration
+    use_migration: true
+    migration_interval: 15
+    migration_count: 5
+
+    # Unified archive
+    use_unified_archive: true
+    archive_size: 100
+    archive_elite_ratio: 0.2
+
+    # Context sampling
+    local_context_program_ratio: 0.6
+
+    # Multi-objective
+    pareto_weight: 0.4
+    fitness_weight: 1.0
+    novelty_weight: 0.0
+    k_neighbors: 5
+    diversity_strategy: "code"
+
+    # Dynamic islands
+    use_dynamic_islands: true
+    max_islands: 5
+    spawn_productivity_threshold: 0.015
+    spawn_cooldown_iterations: 30
+
+    # Paradigm breakthrough
+    use_paradigm_breakthrough: true
+    paradigm_window_size: 10
+    paradigm_improvement_threshold: 0.12
+    paradigm_max_uses: 2
+    paradigm_num_to_generate: 3
+    paradigm_max_tried: 10
+
+    # Stagnation handling
+    stagnation_threshold: 10
+    stagnation_multi_child_count: 3
+
+    # Sibling context
+    sibling_context_limit: 5
+
+    # Error retry
+    enable_error_retry: true
+    max_error_retries: 2
+
+    # Metric direction
+    higher_is_better: {}
+    fitness_key: null
+    pareto_objectives: []
+    pareto_objectives_weight: 0.0
+```
+
+### AdaEvolve Parameters
+
+| Parameter | Type | Default | Description |
+|:---|:---|:---|:---|
+| `population_size` | `int` | `20` | Programs per island |
+| `num_islands` | `int` | `2` | Initial number of islands |
+| `decay` | `float` | `0.9` | Intensity decay factor |
+| `intensity_min` | `float` | `0.15` | Minimum mutation intensity |
+| `intensity_max` | `float` | `0.5` | Maximum mutation intensity |
+| `use_adaptive_search` | `bool` | `true` | Enable adaptive intensity adjustment |
+| `use_ucb_selection` | `bool` | `true` | Use UCB for island selection |
+| `use_migration` | `bool` | `true` | Enable migration between islands |
+| `use_unified_archive` | `bool` | `true` | Maintain a shared elite archive |
+| `fixed_intensity` | `float` | `0.4` | Intensity when adaptive search is off |
+| `migration_interval` | `int` | `15` | Iterations between migrations |
+| `migration_count` | `int` | `5` | Programs migrated per event |
+| `local_context_program_ratio` | `float` | `0.6` | Ratio of context from local island vs. archive |
+| `archive_elite_ratio` | `float` | `0.2` | Fraction of archive slots reserved for elites |
+| `archive_size` | `int` | `100` | Maximum archive size |
+| `pareto_weight` | `float` | `0.4` | Weight for Pareto-based fitness |
+| `fitness_weight` | `float` | `1.0` | Weight for score-based fitness |
+| `novelty_weight` | `float` | `0.0` | Weight for novelty-based fitness |
+| `k_neighbors` | `int` | `5` | Neighbors for novelty calculation |
+| `diversity_strategy` | `str` | `"code"` | Diversity metric (`"code"` or `"metric"`) |
+| `use_dynamic_islands` | `bool` | `true` | Spawn/merge islands dynamically |
+| `max_islands` | `int` | `5` | Maximum number of islands |
+| `spawn_productivity_threshold` | `float` | `0.015` | Improvement needed to spawn new island |
+| `spawn_cooldown_iterations` | `int` | `30` | Minimum iterations between spawns |
+| `use_paradigm_breakthrough` | `bool` | `true` | Enable paradigm breakthrough attempts |
+| `paradigm_window_size` | `int` | `10` | Window for detecting stagnation |
+| `paradigm_improvement_threshold` | `float` | `0.12` | Min improvement to avoid paradigm trigger |
+| `paradigm_max_uses` | `int` | `2` | Max breakthroughs per run |
+| `paradigm_num_to_generate` | `int` | `3` | Candidates per breakthrough attempt |
+| `paradigm_max_tried` | `int` | `10` | Max breakthrough attempts before giving up |
+| `stagnation_threshold` | `int` | `10` | Iterations without improvement to trigger stagnation |
+| `stagnation_multi_child_count` | `int` | `3` | Children generated during stagnation |
+| `sibling_context_limit` | `int` | `5` | Max sibling programs in context |
+| `enable_error_retry` | `bool` | `true` | Retry on evaluation errors |
+| `max_error_retries` | `int` | `2` | Max retries per error |
+
+---
+
+## Beam Search
+
+Beam search with diversity-weighted selection. Maintains a beam of the best programs and expands the most promising candidates.
+
+```yaml
+search:
+  type: "beam_search"
+  num_context_programs: 4
+  database:
+    beam_width: 5
+    beam_selection_strategy: "diversity_weighted"
+    beam_diversity_weight: 0.3
+    beam_temperature: 1.0
+    beam_depth_penalty: 0.0
+```
+
+| Parameter | Type | Default | Description |
+|:---|:---|:---|:---|
+| `beam_width` | `int` | `5` | Number of programs in the beam |
+| `beam_selection_strategy` | `str` | `"diversity_weighted"` | Selection strategy for beam candidates |
+| `beam_diversity_weight` | `float` | `0.3` | Weight for diversity in selection (0–1) |
+| `beam_temperature` | `float` | `1.0` | Temperature for probabilistic selection |
+| `beam_depth_penalty` | `float` | `0.0` | Penalty for deeper programs in the tree |
+
+---
+
+## Best-of-N
+
+Generates N variants of each parent and keeps only the best. Simple but effective for quick baselines.
+
+```yaml
+search:
+  type: "best_of_n"
+  num_context_programs: 4
+  database:
+    best_of_n: 5
+```
+
+| Parameter | Type | Default | Description |
+|:---|:---|:---|:---|
+| `best_of_n` | `int` | `5` | Number of variants generated per parent |
+
+---
+
+## EvoX
+
+Co-evolutionary meta-learning. EvoX co-evolves the search strategy itself alongside the solution, using an inner LLM loop to adapt variation operators.
+
+```yaml
+search:
+  type: "evox"
+  num_context_programs: 4
+  database:
+    database_file_path: null          # Path to initial search strategy
+    evaluation_file: null             # Evaluator for the search strategy
+    config_path: null                 # Config for the inner search loop
+    auto_generate_variation_operators: true
+```
+
+| Parameter | Type | Default | Description |
+|:---|:---|:---|:---|
+| `database_file_path` | `str` | built-in | Path to initial search strategy file |
+| `evaluation_file` | `str` | built-in | Evaluator for the search strategy |
+| `config_path` | `str` | built-in | Config for the inner search loop |
+| `auto_generate_variation_operators` | `bool` | `true` | Auto-generate variation operators |
+
+When fields are `null`, EvoX uses its built-in default strategy, evaluator, and config.
+
+---
+
+## OpenEvolve Native
+
+Native reimplementation of OpenEvolve with MAP-Elites and island-based search.
+
+```yaml
+search:
+  type: "openevolve_native"
+  num_context_programs: 4
+  database:
+    num_islands: 5
+    population_size: 40
+    archive_size: 100
+    exploration_ratio: 0.2
+    exploitation_ratio: 0.7
+    elite_selection_ratio: 0.1
+    feature_dimensions: ["complexity", "diversity"]
+    feature_bins: 10
+    diversity_reference_size: 20
+    migration_interval: 10
+    migration_rate: 0.1
+    random_seed: 42
+```
+
+| Parameter | Type | Default | Description |
+|:---|:---|:---|:---|
+| `num_islands` | `int` | `5` | Number of independent islands |
+| `population_size` | `int` | `40` | Programs per island |
+| `archive_size` | `int` | `100` | MAP-Elites archive capacity |
+| `exploration_ratio` | `float` | `0.2` | Fraction of iterations for exploration |
+| `exploitation_ratio` | `float` | `0.7` | Fraction of iterations for exploitation |
+| `elite_selection_ratio` | `float` | `0.1` | Fraction of iterations for elite selection |
+| `feature_dimensions` | `list` | `["complexity", "diversity"]` | MAP-Elites feature dimensions |
+| `feature_bins` | `int` | `10` | Bins per feature dimension |
+| `diversity_reference_size` | `int` | `20` | Reference set size for diversity |
+| `migration_interval` | `int` | `10` | Iterations between inter-island migration |
+| `migration_rate` | `float` | `0.1` | Fraction of population migrated |
+| `random_seed` | `int` | `42` | Random seed for reproducibility |
+
+---
+
+## GEPA Native
+
+Native reimplementation of GEPA (Guided Evolution for Program Adaptation) with epsilon-greedy selection, acceptance gating, and LLM-mediated merge.
+
+```yaml
+search:
+  type: "gepa_native"
+  num_context_programs: 4
+  database:
+    population_size: 40
+    candidate_selection_strategy: "epsilon_greedy"
+    epsilon: 0.1
+    max_rejection_history: 20
+    acceptance_gating: true
+    use_merge: true
+    merge_after_stagnation: 15
+    max_merge_attempts: 10
+    max_recent_failures: 5
+    random_seed: 42
+```
+
+| Parameter | Type | Default | Description |
+|:---|:---|:---|:---|
+| `population_size` | `int` | `40` | Size of the elite pool |
+| `candidate_selection_strategy` | `str` | `"epsilon_greedy"` | Selection strategy: `"epsilon_greedy"`, `"best"`, or `"pareto"` |
+| `epsilon` | `float` | `0.1` | Exploration probability for epsilon-greedy |
+| `max_rejection_history` | `int` | `20` | Max rejected candidates to track |
+| `acceptance_gating` | `bool` | `true` | Gate new programs by improvement threshold |
+| `use_merge` | `bool` | `true` | Enable LLM-mediated merge of programs |
+| `merge_after_stagnation` | `int` | `15` | Iterations of stagnation before merging |
+| `max_merge_attempts` | `int` | `10` | Max merge attempts per stagnation event |
+| `max_recent_failures` | `int` | `5` | Recent failures tracked for stagnation detection |
+| `random_seed` | `int` | `42` | Random seed for reproducibility |
+
+---
+
+## Common Database Options
+
+All search algorithms inherit these shared database settings:
+
+| Parameter | Type | Default | Description |
+|:---|:---|:---|:---|
+| `db_path` | `str` | `None` | Path for persistent database storage |
+| `log_prompts` | `bool` | `true` | Log prompts used to generate each program |
+
+## See Also
+
+- [Configuration Overview](/config/overview) — Full configuration hierarchy
+- [LLM Configuration](/config/llm) — Model pool and generation parameters
+- [Search Algorithms](/concepts/algorithms) — How each algorithm works
+- [Custom Algorithms](/extending/custom-algorithms) — Implementing your own search

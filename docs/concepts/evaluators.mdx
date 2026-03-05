@@ -1,0 +1,325 @@
+---
+title: "Evaluators"
+description: "Writing effective evaluation functions to guide discovery"
+---
+
+## Basic Structure
+
+An evaluator is a Python file with an `evaluate(program_path)` function. It receives the path to a generated program file, runs it, scores it, and returns a dictionary of metrics:
+
+```python
+def evaluate(program_path):
+    score = run_and_grade(program_path)
+    return {
+        "combined_score": score,       # required — primary optimization target
+        "artifacts": {                 # optional — textual feedback for the LLM
+            "feedback": "Off by one in the loop boundary",
+        },
+    }
+```
+
+## Return Format
+
+### Metrics
+
+The returned dict must include numeric metrics. The key `combined_score` is the primary optimization target — SkyDiscover maximizes it.
+
+```python
+return {
+    "combined_score": 0.85,     # required — higher is better
+    "accuracy": 0.9,            # optional additional metrics
+    "efficiency": 0.7,          # tracked and displayed in dashboard
+    "validity": 1.0,
+}
+```
+
+If `combined_score` is omitted, SkyDiscover averages all numeric values in the dict. For best results, always provide an explicit `combined_score` normalized to the 0–1 range.
+
+### Artifacts
+
+Artifacts are optional key-value pairs that get stored with the program and injected into the LLM prompt on subsequent iterations. Use them to provide actionable feedback:
+
+```python
+return {
+    "combined_score": 0.3,
+    "artifacts": {
+        "feedback": "The solution fails on edge case n=1. The loop should start at index 0, not 1.",
+        "test_results": "Passed: 7/10. Failed: test_empty, test_single, test_boundary",
+    },
+}
+```
+
+Good artifacts tell the LLM **what went wrong** and **how to fix it**, not just that the score is low.
+
+## Real Examples
+
+### Circle Packing Evaluator
+
+This evaluator scores a circle packing solution for 26 circles in a unit square:
+
+```python
+import numpy as np
+import subprocess
+import sys
+import tempfile
+import time
+import os
+import pickle
+
+def evaluate(program_path):
+    TARGET_VALUE = 2.635  # AlphaEvolve result for n=26
+
+    try:
+        start_time = time.time()
+        centers, radii, reported_sum = run_with_timeout(program_path, timeout_seconds=600)
+
+        centers = np.array(centers) if not isinstance(centers, np.ndarray) else centers
+        radii = np.array(radii) if not isinstance(radii, np.ndarray) else radii
+
+        if np.isnan(centers).any() or np.isnan(radii).any():
+            return {"combined_score": 0.0, "validity": 0.0}
+
+        valid = validate_packing(centers, radii)
+        shape_valid = centers.shape == (26, 2) and radii.shape == (26,)
+        valid = valid and shape_valid
+
+        sum_radii = np.sum(radii) if valid else 0.0
+        target_ratio = sum_radii / TARGET_VALUE if valid else 0.0
+
+        return {
+            "combined_score": float(target_ratio * (1.0 if valid else 0.0)),
+            "sum_radii": float(sum_radii),
+            "target_ratio": float(target_ratio),
+            "validity": 1.0 if valid else 0.0,
+            "eval_time": float(time.time() - start_time),
+        }
+
+    except Exception as e:
+        return {"combined_score": 0.0, "validity": 0.0, "error": str(e)}
+
+
+def run_with_timeout(program_path, timeout_seconds=20):
+    """Run the program in a subprocess with timeout."""
+    with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as f:
+        script = f"""
+import sys, numpy as np, pickle, importlib.util
+spec = importlib.util.spec_from_file_location("prog", '{program_path}')
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+centers, radii, s = mod.run_packing()
+with open('{f.name}.results', 'wb') as fp:
+    pickle.dump({{'centers': centers, 'radii': radii, 'sum_radii': s}}, fp)
+"""
+        f.write(script.encode())
+        tmp = f.name
+
+    try:
+        proc = subprocess.run([sys.executable, tmp], timeout=timeout_seconds,
+                              capture_output=True)
+        with open(f"{tmp}.results", "rb") as fp:
+            results = pickle.load(fp)
+        return results["centers"], results["radii"], results["sum_radii"]
+    finally:
+        for p in [tmp, f"{tmp}.results"]:
+            if os.path.exists(p):
+                os.unlink(p)
+
+
+def validate_packing(centers, radii):
+    """Check circles don't overlap and fit inside the unit square."""
+    n = centers.shape[0]
+    for i in range(n):
+        x, y, r = centers[i][0], centers[i][1], radii[i]
+        if r < 0 or x - r < -1e-6 or x + r > 1 + 1e-6 or y - r < -1e-6 or y + r > 1 + 1e-6:
+            return False
+    for i in range(n):
+        for j in range(i + 1, n):
+            dist = np.sqrt(np.sum((centers[i] - centers[j]) ** 2))
+            if dist < radii[i] + radii[j] - 1e-6:
+                return False
+    return True
+```
+
+### Simple Correctness + Performance Evaluator
+
+A common pattern: validate correctness first, then measure performance:
+
+```python
+def evaluate(program_path):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("solution", program_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    # Correctness
+    test_cases = load_test_cases()
+    passed = 0
+    for inp, expected in test_cases:
+        try:
+            result = mod.solve(inp)
+            if result == expected:
+                passed += 1
+        except Exception:
+            pass
+
+    accuracy = passed / len(test_cases)
+
+    if accuracy < 0.5:
+        return {
+            "combined_score": accuracy * 0.1,
+            "accuracy": accuracy,
+            "artifacts": {"feedback": f"Only {passed}/{len(test_cases)} tests pass. Fix correctness first."},
+        }
+
+    # Performance (only if mostly correct)
+    import time
+    start = time.time()
+    for inp, _ in test_cases:
+        mod.solve(inp)
+    elapsed = time.time() - start
+
+    speed_score = max(0, 1.0 - elapsed / 10.0)
+
+    return {
+        "combined_score": accuracy * 0.7 + speed_score * 0.3,
+        "accuracy": accuracy,
+        "speed_score": speed_score,
+        "elapsed_seconds": elapsed,
+    }
+```
+
+### Cost Minimization Evaluator
+
+For problems where lower is better, invert the score:
+
+```python
+def evaluate(program_path):
+    cost = simulate_and_compute_cost(program_path)
+    max_cost = 1000.0  # known upper bound
+
+    return {
+        "combined_score": max(0, 1.0 - cost / max_cost),
+        "raw_cost": cost,
+        "artifacts": {
+            "feedback": f"Current cost: {cost:.2f}. Target: below 200.",
+        },
+    }
+```
+
+## Cascade Evaluation
+
+For expensive evaluations, use cascade (multi-stage) evaluation. Define `evaluate_stage1` for fast filtering and `evaluate_stage2` for full evaluation:
+
+```python
+def evaluate_stage1(program_path):
+    """Quick validation — runs in seconds."""
+    try:
+        result = quick_validate(program_path)
+        return {
+            "combined_score": result["basic_score"],
+            "validity": 1.0 if result["valid"] else 0.0,
+        }
+    except Exception as e:
+        return {"combined_score": 0.0, "validity": 0.0, "error": str(e)}
+
+
+def evaluate_stage2(program_path):
+    """Full evaluation — runs in minutes."""
+    return {
+        "combined_score": full_benchmark(program_path),
+        "detailed_metric_1": ...,
+        "detailed_metric_2": ...,
+    }
+
+
+def evaluate(program_path):
+    """Fallback if cascade is disabled."""
+    return evaluate_stage2(program_path)
+```
+
+Configure cascade thresholds in YAML:
+
+```yaml
+evaluator:
+  cascade_evaluation: true
+  cascade_thresholds: [0.3, 0.6]
+```
+
+Stage 1 runs first. If the `combined_score` is below the first threshold (0.3), the program is rejected without running stage 2. This saves significant time when many candidates are clearly bad.
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Normalize scores to 0-1" icon="chart-line">
+    Normalized scores make it easier to interpret results and compare across problems. Use `score / known_maximum` or `1.0 - cost / max_cost`.
+  </Card>
+  <Card title="Provide actionable feedback" icon="comment">
+    Artifacts should tell the LLM what went wrong and how to fix it. "Test 3 failed: expected [1,2,3] but got [1,2]" is far better than "Score: 0.3".
+  </Card>
+  <Card title="Handle errors gracefully" icon="shield">
+    Always wrap execution in try/except and return a zero score with error info rather than raising. The search algorithm needs a score even for broken solutions.
+  </Card>
+  <Card title="Use subprocesses for safety" icon="terminal">
+    Run generated code in a subprocess with a timeout to prevent infinite loops, excessive memory usage, or crashes from affecting the evaluator.
+  </Card>
+  <Card title="Report multiple metrics" icon="table">
+    Track accuracy, speed, memory, and domain-specific metrics alongside `combined_score`. They appear in the dashboard and help diagnose issues.
+  </Card>
+  <Card title="Test on multiple cases" icon="list-check">
+    Evaluate on diverse test inputs to prevent overfitting to a single case. Average scores across test cases for a robust `combined_score`.
+  </Card>
+</CardGroup>
+
+## Common Patterns
+
+### Multi-Objective Weighting
+
+```python
+return {
+    "combined_score": accuracy * 0.5 + efficiency * 0.3 + robustness * 0.2,
+    "accuracy": accuracy,
+    "efficiency": efficiency,
+    "robustness": robustness,
+}
+```
+
+### Threshold-Gated Performance
+
+Only measure performance when correctness passes a threshold:
+
+```python
+if accuracy < 0.8:
+    return {"combined_score": accuracy * 0.1, "accuracy": accuracy}
+
+return {
+    "combined_score": 0.5 + performance_score * 0.5,
+    "accuracy": accuracy,
+    "performance": performance_score,
+}
+```
+
+## Configuration
+
+Evaluator settings in YAML:
+
+```yaml
+evaluator:
+  timeout: 360                    # Max seconds per evaluation
+  max_retries: 3                  # Retry on transient failures
+  cascade_evaluation: true        # Enable multi-stage evaluation
+  cascade_thresholds: [0.3, 0.6]  # Stage 1 pass threshold
+  llm_as_judge: false             # Enable LLM-based scoring alongside evaluator
+```
+
+## Debugging with Prompt Logging
+
+Enable prompt logging to inspect what the LLM sees:
+
+```yaml
+search:
+  database:
+    log_prompts: true
+```
+
+Prompts are saved per program in the checkpoint directory. This is invaluable for understanding why the LLM generates certain solutions and tuning your evaluator's artifact feedback.

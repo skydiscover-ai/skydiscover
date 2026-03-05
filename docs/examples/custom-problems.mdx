@@ -1,0 +1,433 @@
+---
+title: "Creating Custom Problems"
+description: "Learn how to create your own optimization benchmarks with custom evaluators and initial programs"
+---
+
+## Minimal Example
+
+The only required file is an **evaluator**. SkyDiscover can generate solutions from scratch:
+
+```bash
+skydiscover-run evaluator.py -s evox -m gpt-5 -i 100
+```
+
+## Step 1: Write an Evaluator
+
+Create a Python file with an `evaluate(program_path)` function that returns a dict with `combined_score`:
+
+```python
+import subprocess
+import sys
+
+def evaluate(program_path):
+    """Score a candidate solution."""
+    try:
+        result = subprocess.run(
+            [sys.executable, program_path],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        if result.returncode != 0:
+            return {"combined_score": 0.0, "error": result.stderr[:500]}
+
+        output = result.stdout.strip()
+        score = float(output)
+
+        return {
+            "combined_score": max(0.0, min(score, 1.0)),
+            "raw_score": score,
+        }
+
+    except subprocess.TimeoutExpired:
+        return {"combined_score": 0.0, "error": "timeout"}
+    except Exception as e:
+        return {"combined_score": 0.0, "error": str(e)}
+```
+
+Key requirements:
+- Accept a single `program_path` argument
+- Return a dict with `combined_score` (float, higher is better)
+- Handle all errors gracefully — return `0.0`, never raise
+
+## Step 2: Initial Program (Optional)
+
+Provide a starting solution with `EVOLVE-BLOCK` markers around the mutable region:
+
+```python
+import math
+
+# This function won't be changed
+def run_tests(solution_fn):
+    test_cases = [(1, 1), (2, 4), (3, 9), (10, 100)]
+    correct = sum(1 for x, y in test_cases if solution_fn(x) == y)
+    return correct / len(test_cases)
+
+
+# EVOLVE-BLOCK-START
+def solve(x):
+    """Return x squared."""
+    return x + x  # baseline — SkyDiscover will improve this
+# EVOLVE-BLOCK-END
+
+
+if __name__ == "__main__":
+    score = run_tests(solve)
+    print(score)
+```
+
+If you omit the initial program entirely, SkyDiscover prompts the LLM to generate one from scratch.
+
+If no `EVOLVE-BLOCK` markers are present, the entire file is treated as mutable.
+
+## Step 3: Configuration (Optional)
+
+Create a YAML config to tune the run:
+
+```yaml
+max_iterations: 100
+
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+  temperature: 0.8
+
+search:
+  type: "adaevolve"
+
+evaluator:
+  timeout: 30
+
+prompt:
+  system_message: |
+    You are an expert Python programmer.
+    Optimize the function to pass all test cases.
+```
+
+## Step 4: Run
+
+```bash
+skydiscover-run initial_program.py evaluator.py -c config.yaml -s adaevolve -i 100
+```
+
+Or without config and initial program:
+
+```bash
+skydiscover-run evaluator.py -s evox -m gpt-5 -i 50
+```
+
+## Complete Example: String Compression
+
+A full example that evolves a string compression algorithm.
+
+### Directory Structure
+
+```
+string_compression/
+├── evaluator.py
+├── initial_program.py
+├── config.yaml
+└── test_data.txt
+```
+
+### Evaluator
+
+```python
+import importlib.util
+import os
+
+TEST_STRINGS = [
+    "aaabbbcccc",
+    "abcabcabc",
+    "aaaaaa",
+    "abcdefg",
+    "aaabbbbccccdddd",
+    "xyzxyzxyzxyz",
+]
+
+
+def evaluate(program_path):
+    try:
+        spec = importlib.util.spec_from_file_location("solution", program_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        if not hasattr(module, "compress") or not hasattr(module, "decompress"):
+            return {"combined_score": 0.0, "error": "Missing compress/decompress"}
+
+        total_ratio = 0.0
+        correct = 0
+
+        for s in TEST_STRINGS:
+            try:
+                compressed = module.compress(s)
+                decompressed = module.decompress(compressed)
+
+                if decompressed != s:
+                    continue
+
+                correct += 1
+                ratio = 1.0 - len(compressed) / len(s)
+                total_ratio += max(ratio, 0.0)
+
+            except Exception:
+                continue
+
+        correctness = correct / len(TEST_STRINGS)
+        avg_ratio = total_ratio / len(TEST_STRINGS)
+
+        return {
+            "combined_score": 0.6 * correctness + 0.4 * avg_ratio,
+            "correctness": correctness,
+            "compression_ratio": avg_ratio,
+            "correct_count": correct,
+        }
+
+    except Exception as e:
+        return {"combined_score": 0.0, "error": str(e)}
+```
+
+### Initial Program
+
+```python
+# EVOLVE-BLOCK-START
+def compress(text):
+    """Compress a string using run-length encoding."""
+    if not text:
+        return ""
+
+    result = []
+    count = 1
+
+    for i in range(1, len(text)):
+        if text[i] == text[i - 1]:
+            count += 1
+        else:
+            result.append(f"{text[i - 1]}{count}")
+            count = 1
+
+    result.append(f"{text[-1]}{count}")
+    return "".join(result)
+
+
+def decompress(text):
+    """Decompress a run-length encoded string."""
+    if not text:
+        return ""
+
+    result = []
+    i = 0
+
+    while i < len(text):
+        char = text[i]
+        i += 1
+        num = ""
+        while i < len(text) and text[i].isdigit():
+            num += text[i]
+            i += 1
+        result.append(char * int(num))
+
+    return "".join(result)
+# EVOLVE-BLOCK-END
+```
+
+### Config
+
+```yaml
+max_iterations: 50
+
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+  temperature: 0.8
+
+search:
+  type: "adaevolve"
+
+evaluator:
+  timeout: 15
+
+prompt:
+  system_message: |
+    You are an expert at data compression algorithms.
+    Optimize the compress/decompress functions to achieve
+    the best compression ratio while maintaining correctness.
+    The decompress(compress(s)) must equal s for all inputs.
+```
+
+### Run
+
+```bash
+skydiscover-run \
+  string_compression/initial_program.py \
+  string_compression/evaluator.py \
+  -c string_compression/config.yaml \
+  -s adaevolve -i 50
+```
+
+## Prompt Optimization Example
+
+Optimize text prompts instead of code. The evaluator receives a `.txt` file:
+
+### Evaluator
+
+```python
+def evaluate(prompt_path):
+    with open(prompt_path) as f:
+        prompt = f.read()
+
+    correct = 0
+    total = len(TEST_QUESTIONS)
+
+    for question, expected in TEST_QUESTIONS:
+        answer = call_llm(prompt, question)
+        if expected.lower() in answer.lower():
+            correct += 1
+
+    return {"combined_score": correct / total}
+```
+
+### Initial Prompt
+
+Create a `prompt.txt` with the starting prompt:
+
+```text
+Answer the following question accurately and concisely.
+```
+
+### Config
+
+```yaml
+language: "text"
+file_suffix: ".txt"
+
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+
+search:
+  type: "adaevolve"
+```
+
+### Run
+
+```bash
+skydiscover-run prompt.txt evaluator.py -c config.yaml -s adaevolve -i 30
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Fail gracefully">
+    Never let `evaluate` raise. Always return `{"combined_score": 0.0, "error": "..."}` on failure.
+  </Card>
+  <Card title="Validate outputs">
+    Check for NaN, infinity, wrong types, and unexpected shapes before computing a score.
+  </Card>
+  <Card title="Use multiple test cases">
+    Test against a diverse set of inputs to avoid overfitting to a single case.
+  </Card>
+  <Card title="Normalize scores">
+    Keep `combined_score` in the 0–1 range for consistent algorithm behavior.
+  </Card>
+  <Card title="Set timeouts">
+    Use `subprocess.run(..., timeout=N)` to prevent infinite loops.
+  </Card>
+  <Card title="Log useful metrics">
+    Return extra metrics (`correctness`, `speed`, `memory`) — they appear in the dashboard.
+  </Card>
+</CardGroup>
+
+## File Types
+
+| Language | `file_suffix` | `language` | Use Case |
+|----------|---------------|------------|----------|
+| Python | `.py` | `"python"` | Default — code optimization |
+| C++ | `.cpp` | `"cpp"` | Competitive programming, systems |
+| Text | `.txt` | `"text"` | Prompt optimization |
+
+## Common Patterns
+
+### Constructor-Based
+
+The evaluator imports the solution module and calls a specific function:
+
+```python
+def evaluate(program_path):
+    spec = importlib.util.spec_from_file_location("solution", program_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    result = module.construct_solution()
+    score = validate_and_score(result)
+    return {"combined_score": score}
+```
+
+### Subprocess-Based
+
+Run the solution as a script and parse its stdout:
+
+```python
+def evaluate(program_path):
+    result = subprocess.run(
+        [sys.executable, program_path],
+        capture_output=True, text=True, timeout=30,
+    )
+    output = result.stdout.strip()
+    score = float(output)
+    return {"combined_score": score}
+```
+
+### Algorithm Optimization
+
+Import the solution and measure it against known inputs:
+
+```python
+def evaluate(program_path):
+    spec = importlib.util.spec_from_file_location("algo", program_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    value = module.optimize(benchmark_data)
+    return {"combined_score": value / KNOWN_OPTIMUM}
+```
+
+### Prompt Optimization
+
+Read the prompt file and evaluate on a QA benchmark:
+
+```python
+def evaluate(prompt_path):
+    with open(prompt_path) as f:
+        prompt = f.read()
+
+    accuracy = run_qa_benchmark(prompt, test_questions)
+    return {"combined_score": accuracy}
+```
+
+## Handling Timeouts
+
+Always wrap solution execution in a subprocess with a timeout to prevent hanging:
+
+```python
+import subprocess
+import sys
+
+def evaluate(program_path):
+    try:
+        result = subprocess.run(
+            [sys.executable, program_path],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        # ... process result ...
+    except subprocess.TimeoutExpired:
+        return {"combined_score": 0.0, "error": "timeout"}
+```
+
+For constructor-based evaluators that import the module directly, use `signal.alarm` on Unix or `multiprocessing` with a timeout.

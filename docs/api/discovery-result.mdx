@@ -1,0 +1,225 @@
+---
+title: "DiscoveryResult"
+description: "Result object and Program dataclass for discovery runs"
+---
+
+## DiscoveryResult
+
+A dataclass returned by [`run_discovery`](/api/run-discovery) and [`discover_solution`](/api/discover-solution) containing the outcome of a discovery run.
+
+```python
+@dataclass
+class DiscoveryResult:
+    best_program: Optional[Program]
+    best_score: float
+    best_solution: str
+    metrics: Dict[str, Any]
+    output_dir: Optional[str]
+    initial_score: Optional[float] = None
+```
+
+### Fields
+
+<ParamField path="best_program" type="Optional[Program]">
+  The best [`Program`](#program) object found during the run. Contains the full solution, metrics, lineage, and metadata. `None` if no valid programs were produced.
+</ParamField>
+
+<ParamField path="best_score" type="float">
+  The highest `combined_score` achieved across all iterations. This is the primary metric that drives evolution.
+</ParamField>
+
+<ParamField path="best_solution" type="str">
+  Source code of the best solution as a string. Equivalent to `best_program.solution`.
+</ParamField>
+
+<ParamField path="metrics" type="Dict[str, Any]">
+  Full metrics dictionary for the best solution. Includes `combined_score` and any additional metrics returned by the evaluator (e.g., `correctness`, `speed`, `validity`).
+</ParamField>
+
+<ParamField path="output_dir" type="Optional[str]">
+  Path to the output directory containing checkpoints, logs, and the best solution file. `None` if a temp directory was used and cleaned up.
+</ParamField>
+
+<ParamField path="initial_score" type="Optional[float]" default="None">
+  The `combined_score` of the initial program before any evolution. `None` when no initial program was provided (from-scratch generation).
+</ParamField>
+
+### Usage Examples
+
+#### Accessing Fields
+
+```python
+from skydiscover import run_discovery
+
+result = run_discovery(
+    evaluator="evaluator.py",
+    initial_program="solution.py",
+    search="adaevolve",
+    iterations=100,
+)
+
+print(f"Best score: {result.best_score:.4f}")
+print(f"Initial score: {result.initial_score:.4f}")
+print(f"Improvement: {result.best_score - result.initial_score:.4f}")
+print(f"Output dir: {result.output_dir}")
+print(f"Solution:\n{result.best_solution}")
+```
+
+#### Comparing Scores
+
+```python
+result = run_discovery(evaluator="evaluator.py", initial_program="solution.py")
+
+if result.initial_score is not None:
+    improvement = (result.best_score - result.initial_score) / max(result.initial_score, 1e-8)
+    print(f"Relative improvement: {improvement:.1%}")
+else:
+    print(f"Generated from scratch with score: {result.best_score:.4f}")
+```
+
+#### Saving Results
+
+```python
+result = run_discovery(evaluator="evaluator.py", initial_program="solution.py")
+
+with open("best_solution.py", "w") as f:
+    f.write(result.best_solution)
+
+import json
+with open("metrics.json", "w") as f:
+    json.dump(result.metrics, f, indent=2)
+```
+
+#### Iterating Over Metrics
+
+```python
+result = run_discovery(evaluator="evaluator.py", initial_program="solution.py")
+
+for key, value in result.metrics.items():
+    print(f"  {key}: {value}")
+```
+
+#### String Representation
+
+```python
+result = run_discovery(evaluator="evaluator.py", initial_program="solution.py")
+print(result)
+# DiscoveryResult(best_score=0.9523, initial_score=0.3100)
+```
+
+---
+
+## Program
+
+A dataclass representing a single program (solution candidate) in the database. Each `Program` tracks its source code, evaluation metrics, lineage, and metadata.
+
+```python
+@dataclass
+class Program:
+    id: str
+    solution: str
+    language: str = "python"
+    metrics: Dict[str, Any] = field(default_factory=dict)
+    iteration_found: int = 0
+    parent_id: Optional[str] = None
+    other_context_ids: Optional[List[str]] = None
+    parent_info: Optional[Tuple[str, str]] = None
+    context_info: Optional[List[Tuple[str, str]]] = None
+    timestamp: float = field(default_factory=time.time)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    artifacts: Dict[str, Any] = field(default_factory=dict)
+    prompts: Optional[Dict[str, Any]] = None
+    generation: int = 0
+```
+
+### Fields
+
+| Field | Type | Default | Description |
+|:---|:---|:---|:---|
+| `id` | `str` | — | Unique UUID identifying this program |
+| `solution` | `str` | — | Full source code of the solution |
+| `language` | `str` | `"python"` | Programming language of the solution |
+| `metrics` | `Dict[str, Any]` | `{}` | Evaluation metrics including `combined_score` |
+| `iteration_found` | `int` | `0` | Iteration number when this program was created |
+| `parent_id` | `Optional[str]` | `None` | UUID of the parent program this was mutated from |
+| `other_context_ids` | `Optional[List[str]]` | `None` | UUIDs of other programs used as context for generation |
+| `parent_info` | `Optional[Tuple[str, str]]` | `None` | Information about the parent program |
+| `context_info` | `Optional[List[Tuple[str, str]]]` | `None` | Information about context programs |
+| `timestamp` | `float` | `time.time()` | Unix timestamp when the program was created |
+| `metadata` | `Dict[str, Any]` | `{}` | Arbitrary metadata (model used, generation params, etc.) |
+| `artifacts` | `Dict[str, Any]` | `{}` | Evaluator artifacts (feedback strings, intermediate results) |
+| `prompts` | `Optional[Dict[str, Any]]` | `None` | Prompts used to generate this program |
+| `generation` | `int` | `0` | Generation depth in the evolutionary tree (0 = initial) |
+
+### Methods
+
+| Method | Description |
+|:---|:---|
+| `to_dict() -> Dict[str, Any]` | Serialize the program to a dictionary |
+| `from_dict(data: Dict) -> Program` | Class method to deserialize from a dictionary |
+
+### Working with Program Objects
+
+#### Lineage Tracking
+
+```python
+result = run_discovery(evaluator="evaluator.py", initial_program="solution.py")
+program = result.best_program
+
+print(f"Program ID: {program.id}")
+print(f"Parent ID: {program.parent_id}")
+print(f"Context programs used: {program.other_context_ids}")
+print(f"Found at iteration: {program.iteration_found}")
+```
+
+#### Generation Depth
+
+The `generation` field tracks how many evolutionary steps separate this program from the initial seed:
+
+```python
+program = result.best_program
+
+print(f"Generation: {program.generation}")
+# Generation 0 = initial program
+# Generation 1 = first mutation
+# Generation N = N mutations from the seed
+```
+
+#### Serialization
+
+```python
+import json
+
+program = result.best_program
+data = program.to_dict()
+
+with open("program.json", "w") as f:
+    json.dump(data, f, indent=2)
+
+from skydiscover.search.base_database import Program
+restored = Program.from_dict(data)
+```
+
+#### Accessing Evaluation Metrics
+
+```python
+program = result.best_program
+
+score = program.metrics.get("combined_score", 0.0)
+print(f"Combined score: {score:.4f}")
+
+for key, value in program.metrics.items():
+    print(f"  {key}: {value}")
+```
+
+#### Inspecting Artifacts
+
+Evaluators can attach feedback and intermediate results via the `artifacts` field:
+
+```python
+program = result.best_program
+
+if program.artifacts:
+    feedback = program.artifacts.get("feedback", "")
+    print(f"Evaluator feedback: {feedback}")
+```

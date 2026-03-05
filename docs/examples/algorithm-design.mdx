@@ -1,0 +1,236 @@
+---
+title: "Algorithm Design Examples"
+description: "Competitive programming problems from the Frontier-CS benchmark with 172 algorithmic challenges"
+---
+
+## Overview
+
+The Frontier-CS benchmark contains 172 competitive programming problems covering dynamic programming, graph algorithms, geometry, data structures, greedy algorithms, number theory, and combinatorics. Solutions are written in C++ and evaluated against a Docker-based judge.
+
+## Setup
+
+### 1. Install Dependencies
+
+```bash
+uv sync --extra frontier-cs
+```
+
+### 2. Clone the Frontier-CS Judge
+
+```bash
+cd benchmarks/frontier-cs-eval
+git clone https://github.com/frontier-cs-org/frontier-cs-judge.git Frontier-CS
+```
+
+### 3. Start the Docker Judge
+
+```bash
+cd Frontier-CS
+docker compose up -d
+```
+
+The judge runs on `http://localhost:8081` by default.
+
+### 4. Set Your API Key
+
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+## Initial Program
+
+The starting solution is a minimal C++ skeleton:
+
+```cpp
+#include <bits/stdc++.h>
+using namespace std;
+int main(){
+    std::cout << "Hello, World!" << std::endl;
+    return 0;
+}
+```
+
+SkyDiscover evolves this into a complete algorithmic solution.
+
+## Evaluator
+
+The evaluator submits C++ solutions to the Docker judge and returns the score:
+
+```python
+from frontier_cs.single_evaluator import SingleEvaluator as FrontierCSEvaluator
+from frontier_cs.runner.base import EvaluationStatus
+
+JUDGE_URLS = os.environ.get("JUDGE_URLS", "http://localhost:8081").split(",")
+
+def get_judge_url() -> str:
+    return random.choice(JUDGE_URLS)
+
+def evaluate(program_path: str, problem_id: str = None, **kwargs) -> dict:
+    if problem_id is None:
+        problem_id = os.environ.get('FRONTIER_CS_PROBLEM', '0')
+
+    try:
+        evaluator = FrontierCSEvaluator(
+            backend="docker",
+            judge_url=get_judge_url(),
+            register_cleanup=False,
+        )
+
+        code = Path(program_path).read_text()
+        code = code.replace("// EVOLVE-BLOCK-START", "").replace("// EVOLVE-BLOCK-END", "").strip()
+
+        result = evaluator.evaluate(
+            track="algorithmic",
+            problem_id=problem_id,
+            code=code,
+            backend="docker",
+        )
+
+        if result.status == EvaluationStatus.SUCCESS:
+            return {
+                "combined_score": float(result.score),
+                "runs_successfully": 1.0,
+                "status": "success",
+                "problem_id": problem_id,
+            }
+        elif result.status == EvaluationStatus.TIMEOUT:
+            return {
+                "combined_score": 0.0,
+                "status": "timeout",
+                "problem_id": problem_id,
+            }
+        else:
+            return {
+                "combined_score": 0.0,
+                "status": "error",
+                "message": result.message,
+                "problem_id": problem_id,
+            }
+
+    except Exception as e:
+        return {"combined_score": 0.0, "error": str(e)}
+```
+
+The evaluator supports load balancing across multiple judge instances via the `JUDGE_URLS` environment variable.
+
+## Running a Single Problem
+
+Set the `FRONTIER_CS_PROBLEM` environment variable and run:
+
+```bash
+FRONTIER_CS_PROBLEM=problem_001 uv run skydiscover-run \
+  benchmarks/frontier-cs-eval/initial_program.cpp \
+  benchmarks/frontier-cs-eval/evaluator.py \
+  -c benchmarks/frontier-cs-eval/config.yaml \
+  -s adaevolve -i 100
+```
+
+## Running All Problems in Parallel
+
+Use the provided batch script to run all 172 problems:
+
+```bash
+uv run python benchmarks/frontier-cs-eval/run_all_frontiercs.py \
+  --search adaevolve \
+  --iterations 100 \
+  --model gpt-5
+```
+
+This launches each problem as an independent discovery run.
+
+## Evaluating Best Programs
+
+After a run completes, the best solution is saved in the output directory. You can re-evaluate it:
+
+```bash
+FRONTIER_CS_PROBLEM=problem_001 python -c "
+from benchmarks.frontier_cs_eval.evaluator import evaluate
+result = evaluate('output/best_program.cpp', problem_id='problem_001')
+print(result)
+"
+```
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `FRONTIER_CS_PROBLEM` | Problem ID to solve | `"0"` |
+| `JUDGE_URLS` | Comma-separated judge URLs | `"http://localhost:8081"` |
+| `OPENAI_API_KEY` | LLM API key | — |
+
+## C++ Configuration
+
+The config file sets C++ as the target language:
+
+```yaml
+language: "cpp"
+file_suffix: ".cpp"
+diff_based_generation: true
+
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+  max_tokens: 64000
+
+search:
+  type: "adaevolve"
+
+evaluator:
+  timeout: 300
+  cascade_evaluation: false
+
+prompt:
+  system_message: |
+    You are an expert competitive programmer.
+    Write efficient C++ solutions.
+```
+
+## Tips and Common Issues
+
+<AccordionGroup>
+  <Accordion title="Judge not responding">
+    Verify the Docker container is running:
+
+    ```bash
+    docker ps
+    ```
+
+    Check the judge logs:
+
+    ```bash
+    cd benchmarks/frontier-cs-eval/Frontier-CS
+    docker compose logs
+    ```
+
+    If the container crashed, restart it:
+
+    ```bash
+    docker compose down && docker compose up -d
+    ```
+  </Accordion>
+
+  <Accordion title="Compilation errors">
+    C++ solutions are compiled by the judge. Common issues:
+    - Missing headers — ensure `#include <bits/stdc++.h>` is present
+    - C++ standard — the judge uses C++17
+    - Binary I/O — use `cin`/`cout` for standard I/O
+  </Accordion>
+
+  <Accordion title="Time limit exceeded">
+    The judge has per-problem time limits. If solutions consistently time out:
+    - Increase `evaluator.timeout` in the config
+    - Add a system prompt hint about the expected time complexity
+    - Check the problem's expected complexity class
+  </Accordion>
+
+  <Accordion title="Load balancing with multiple judges">
+    For faster evaluation, run multiple judge instances:
+
+    ```bash
+    export JUDGE_URLS="http://localhost:8081,http://localhost:8082,http://localhost:8083"
+    ```
+
+    Each judge should be an independent Docker container on a different port.
+  </Accordion>
+</AccordionGroup>

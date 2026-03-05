@@ -1,0 +1,254 @@
+---
+title: "Configuration Overview"
+description: "Learn how to configure SkyDiscover using YAML files and understand the configuration hierarchy"
+---
+
+## Configuration Hierarchy
+
+SkyDiscover resolves settings in this order (highest priority first):
+
+1. **CLI flags** — `--model`, `--search`, `--iterations`, etc.
+2. **YAML config file** — Loaded via `--config` or passed as a `Config` object
+3. **Environment variables** — API keys, log level, output directory
+4. **Built-in defaults** — Sensible defaults for all settings
+
+For example, `--iterations 200` on the command line overrides `max_iterations: 100` in your YAML config.
+
+## YAML File Structure
+
+A SkyDiscover YAML config has the following top-level sections:
+
+```yaml
+# General settings
+max_iterations: 100
+checkpoint_interval: 10
+log_level: "INFO"
+language: "python"
+diff_based_generation: true
+max_solution_length: 60000
+max_parallel_iterations: 1
+
+# Component configurations
+llm:
+  # Model pool and generation parameters
+  # See: /config/llm
+
+search:
+  # Algorithm type and database settings
+  # See: /config/search
+
+prompt:
+  # System messages and template configuration
+  # Mapped to context_builder in Config
+  # See: /config/prompt
+
+evaluator:
+  # Timeout, retries, and cascade settings
+
+monitor:
+  # Live dashboard configuration
+  # See: /config/monitor
+
+agentic:
+  # Agentic mode settings
+
+# Human feedback
+human_feedback_enabled: false
+human_feedback_file: null
+human_feedback_mode: "append"  # "append" or "replace"
+```
+
+## Loading Configuration
+
+### From a YAML File
+
+```bash
+uv run skydiscover-run solution.py evaluator.py --config config.yaml
+```
+
+### From a Python Config Object
+
+```python
+from skydiscover import run_discovery
+from skydiscover.config import Config, LLMConfig, SearchConfig
+
+config = Config(
+    max_iterations=200,
+    llm=LLMConfig(temperature=0.8),
+    search=SearchConfig(type="adaevolve"),
+)
+
+result = run_discovery(
+    evaluator="evaluator.py",
+    config=config,
+)
+```
+
+### Combining CLI Flags with YAML
+
+CLI flags override the corresponding YAML values:
+
+```bash
+uv run skydiscover-run solution.py evaluator.py \
+  --config config.yaml \
+  --iterations 200 \
+  --model gpt-5
+```
+
+In this case, `max_iterations` and the model are overridden while all other config values come from `config.yaml`.
+
+## Quick Reference
+
+| Setting | YAML Key | CLI Flag | Default |
+|:---|:---|:---|:---|
+| Max iterations | `max_iterations` | `-i` / `--iterations` | `100` |
+| Search algorithm | `search.type` | `-s` / `--search` | `topk` |
+| Model(s) | `llm.models[].name` | `-m` / `--model` | — |
+| Output directory | — | `-o` / `--output` | auto |
+| Log level | `log_level` | `-l` / `--log-level` | `INFO` |
+| API base URL | `llm.api_base` | `--api-base` | provider default |
+| Agentic mode | `agentic.enabled` | `--agentic` | `false` |
+| Checkpoint interval | `checkpoint_interval` | — | `10` |
+| Diff-based generation | `diff_based_generation` | — | `true` |
+| Parallel iterations | `max_parallel_iterations` | — | `1` |
+| Live monitor | `monitor.enabled` | — | `false` |
+
+## Minimal Config
+
+The simplest useful config sets the model and search algorithm:
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+
+search:
+  type: "adaevolve"
+```
+
+## Full Config Example
+
+A comprehensive config with all sections:
+
+```yaml
+max_iterations: 200
+checkpoint_interval: 25
+log_level: "INFO"
+diff_based_generation: true
+max_solution_length: 60000
+max_parallel_iterations: 1
+
+llm:
+  temperature: 0.7
+  top_p: 0.95
+  max_tokens: 32000
+  timeout: 600
+  retries: 3
+  retry_delay: 5
+  models:
+    - name: "gpt-5"
+      weight: 0.7
+    - name: "gemini/gemini-3-pro-preview"
+      weight: 0.3
+  evaluator_models:
+    - name: "gpt-5-mini"
+      weight: 1.0
+  guide_models:
+    - name: "gpt-5"
+      weight: 1.0
+
+search:
+  type: "adaevolve"
+  num_context_programs: 4
+  database:
+    population_size: 20
+    num_islands: 2
+
+evaluator:
+  timeout: 360
+  max_retries: 3
+  cascade_evaluation: true
+  cascade_thresholds: [0.3, 0.6]
+  llm_as_judge: false
+
+monitor:
+  enabled: true
+  port: 8765
+  host: "127.0.0.1"
+  summary_model: "gpt-5-mini"
+  summary_interval: 0
+
+agentic:
+  enabled: false
+  max_steps: 5
+  overall_timeout: 300.0
+
+human_feedback_enabled: false
+human_feedback_file: null
+human_feedback_mode: "append"
+```
+
+## Environment Variable Expansion
+
+YAML values can reference environment variables using `${VAR}` syntax:
+
+```yaml
+llm:
+  api_key: "${OPENAI_API_KEY}"
+  models:
+    - name: "gpt-5"
+      api_key: "${CUSTOM_API_KEY}"
+
+evaluator:
+  timeout: 360
+```
+
+If the environment variable is not set, the `${VAR}` string is kept as-is.
+
+## Config Validation
+
+SkyDiscover validates the config at load time. Common issues:
+
+- **Unknown search type** — Must be one of `topk`, `adaevolve`, `evox`, `beam_search`, `best_of_n`, `openevolve_native`, `gepa_native`
+- **Invalid model name** — Provider is auto-detected from the model name prefix
+- **Missing API key** — Set the appropriate environment variable for your provider
+
+## Config Dataclass
+
+The Python `Config` dataclass has the following structure:
+
+```python
+@dataclass
+class Config:
+    max_iterations: int = 100
+    checkpoint_interval: int = 10
+    log_level: str = "INFO"
+    log_dir: Optional[str] = None
+    language: Optional[str] = None
+    file_suffix: str = ".py"
+
+    llm: LLMConfig = LLMConfig()
+    context_builder: ContextBuilderConfig = ContextBuilderConfig()
+    search: SearchConfig = SearchConfig()
+    evaluator: EvaluatorConfig = EvaluatorConfig()
+    agentic: AgenticConfig = AgenticConfig()
+    monitor: MonitorConfig = MonitorConfig()
+
+    human_feedback_enabled: bool = False
+    human_feedback_file: Optional[str] = None
+    human_feedback_mode: str = "append"
+
+    diff_based_generation: bool = True
+    max_solution_length: int = 60000
+    max_parallel_iterations: int = 1
+    system_prompt_override: Optional[str] = None
+```
+
+## See Also
+
+- [LLM Configuration](/config/llm) — Model pool, generation parameters, and provider setup
+- [Search Configuration](/config/search) — Algorithm-specific settings and database options
+- [Prompt Configuration](/config/prompt) — System messages and template customization
+- [Monitor Configuration](/config/monitor) — Live dashboard settings
+- [CLI Flags Reference](/cli/flags) — Complete flag reference

@@ -1,0 +1,185 @@
+---
+title: "Monitor Configuration"
+description: "Configure the live monitoring dashboard for real-time search progress visualization"
+---
+
+## Overview
+
+SkyDiscover includes a live monitoring dashboard that visualizes the evolutionary search in real time. When enabled, it starts a web server serving an interactive dashboard with scatter plots, metrics, code diffs, AI summaries, and a human feedback panel.
+
+## Basic Configuration
+
+```yaml
+monitor:
+  enabled: true
+  host: "127.0.0.1"
+  port: 8765
+  max_solution_length: 10000
+```
+
+The dashboard URL prints at run start (default: `http://127.0.0.1:8765`).
+
+## All Parameters
+
+| Parameter | Type | Default | Description |
+|:---|:---|:---|:---|
+| `enabled` | `bool` | `false` | Enable the live monitoring dashboard |
+| `host` | `str` | `"127.0.0.1"` | Host address to bind to |
+| `port` | `int` | `8765` | Port number for the dashboard |
+| `max_solution_length` | `int` | `10000` | Maximum solution length displayed in the code inspector |
+
+## AI Summary Settings
+
+The dashboard can generate AI-powered summaries of the top programs, highlighting key improvements and patterns:
+
+```yaml
+monitor:
+  enabled: true
+  summary_model: "gpt-5-mini"
+  summary_api_key: null         # Falls back to OPENAI_API_KEY
+  summary_api_base: "https://api.openai.com/v1"
+  summary_top_k: 3
+  summary_interval: 0           # 0 = manual only
+```
+
+| Parameter | Type | Default | Description |
+|:---|:---|:---|:---|
+| `summary_model` | `str` | `"gpt-5-mini"` | LLM model for generating summaries |
+| `summary_api_key` | `str` | `None` | API key for the summary model (falls back to `OPENAI_API_KEY`) |
+| `summary_api_base` | `str` | `"https://api.openai.com/v1"` | API base URL for the summary model |
+| `summary_top_k` | `int` | `3` | Number of top programs to include in each summary |
+| `summary_interval` | `int` | `0` | Auto-generate a summary every N programs. `0` = manual only (click the button in the dashboard) |
+
+## Human Feedback Integration
+
+The dashboard includes a **Human Feedback** panel where you can type instructions to steer evolution in real time. Configure it at the top level of the config:
+
+```yaml
+monitor:
+  enabled: true
+
+human_feedback_enabled: true
+human_feedback_file: "feedback.txt"
+human_feedback_mode: "append"
+```
+
+| Parameter | Type | Default | Description |
+|:---|:---|:---|:---|
+| `human_feedback_enabled` | `bool` | `false` | Enable the human feedback panel |
+| `human_feedback_file` | `str` | `null` | Path to a file for storing feedback |
+| `human_feedback_mode` | `str` | `"append"` | `"append"` adds to existing feedback, `"replace"` overwrites |
+
+When you submit feedback through the dashboard, it is injected into subsequent LLM prompts, guiding the search toward your goals.
+
+## Remote Access
+
+To access the dashboard from another machine, bind to all interfaces:
+
+```yaml
+monitor:
+  enabled: true
+  host: "0.0.0.0"
+  port: 8765
+```
+
+Then access the dashboard at `http://<your-ip>:8765`.
+
+<Warning>
+  Binding to `0.0.0.0` exposes the dashboard on all network interfaces. Use with caution on shared networks.
+</Warning>
+
+## Example Configurations
+
+### Minimal
+
+```yaml
+monitor:
+  enabled: true
+```
+
+Uses all defaults: `127.0.0.1:8765`, no auto-summaries.
+
+### With AI Summaries
+
+```yaml
+monitor:
+  enabled: true
+  summary_model: "gpt-5-mini"
+  summary_top_k: 5
+  summary_interval: 10   # Auto-summarize every 10 programs
+```
+
+### With Human Feedback
+
+```yaml
+monitor:
+  enabled: true
+  summary_model: "gpt-5-mini"
+  summary_interval: 0
+
+human_feedback_enabled: true
+human_feedback_file: "human_feedback.txt"
+human_feedback_mode: "append"
+```
+
+### Remote Access with Summaries
+
+```yaml
+monitor:
+  enabled: true
+  host: "0.0.0.0"
+  port: 9000
+  summary_model: "gpt-5-mini"
+  summary_api_key: "${OPENAI_API_KEY}"
+  summary_top_k: 3
+  summary_interval: 5
+  max_solution_length: 20000
+```
+
+## Dashboard Features
+
+<CardGroup cols={2}>
+  <Card title="Scatter Plot" icon="chart-scatter">
+    All programs plotted by score and iteration. Click any point to inspect.
+  </Card>
+  <Card title="Metrics Timeline" icon="chart-line">
+    Best score, average score, and custom metrics tracked over time.
+  </Card>
+  <Card title="Code Inspector" icon="code">
+    View source code, diffs between parent and child, and evaluation details.
+  </Card>
+  <Card title="AI Summary" icon="robot">
+    LLM-generated analysis of top programs and improvement patterns.
+  </Card>
+  <Card title="Human Feedback" icon="comment">
+    Type instructions to steer evolution. Feedback is injected into prompts.
+  </Card>
+  <Card title="Progress Chart" icon="chart-area">
+    Overall improvement trajectory and convergence visualization.
+  </Card>
+</CardGroup>
+
+## Monitor Config Reference
+
+The full `MonitorConfig` dataclass:
+
+```python
+@dataclass
+class MonitorConfig:
+    enabled: bool = False
+    port: int = 8765
+    host: str = "127.0.0.1"
+    max_solution_length: int = 10000
+    summary_model: str = "gpt-5-mini"
+    summary_api_key: Optional[str] = None
+    summary_api_base: str = "https://api.openai.com/v1"
+    summary_top_k: int = 3
+    summary_interval: int = 0
+```
+
+## See Also
+
+- [Configuration Overview](/config/overview) — Full configuration hierarchy
+- [Monitoring Guide](/guides/monitoring) — Detailed walkthrough of dashboard features
+- [`skydiscover-viewer`](/cli/skydiscover-viewer) — Replay completed runs
+- [Prompt Configuration](/config/prompt) — How human feedback integrates with prompts

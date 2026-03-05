@@ -1,0 +1,212 @@
+---
+title: "Top-K"
+description: "Simple and effective algorithm that selects the top-K solutions for refinement"
+---
+
+## Overview
+
+Top-K is the simplest search algorithm in SkyDiscover. It always selects the highest-scoring program as the parent for mutation and provides the next K best programs as context. There is no randomness, no population management, and no exploration strategy — pure greedy exploitation.
+
+This makes Top-K an excellent baseline and a solid choice for short runs or problems where greedy refinement is sufficient.
+
+### Features
+
+- **Greedy selection** — always picks the best program as the parent
+- **Elite context** — provides the top K programs as context to the LLM
+- **No stagnation handling** — no built-in mechanisms to escape local optima
+- **Minimal overhead** — simplest possible database implementation
+
+---
+
+## How It Works
+
+### Sampling Strategy
+
+Every iteration:
+
+1. Sort all programs by `combined_score` (descending)
+2. Select the #1 program as the **parent**
+3. Select programs #2 through #(K+1) as **context programs**
+
+```
+Programs by score:  [0.93, 0.87, 0.82, 0.71, 0.65, 0.54, ...]
+                      ↑      ↑     ↑     ↑
+                    parent  ctx1  ctx2  ctx3  (K=3)
+```
+
+### Pure Exploitation
+
+Top-K has no exploration component:
+
+- No randomness in parent selection
+- No island populations or migration
+- No diversity pressure
+- No stagnation detection or paradigm breakthroughs
+
+The LLM itself provides implicit exploration through the variability of its outputs. For many problems, this is sufficient.
+
+---
+
+## Configuration
+
+### CLI
+
+```bash
+uv run skydiscover-run initial_program.py evaluator.py \
+  --search topk \
+  --iterations 50
+```
+
+### Python API
+
+```python
+from skydiscover import run_discovery
+
+result = run_discovery(
+    initial_program="initial_program.py",
+    evaluator="evaluator.py",
+    search="topk",
+    model="gpt-5",
+    iterations=50,
+)
+```
+
+### Full Configuration
+
+```yaml
+max_iterations: 50
+diff_based_generation: true
+
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+
+search:
+  type: "topk"
+  database:
+    num_context_programs: 4
+    db_path: "outputs/topk_run"
+    log_prompts: false
+
+prompt:
+  system_message: |
+    You are an expert algorithm designer.
+```
+
+### Config Options
+
+| Option | Default | Description |
+|:-------|:--------|:------------|
+| `num_context_programs` | `4` | Number of top programs to include as context (K) |
+| `db_path` | `null` | Path to persist programs to disk |
+| `log_prompts` | `false` | Whether to store prompts alongside programs |
+
+---
+
+## When to Use Top-K
+
+<CardGroup cols={2}>
+  <Card title="Best For" icon="check">
+    - Quick baseline for any new problem
+    - Short runs (< 50 iterations)
+    - Greedy refinement when the solution landscape is smooth
+    - Simple problems with few local optima
+  </Card>
+  <Card title="Avoid When" icon="xmark">
+    - Risk of local optima — Top-K has no escape mechanism
+    - Need for diverse solutions — it converges to one line of descent
+    - Long runs — more sophisticated algorithms amortize their overhead
+  </Card>
+</CardGroup>
+
+---
+
+## Comparison
+
+| Feature | Top-K | AdaEvolve | Beam Search | Best-of-N | GEPA Native |
+|:--------|:------|:----------|:------------|:----------|:------------|
+| Selection | Greedy best | UCB islands | Beam strategies | Fixed parent | Epsilon-greedy |
+| Exploration | None | Adaptive intensity | Diversity weight | N variants | Merge + reflection |
+| Complexity | Minimal | Medium | Low | Minimal | Medium |
+| Stagnation handling | None | Paradigm breakthrough | None | Auto-reset | Reactive merge |
+| Best for | Baselines, short runs | Complex, long runs | Structured search | Local exploration | Rich feedback |
+
+---
+
+## Example
+
+```bash
+uv run skydiscover-run benchmarks/math/circle_packing/initial_program.py \
+  benchmarks/math/circle_packing/evaluator.py \
+  --search topk \
+  --iterations 50
+```
+
+Output structure:
+
+```
+outputs/topk/circle_packing_0305_1430/
+├── programs/
+│   ├── initial_0.py          # Starting solution
+│   ├── gen_1_abc123.py       # Iteration 1 result
+│   ├── gen_2_def456.py       # Iteration 2 result
+│   └── ...
+├── checkpoints/
+│   ├── checkpoint_10/
+│   └── checkpoint_20/
+└── best_program.py           # Best solution found
+```
+
+---
+
+## Tips
+
+- **Start with Top-K** — use it as a baseline before trying more complex algorithms. If Top-K works well, you may not need anything fancier
+- **Monitor for stagnation** — if the score plateaus for 10+ iterations, consider switching to AdaEvolve or Beam Search
+- **Use good context** — increase `num_context_programs` to 6–8 to give the LLM more examples of high-scoring solutions
+- **Iterate quickly** — Top-K's minimal overhead means fast iterations. Use short runs to validate your evaluator before committing to longer AdaEvolve or EvoX runs
+
+---
+
+## Variants
+
+### Random Top-K
+
+Add randomness to parent selection by using Beam Search with stochastic selection:
+
+```yaml
+search:
+  type: "beam_search"
+  database:
+    beam_width: 1
+    beam_selection_strategy: "stochastic"
+    beam_temperature: 0.5
+```
+
+### Temperature Top-K
+
+Implement soft selection using temperature-scaled probabilities over the top K programs:
+
+```python
+import numpy as np
+
+def temperature_select(programs, temperature=1.0):
+    scores = np.array([p.metrics.get("combined_score", 0) for p in programs])
+    logits = scores / temperature
+    probs = np.exp(logits) / np.exp(logits).sum()
+    return np.random.choice(programs, p=probs)
+```
+
+Higher temperature = more random selection. Lower temperature = closer to greedy Top-K behavior.
+
+---
+
+## Related Algorithms
+
+- [AdaEvolve](/algorithms/adaevolve) — adds adaptive intensity, islands, and paradigm breakthroughs
+- [Beam Search](/algorithms/beam-search) — maintains multiple candidates with selection strategies
+- [Best-of-N](/algorithms/best-of-n) — focused local exploration with N variants per parent
+- [GEPA Native](/algorithms/gepa-native) — acceptance gating and merge operations
+- [OpenEvolve Native](/algorithms/openevolve-native) — MAP-Elites quality-diversity search
+- [EvoX](/algorithms/evox) — co-evolves the search strategy itself

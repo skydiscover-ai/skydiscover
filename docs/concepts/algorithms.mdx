@@ -1,0 +1,288 @@
+---
+title: "Search Algorithms"
+description: "Understanding SkyDiscover's search algorithms and when to use each one"
+---
+
+## Algorithm Overview
+
+SkyDiscover ships with seven search algorithms spanning simple baselines to advanced adaptive strategies:
+
+| Algorithm | Complexity | Key Idea | Best For |
+|:---|:---|:---|:---|
+| **TopK** | Simple | Always refine the best | Quick baselines |
+| **Best-of-N** | Simple | N variants from same parent | Exploration-heavy problems |
+| **Beam Search** | Moderate | Fixed-width beam expansion | Structured / discrete domains |
+| **OpenEvolve Native** | Moderate | MAP-Elites + islands | Feature-diverse landscapes |
+| **GEPA Native** | Advanced | Pareto + acceptance gating + merge | Multi-objective problems |
+| **AdaEvolve** | Advanced | Multi-island UCB + paradigm breakthroughs | Most problems (recommended) |
+| **EvoX** | Advanced | Co-evolves search strategy | Complex / novel domains |
+
+## Simple Algorithms
+
+### TopK
+
+The simplest strategy: always select the current best program as the parent and ask the LLM to improve it. Context programs are the next-best solutions.
+
+```bash
+uv run skydiscover-run evaluator.py --search topk --iterations 100
+```
+
+```yaml
+search:
+  type: "topk"
+  num_context_programs: 4
+```
+
+**When to use:** Quick baseline, simple problems, or when you want deterministic parent selection.
+
+**Trade-off:** Low diversity — can get stuck in local optima because it always exploits the same parent.
+
+### Best-of-N
+
+Generates N variant solutions from the same parent in each iteration and keeps only the best. Increases exploration by sampling multiple mutations per step.
+
+```bash
+uv run skydiscover-run evaluator.py --search best_of_n --iterations 100
+```
+
+```yaml
+search:
+  type: "best_of_n"
+  database:
+    best_of_n: 5
+```
+
+**When to use:** When LLM calls are cheap and you want broader exploration per iteration.
+
+**Trade-off:** Uses N× the LLM budget per iteration. Best when combined with fast models.
+
+### Beam Search
+
+Maintains a fixed-width beam of the top candidates. At each step, it selects a parent from the beam, generates a child, and prunes the beam back to `beam_width`.
+
+```yaml
+search:
+  type: "beam_search"
+  database:
+    beam_width: 5
+    beam_selection_strategy: "diversity_weighted"
+    beam_diversity_weight: 0.3
+    beam_temperature: 1.0
+    beam_depth_penalty: 0.0
+```
+
+**Selection strategies:**
+
+| Strategy | Behavior |
+|:---|:---|
+| `best` | Always pick the highest-scoring beam member |
+| `stochastic` | Sample proportional to score (softmax with temperature) |
+| `round_robin` | Cycle through beam members in order |
+| `diversity_weighted` | Balance score and solution diversity (recommended) |
+
+**When to use:** Discrete or structured problems where maintaining multiple parallel paths is valuable.
+
+## Advanced Algorithms
+
+### OpenEvolve Native
+
+A native reimplementation of [OpenEvolve](https://github.com/codelion/openevolve) within SkyDiscover's modular framework. Uses MAP-Elites for quality-diversity optimization with island-based populations.
+
+```yaml
+search:
+  type: "openevolve_native"
+  database:
+    num_islands: 5
+    population_size: 40
+    archive_size: 100
+    exploration_ratio: 0.2
+    exploitation_ratio: 0.7
+    feature_dimensions: ["complexity", "diversity"]
+```
+
+**Key mechanisms:**
+- **MAP-Elites archive** maps solutions into a feature space, maintaining the best solution per cell
+- **Island populations** evolve independently with periodic migration
+- **Exploration/exploitation balance** controlled by configurable ratios
+
+### GEPA Native
+
+A native reimplementation of [GEPA](https://github.com/gepa-ai/gepa) — Guided Evolution for Program Adaptation. Uses Pareto-efficient search with reflective prompting, acceptance gating, and LLM-mediated merge.
+
+```yaml
+search:
+  type: "gepa_native"
+  database:
+    population_size: 40
+    candidate_selection_strategy: "epsilon_greedy"
+    epsilon: 0.1
+    acceptance_gating: true
+    use_merge: true
+    merge_after_stagnation: 15
+```
+
+**Key mechanisms:**
+- **Acceptance gating** — only accepts children that improve on their parent, reducing noise
+- **LLM-mediated merge** — when stagnation is detected, merges the best features of two top solutions using the LLM
+- **Epsilon-greedy selection** — explores with probability ε, exploits with probability 1-ε
+
+### AdaEvolve
+
+The recommended algorithm for most problems. AdaEvolve uses multi-island evolution with Upper Confidence Bound (UCB) selection, adaptive mutation intensity, migration, and paradigm breakthroughs.
+
+```bash
+uv run skydiscover-run evaluator.py --search adaevolve --iterations 100
+```
+
+```yaml
+search:
+  type: "adaevolve"
+  database:
+    population_size: 20
+    num_islands: 2
+    use_adaptive_search: true
+    use_ucb_selection: true
+    use_migration: true
+    use_paradigm_breakthrough: true
+    migration_interval: 15
+    migration_count: 5
+```
+
+**Key mechanisms:**
+
+**Multi-island populations** — Solutions are partitioned across islands that evolve semi-independently. Each island can specialize in a different region of the solution space.
+
+**UCB selection** — Islands are selected using Upper Confidence Bound scores that balance exploitation (high-performing islands) with exploration (under-sampled islands).
+
+**Adaptive mutation intensity** — The framework adjusts how aggressively the LLM should mutate solutions based on recent progress. When improvements stall, intensity increases to escape local optima; when progress is steady, intensity decreases for refinement.
+
+**Migration** — Periodically, top solutions migrate between islands, spreading successful patterns while maintaining diversity.
+
+**Paradigm breakthroughs** — When the search detects prolonged stagnation (no meaningful improvement for `paradigm_window_size` iterations), it triggers a paradigm breakthrough: the LLM is asked to generate fundamentally different approaches rather than incremental improvements.
+
+**Dynamic islands** — New islands can be spawned when existing ones show declining productivity, and unproductive islands can be pruned.
+
+**Unified archive** — An elite archive stores the best solutions across all islands, providing high-quality context programs.
+
+### EvoX
+
+EvoX co-evolves the search strategy alongside the solution. Instead of using a fixed search algorithm, EvoX uses the LLM to evolve the search strategy itself based on observed performance patterns.
+
+```bash
+uv run skydiscover-run evaluator.py --search evox --iterations 100
+```
+
+```yaml
+search:
+  type: "evox"
+```
+
+**Key mechanisms:**
+- **Co-evolution** — Two interleaved loops: one evolves the solution, the other evolves the search strategy
+- **Meta-learning** — The search strategy is itself a program that the LLM improves based on how well recent solutions performed
+- **Auto-generated variation operators** — The system can generate custom mutation operators tailored to the problem domain
+
+**When to use:** Complex or novel domains where you don't know which search strategy will work best. EvoX discovers its own strategy.
+
+## Algorithm Comparison
+
+### Convergence Speed vs. Diversity
+
+```
+                    High Diversity
+                         │
+              EvoX ──────┤
+                         │
+           AdaEvolve ────┤
+                         │
+        OpenEvolve ──────┤
+                         │
+         BeamSearch ─────┤
+                         │
+           Best-of-N ────┤
+                         │
+              TopK ──────┤
+                         │
+                    Low Diversity
+    Fast Convergence ────────────── Slow Convergence
+```
+
+| Algorithm | Convergence | Diversity | LLM Budget | Adaptiveness |
+|:---|:---|:---|:---|:---|
+| TopK | Fast | Low | 1× | None |
+| Best-of-N | Medium | Medium | N× | None |
+| Beam Search | Medium | Medium | 1× | None |
+| OpenEvolve Native | Medium | High | 1× | Low |
+| GEPA Native | Medium | Medium | 1-2× | Medium |
+| AdaEvolve | Fast | High | 1× | High |
+| EvoX | Variable | High | 2× | Very High |
+
+## Choosing an Algorithm
+
+<Steps>
+  <Step title="Start with AdaEvolve">
+    It adapts automatically to most problems and provides the best balance of convergence speed and diversity.
+  </Step>
+  <Step title="Try EvoX for complex domains">
+    If your problem is novel or multi-objective and you're unsure which strategy works best, EvoX discovers its own.
+  </Step>
+  <Step title="Use Beam Search for discrete problems">
+    When solutions have discrete structure (e.g., scheduling, combinatorics), beam search explores multiple paths systematically.
+  </Step>
+  <Step title="Use TopK for quick baselines">
+    Get a fast initial result to understand the problem landscape before committing to a longer run.
+  </Step>
+</Steps>
+
+## Writing Custom Algorithms
+
+### Database Only
+
+For algorithms that only change parent selection and population management, implement a `ProgramDatabase` subclass:
+
+```python
+from skydiscover.search.base_database import ProgramDatabase, Program
+from skydiscover.search.registry import register_database
+
+class MyDatabase(ProgramDatabase):
+    def __init__(self, config):
+        super().__init__("my_algorithm", config)
+
+    def add(self, program: Program, iteration=None, **kwargs) -> str:
+        self.programs[program.id] = program
+        self._update_best_program(program)
+        return program.id
+
+    def sample(self, num_context_programs=4, **kwargs):
+        parent = self.get_best_program()
+        context = self.get_top_programs(num_context_programs)
+        return parent, context
+
+register_database("my_algorithm", MyDatabase)
+```
+
+### Database + Controller
+
+For algorithms that change the iteration loop itself (e.g., co-evolution, merge steps), also implement a `DiscoveryController` subclass:
+
+```python
+from skydiscover.search.default_discovery_controller import (
+    DiscoveryController, DiscoveryControllerInput
+)
+from skydiscover.search.registry import register_controller
+
+class MyController(DiscoveryController):
+    def __init__(self, controller_input: DiscoveryControllerInput):
+        super().__init__(controller_input)
+
+    async def run_discovery(self, start_iteration, max_iterations, **kwargs):
+        # Custom orchestration logic
+        for iteration in range(start_iteration, start_iteration + max_iterations):
+            result = await self._run_iteration(iteration)
+            self._process_iteration_result(result, iteration, kwargs.get("checkpoint_callback"))
+        return self._finalize_discovery()
+
+register_controller("my_algorithm", MyController)
+```
+
+After registering, your algorithm is available via `--search my_algorithm` on the CLI and `search="my_algorithm"` in the Python API.

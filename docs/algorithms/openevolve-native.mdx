@@ -1,0 +1,298 @@
+---
+title: "OpenEvolve Native"
+description: "MAP-Elites with island-based evolutionary search"
+---
+
+## Overview
+
+OpenEvolve Native is SkyDiscover's built-in reimplementation of the OpenEvolve algorithm, combining **MAP-Elites** quality-diversity optimization with **island-based populations**. It maintains a discretized feature space where each cell stores the best program for that feature combination, encouraging diverse solutions across multiple dimensions.
+
+### Features
+
+- **MAP-Elites archive** — discretized feature space grid that preserves the best solution per cell
+- **Island populations** — independent populations with periodic migration
+- **Quality-diversity** — optimizes for both score and behavioral diversity simultaneously
+- **Adaptive sampling** — balances exploration, exploitation, and global random selection
+
+---
+
+## Key Concepts
+
+### MAP-Elites Archive
+
+MAP-Elites discretizes the feature space into a grid. Each cell stores the single best program found for that feature combination:
+
+```
+Feature: complexity (3 bins) × diversity (3 bins)
+
+         low-div   med-div   high-div
+        ┌─────────┬─────────┬─────────┐
+low-cx  │  0.72   │  0.68   │  0.45   │
+        ├─────────┼─────────┼─────────┤
+med-cx  │  0.81   │  ★ 0.93 │  0.77   │
+        ├─────────┼─────────┼─────────┤
+high-cx │  0.65   │  0.71   │  0.59   │
+        └─────────┴─────────┴─────────┘
+
+★ = global best (0.93)
+Coverage: 9/9 cells filled (100%)
+```
+
+When a new program is generated, its features are computed, the corresponding cell is found, and the program replaces the current occupant only if its score is higher.
+
+### Feature Dimensions
+
+Features determine which cell a program maps to. Three built-in dimensions are available:
+
+| Dimension | Description |
+|:----------|:------------|
+| `score` | The `combined_score` from the evaluator |
+| `diversity` | Code-level diversity measured against a reference set |
+| `complexity` | Solution complexity (code length, cyclomatic complexity) |
+
+You can also use **custom features** from your evaluator. Any numeric metric returned by the evaluator can serve as a feature dimension.
+
+### Island Architecture
+
+Each island maintains its own independent MAP-Elites grid and population:
+
+- **Independent populations** — islands evolve separately, each exploring different regions of the feature space
+- **Migration** — periodically, top programs are copied between adjacent islands (ring topology). Programs are copied, not moved, so the source island retains them
+- **Independent MAP-Elites grids** — each island has its own archive, preventing one island's discoveries from overwriting another's diversity
+
+---
+
+## Configuration
+
+### CLI
+
+```bash
+uv run skydiscover-run initial_program.py evaluator.py \
+  --search openevolve_native \
+  --iterations 200
+```
+
+### Full Configuration
+
+```yaml
+max_iterations: 200
+diff_based_generation: true
+
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+
+search:
+  type: "openevolve_native"
+  database:
+    num_islands: 5
+    population_size: 40
+    archive_size: 100
+    feature_dimensions:
+      - "complexity"
+      - "diversity"
+    feature_bins: 10
+    exploration_ratio: 0.2
+    exploitation_ratio: 0.7
+    elite_selection_ratio: 0.1
+    diversity_reference_size: 20
+    migration_interval: 10
+    migration_rate: 0.1
+
+prompt:
+  system_message: |
+    You are an expert algorithm designer.
+```
+
+### Config Options
+
+| Option | Default | Description |
+|:-------|:--------|:------------|
+| `num_islands` | `5` | Number of independent island populations |
+| `population_size` | `40` | Maximum programs per island |
+| `archive_size` | `100` | Maximum programs in the MAP-Elites archive per island |
+| `feature_dimensions` | `["complexity", "diversity"]` | Feature dimensions for the MAP-Elites grid |
+| `feature_bins` | `10` | Number of bins per feature dimension (single value for all, or list for per-dimension) |
+| `exploration_ratio` | `0.2` | Probability of sampling a random parent (exploration) |
+| `exploitation_ratio` | `0.7` | Probability of sampling the best parent (exploitation) |
+| `elite_selection_ratio` | `0.1` | Probability of sampling from the archive elite |
+| `diversity_reference_size` | `20` | Number of reference programs for diversity computation |
+| `migration_interval` | `10` | Iterations between migration events |
+| `migration_rate` | `0.1` | Fraction of population migrated per event |
+
+<Note>
+  `feature_bins` can be a single integer (same bins for all dimensions) or a list of integers (one per dimension) for asymmetric binning. For example, `feature_bins: [5, 20]` uses 5 bins for the first dimension and 20 for the second.
+</Note>
+
+---
+
+## How It Works
+
+### Sampling Strategy
+
+Each iteration randomly selects one of three strategies:
+
+| Strategy | Probability | Description |
+|:---------|:------------|:------------|
+| **Exploitation** | `exploitation_ratio` (70%) | Select the highest-scoring program as parent |
+| **Exploration** | `exploration_ratio` (20%) | Select a random program as parent |
+| **Elite selection** | `elite_selection_ratio` (10%) | Select from the MAP-Elites archive elite |
+
+### MAP-Elites Insertion
+
+When a new program is evaluated:
+
+1. **Calculate features** — compute the program's feature values (complexity, diversity, custom metrics)
+2. **Find cell** — discretize features into bin indices to locate the target cell
+3. **Compare** — if the cell is empty, insert. If occupied, replace only if the new program's `combined_score` is higher
+4. **Update** — update island population and archive statistics
+
+### Migration
+
+Migration follows a **ring topology** — island `i` sends programs to island `(i + 1) % num_islands`:
+
+- Programs are **copied, not moved** — the source island retains the migrant
+- `migration_rate` controls how many programs migrate (fraction of population)
+- Migration injects diversity from neighboring islands without destroying the source population
+
+---
+
+## When to Use OpenEvolve Native
+
+<CardGroup cols={2}>
+  <Card title="Best For" icon="check">
+    - Problems with meaningful custom features from the evaluator
+    - Long runs where quality-diversity exploration pays off
+    - Tasks where you want diverse solutions, not just the single best
+    - Multi-dimensional optimization landscapes
+  </Card>
+  <Card title="Avoid When" icon="xmark">
+    - Simple problems where greedy Top-K suffices
+    - Very short runs (< 30 iterations) — MAP-Elites needs coverage time
+    - No meaningful feature dimensions — archive degenerates without useful features
+  </Card>
+</CardGroup>
+
+---
+
+## Example: Sorting Algorithm with Custom Features
+
+Use evaluator metrics as feature dimensions to explore diverse sorting strategies:
+
+```python
+def evaluate(program_path):
+    """Evaluator that returns custom features for MAP-Elites."""
+    comparisons, swaps, time_ms = benchmark_sort(program_path)
+
+    return {
+        "combined_score": 1.0 / (comparisons + 1),
+        "comparisons": comparisons,
+        "swaps": swaps,
+        "time_ms": time_ms,
+    }
+```
+
+```yaml
+search:
+  type: "openevolve_native"
+  database:
+    feature_dimensions:
+      - "comparisons"
+      - "swaps"
+    feature_bins: 8
+```
+
+This creates an 8x8 MAP-Elites grid that preserves the best sorting algorithm for each combination of comparison count and swap count — discovering solutions that trade off differently between the two.
+
+---
+
+## Monitoring
+
+### Island Status
+
+Track each island's population size, best score, and MAP-Elites coverage:
+
+| Metric | Description |
+|:-------|:------------|
+| Population size | Number of programs per island |
+| Best score | Highest `combined_score` per island |
+| Archive coverage | Fraction of MAP-Elites cells filled |
+| Archive quality | Average score across filled cells |
+
+### Feature Space Visualization
+
+Generate a heatmap of the MAP-Elites archive:
+
+```python
+import numpy as np
+import matplotlib.pyplot as plt
+
+def visualize_archive(database, island_idx=0):
+    island = database.islands[island_idx]
+    grid = np.full((database.feature_bins, database.feature_bins), np.nan)
+
+    for cell_key, program in island.archive.items():
+        i, j = cell_key
+        grid[i][j] = program.metrics.get("combined_score", 0)
+
+    plt.imshow(grid, cmap="viridis", origin="lower")
+    plt.colorbar(label="Score")
+    plt.xlabel(database.feature_dimensions[0])
+    plt.ylabel(database.feature_dimensions[1])
+    plt.title(f"MAP-Elites Archive — Island {island_idx}")
+    plt.show()
+```
+
+---
+
+## Advanced
+
+### Custom Feature Bins Per Dimension
+
+Use different granularity for different features:
+
+```yaml
+search:
+  database:
+    feature_dimensions:
+      - "score"
+      - "complexity"
+    feature_bins: [5, 20]   # 5 bins for score, 20 for complexity
+```
+
+This is useful when one feature has a wider range or more meaningful variation than another.
+
+### Asymmetric Migration
+
+Adjust migration parameters to control diversity injection:
+
+```yaml
+search:
+  database:
+    migration_interval: 5     # migrate more frequently
+    migration_rate: 0.2       # migrate more programs
+```
+
+---
+
+## Comparison
+
+| Feature | OpenEvolve Native | AdaEvolve | Top-K |
+|:--------|:------------------|:----------|:------|
+| MAP-Elites archive | Yes — per-island grids | No | No |
+| Island populations | Yes — ring migration | Yes — UCB selection | No |
+| Quality-diversity | Yes — feature-based cells | Pareto-based diversity | No |
+| Adaptive intensity | No | Yes — improvement signal | No |
+| Paradigm breakthrough | No | Yes | No |
+| Custom features | Yes — evaluator metrics | No | No |
+
+---
+
+## Tips
+
+- **Choose meaningful features** — the archive is only as useful as the feature dimensions. Use evaluator metrics that capture different aspects of solution quality
+- **Balance bins** — 8–12 bins per dimension works well. Too few bins lose granularity; too many create sparse archives
+- **Tune exploration/exploitation** — start with the default 20/70/10 split, then adjust based on coverage rates
+- **Monitor archive coverage** — if coverage is low after many iterations, features may not be discriminative enough
+- **Use custom features** — any numeric metric from your evaluator can be a feature dimension

@@ -1,0 +1,336 @@
+---
+title: "Monitoring"
+description: "Watch your discovery runs in real-time with the live dashboard"
+---
+
+## Overview
+
+SkyDiscover includes a live dashboard that lets you watch your discovery run in real-time. It features scatter plots of all solutions, code inspection with syntax highlighting, metrics panels, AI-generated summaries, and a human feedback interface to steer evolution.
+
+## Quick Start
+
+1. Enable the monitor in your config:
+
+```yaml
+monitor:
+  enabled: true
+```
+
+2. Run your discovery:
+
+```bash
+skydiscover-run initial_program.py evaluator.py -c config.yaml
+```
+
+3. Open the URL printed at startup (default: `http://127.0.0.1:8765`).
+
+## Configuration
+
+### Basic Settings
+
+```yaml
+monitor:
+  enabled: true
+  port: 8765
+  host: "127.0.0.1"
+  max_solution_length: 10000
+```
+
+### AI Summaries
+
+The dashboard can generate periodic AI summaries of the discovery progress:
+
+```yaml
+monitor:
+  enabled: true
+  summary_model: "gpt-5-mini"
+  summary_api_base: "https://api.openai.com/v1"
+  summary_api_key: "${OPENAI_API_KEY}"
+  summary_top_k: 3
+  summary_interval: 10    # generate summary every 10 iterations (0 = manual only)
+```
+
+### Human Feedback
+
+Provide feedback during a run to steer evolution. Feedback is injected into the LLM prompt for subsequent iterations:
+
+```yaml
+human_feedback_enabled: true
+human_feedback_file: "feedback.md"
+human_feedback_mode: "append"   # or "replace"
+```
+
+You can also submit feedback through the dashboard's Human Feedback panel.
+
+## Dashboard Features
+
+### Scatter Plot
+
+The main visualization shows every evaluated program:
+
+- **X-axis**: Iteration number
+- **Y-axis**: `combined_score`
+- **Color gradient**: Score intensity (darker = higher)
+- **Lineage arrows**: Lines connect parent programs to their children
+- **Click** any point to inspect its code in the code inspector
+
+### Metrics Panel
+
+Real-time statistics updated after every evaluation:
+
+| Metric | Description |
+|--------|-------------|
+| Best Score | Highest `combined_score` achieved |
+| Programs Evaluated | Total number of candidates scored |
+| Success Rate | Fraction of programs with a non-zero score |
+| Avg Improvement | Mean score improvement per iteration |
+| Runtime | Elapsed wall-clock time |
+
+### Code Inspector
+
+Click a point on the scatter plot to open the code inspector:
+
+- Syntax-highlighted source code
+- All evaluation metrics for that program
+- Parent ID and lineage
+- Model that generated the solution
+- Timestamp
+
+### Progress Chart
+
+A line chart showing the evolution of scores over time:
+
+- **Best score line**: Running maximum
+- **Current points**: Score of each new candidate
+- **Moving average**: Smoothed trend line
+
+### AI Summary Panel
+
+Click "Generate Summary" or enable automatic summaries with `summary_interval`. The summary highlights:
+
+- Top-performing approaches
+- Common failure modes
+- Suggested directions for improvement
+
+## Remote Access
+
+### SSH Tunnel
+
+Access the dashboard from a remote machine through an SSH tunnel:
+
+```bash
+ssh -L 8765:localhost:8765 user@remote-host
+```
+
+Then open `http://localhost:8765` in your local browser.
+
+### Public Access
+
+<Warning>
+  Exposing the dashboard publicly is not recommended — it has no authentication.
+</Warning>
+
+To bind to all interfaces:
+
+```yaml
+monitor:
+  host: "0.0.0.0"
+  port: 8765
+```
+
+## Programmatic Access
+
+### Python API
+
+Enable monitoring through the Python API:
+
+```python
+from skydiscover import run_discovery
+from skydiscover.config import Config, MonitorConfig
+
+config = Config(
+    monitor=MonitorConfig(
+        enabled=True,
+        port=8765,
+        summary_model="gpt-5-mini",
+    ),
+)
+
+result = run_discovery(
+    evaluator="evaluator.py",
+    config=config,
+    search="adaevolve",
+    iterations=100,
+)
+```
+
+### Custom Callbacks
+
+Use the monitor callback system for custom integrations:
+
+```python
+from skydiscover.extras.monitor.server import start_monitor
+from skydiscover.extras.monitor.callback import create_monitor_callback
+
+server, callback, feedback_reader = start_monitor(config.monitor, output_dir)
+```
+
+## Event Stream
+
+The dashboard communicates over WebSocket. You can connect a custom client to receive real-time events.
+
+### Server-to-Client Events
+
+**`init_state`** — Sent on connection with full state:
+
+```json
+{
+  "type": "init_state",
+  "programs": [...],
+  "best_program_id": "abc123",
+  "stats": {"best_score": 0.95, "total_evaluated": 150},
+  "config_summary": {...},
+  "summary_text": "..."
+}
+```
+
+**`new_program`** — Emitted for each evaluated candidate:
+
+```json
+{
+  "type": "new_program",
+  "program": {
+    "id": "def456",
+    "iteration": 42,
+    "score": 0.87,
+    "metrics": {"combined_score": 0.87, "validity": 1.0},
+    "parent_id": "abc123",
+    "label_type": "improved",
+    "solution_snippet": "def solve(x): ...",
+    "island": 0
+  },
+  "stats": {"best_score": 0.95, "total_evaluated": 151},
+  "is_best": false
+}
+```
+
+**`summary_update`** — AI-generated summary:
+
+```json
+{
+  "type": "summary_update",
+  "text": "After 100 iterations, the best approach uses..."
+}
+```
+
+**`discovery_complete`** — Run finished:
+
+```json
+{
+  "type": "discovery_complete"
+}
+```
+
+**`heartbeat`** — Periodic keepalive (every 5 seconds):
+
+```json
+{
+  "type": "heartbeat"
+}
+```
+
+### Client-to-Server Messages
+
+| Message Type | Purpose |
+|-------------|---------|
+| `request_full_state` | Re-fetch full state |
+| `request_program_solution` | Get full source code for a program |
+| `set_feedback` | Submit human feedback text |
+| `clear_feedback` | Clear current feedback |
+| `request_summary` | Trigger AI summary generation |
+| `request_program_summary` | Generate AI summary for a specific program |
+
+## Offline Viewer
+
+Replay a completed run from a checkpoint directory:
+
+```bash
+skydiscover-viewer /path/to/checkpoints/checkpoint_100
+```
+
+Options:
+
+```bash
+skydiscover-viewer /path/to/checkpoint --port 9000 --summary-model gpt-5-mini
+```
+
+The viewer loads all programs from the checkpoint and serves the same dashboard interface.
+
+## Performance Tips
+
+- Set `max_solution_length` to limit the amount of source code sent to the browser (default: 10,000 characters).
+- Use `summary_interval: 0` (manual only) to avoid automatic summary API calls.
+- For very long runs (1000+ iterations), the scatter plot may slow down. The dashboard automatically samples points for rendering.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Dashboard not loading">
+    Check that `monitor.enabled` is `true` in your config and the port is not in use:
+
+    ```bash
+    lsof -i :8765
+    ```
+  </Accordion>
+
+  <Accordion title="No points appearing">
+    The scatter plot updates after each evaluation completes. If evaluations are slow, wait for the first one to finish. Check the terminal for errors.
+  </Accordion>
+
+  <Accordion title="AI summaries not generating">
+    Verify that `summary_model` is set and the API key for that model is available. Check `summary_api_base` if using a non-OpenAI model.
+  </Accordion>
+
+  <Accordion title="WebSocket disconnects">
+    The dashboard automatically reconnects. If the run has finished, use `skydiscover-viewer` to replay from checkpoint.
+  </Accordion>
+</AccordionGroup>
+
+## Example Configurations
+
+### Minimal
+
+```yaml
+monitor:
+  enabled: true
+```
+
+### With AI Summaries
+
+```yaml
+monitor:
+  enabled: true
+  summary_model: "gpt-5-mini"
+  summary_interval: 10
+  summary_top_k: 5
+```
+
+### With Human Feedback
+
+```yaml
+monitor:
+  enabled: true
+human_feedback_enabled: true
+human_feedback_file: "feedback.md"
+human_feedback_mode: "append"
+```
+
+### Remote Access
+
+```yaml
+monitor:
+  enabled: true
+  host: "0.0.0.0"
+  port: 8765
+  summary_model: "gpt-5-mini"
+```

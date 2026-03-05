@@ -1,0 +1,261 @@
+---
+title: "Benchmarks"
+description: "200+ optimization tasks spanning math, systems, algorithms, and reasoning"
+---
+
+## Overview
+
+SkyDiscover ships with a comprehensive benchmark suite spanning mathematical optimization, real-world systems, GPU kernels, competitive programming, reasoning, and creative tasks. Use these benchmarks to evaluate search algorithms, compare model providers, or learn from working examples.
+
+## Quick Stats
+
+| Category | Benchmarks | Domain |
+|----------|-----------|--------|
+| Math | 14 | Circle packing, Heilbronn problems, geometric optimization |
+| Systems (ADRS) | 5 | Cloud scheduling, load balancing, database optimization |
+| GPU Kernels | 4 | Triton kernel optimization |
+| Algorithms (Frontier-CS) | 172 | Competitive programming |
+| Reasoning (ARC-AGI) | — | Visual reasoning |
+| Creative | 1 | AI image generation |
+| Prompts | 1 | HotPotQA prompt optimization |
+
+## Quick Start
+
+### Installation
+
+```bash
+uv sync                              # Base install
+uv sync --extra math                 # Math benchmarks
+uv sync --extra adrs                 # ADRS systems benchmarks
+uv sync --extra frontier-cs          # Frontier-CS benchmark tooling
+uv sync --extra prompt-optimization  # Prompt optimization
+```
+
+Combine extras as needed:
+
+```bash
+uv sync --extra math --extra adrs
+```
+
+### Running a Benchmark
+
+```bash
+uv run skydiscover-run \
+  benchmarks/math/circle_packing/initial_program.py \
+  benchmarks/math/circle_packing/evaluator.py \
+  --config benchmarks/math/circle_packing/config.yaml \
+  --search adaevolve \
+  --iterations 100
+```
+
+## Benchmark Catalog
+
+### Math Benchmarks
+
+Mathematical optimization problems inspired by the AlphaEvolve paper.
+
+<AccordionGroup>
+  <Accordion title="Circle Packing">
+    **Path:** `benchmarks/math/circle_packing/`
+
+    Pack circles inside a unit square to maximize the sum of radii. Targets the known optimum of 2.635.
+
+    ```bash
+    uv run skydiscover-run \
+      benchmarks/math/circle_packing/initial_program.py \
+      benchmarks/math/circle_packing/evaluator.py \
+      -c benchmarks/math/circle_packing/config.yaml \
+      -s adaevolve -i 100
+    ```
+  </Accordion>
+
+  <Accordion title="Heilbronn Triangle">
+    **Path:** `benchmarks/math/heilbronn_triangle/`
+
+    Place N points in a unit square to maximize the area of the smallest triangle formed by any three points.
+
+    ```bash
+    uv run skydiscover-run \
+      benchmarks/math/heilbronn_triangle/initial_program.py \
+      benchmarks/math/heilbronn_triangle/evaluator.py \
+      -c benchmarks/math/heilbronn_triangle/config.yaml \
+      -s adaevolve -i 100
+    ```
+  </Accordion>
+
+  <Accordion title="Erdos Minimum Overlap">
+    **Path:** `benchmarks/math/erdos_min_overlap/`
+
+    Minimize the overlap in Erdos's minimum overlap problem for finite sets.
+
+    ```bash
+    uv run skydiscover-run \
+      benchmarks/math/erdos_min_overlap/initial_program.py \
+      benchmarks/math/erdos_min_overlap/evaluator.py \
+      -c benchmarks/math/erdos_min_overlap/config.yaml \
+      -s adaevolve -i 100
+    ```
+  </Accordion>
+
+  <Accordion title="Autocorrelation Inequalities">
+    **Path:** `benchmarks/math/autocorrelation_inequality_1st/`, `autocorrelation_inequality_2nd/`, `autocorrelation_inequality_3rd/`
+
+    Three variants of autocorrelation inequality problems from extremal combinatorics.
+  </Accordion>
+</AccordionGroup>
+
+**All math benchmarks:**
+
+| Benchmark | Path |
+|-----------|------|
+| Signal Processing | `benchmarks/math/signal_processing/` |
+| Autocorrelation Inequality (1st) | `benchmarks/math/autocorrelation_inequality_1st/` |
+| Autocorrelation Inequality (2nd) | `benchmarks/math/autocorrelation_inequality_2nd/` |
+| Autocorrelation Inequality (3rd) | `benchmarks/math/autocorrelation_inequality_3rd/` |
+| Uncertainty Inequality | `benchmarks/math/uncertainty_inequality/` |
+| Erdos Min Overlap | `benchmarks/math/erdos_min_overlap/` |
+| Sums and Diffs of Finite Sets | `benchmarks/math/sums_diffs_finite_sets/` |
+| Hexagon Packing (11) | `benchmarks/math/hexagon_packing_11/` |
+| Hexagon Packing (12) | `benchmarks/math/hexagon_packing_12/` |
+| Max/Min Distance | `benchmarks/math/max_min_distance/` |
+| Heilbronn Convex (13) | `benchmarks/math/heilbronn_convex_13/` |
+| Heilbronn Convex (14) | `benchmarks/math/heilbronn_convex_14/` |
+| Circle Packing in Rectangle | `benchmarks/math/circle_packing_in_rectangle/` |
+| Matrix Multiplication | `benchmarks/math/matrix_multiplication/` |
+
+### Systems Benchmarks (ADRS)
+
+Real-world systems optimization problems from the ADRS initiative.
+
+| Benchmark | Path | Problem |
+|-----------|------|---------|
+| CloudCast | `benchmarks/ADRS/cloudcast/` | Multi-cloud data transfer cost minimization |
+| EPLB | `benchmarks/ADRS/eplb/` | Mixture-of-Experts load balancing |
+| Prism | `benchmarks/ADRS/prism/` | GPU model placement for KV-cache efficiency |
+| Transaction Scheduling | `benchmarks/ADRS/transaction_scheduling/` | Database transaction ordering |
+| LLM-SQL | `benchmarks/ADRS/llm_sql/` | Column reordering for LLM-based SQL queries |
+
+Install with:
+
+```bash
+uv sync --extra adrs
+```
+
+### GPU Kernels
+
+Triton GPU kernel optimization benchmarks:
+
+| Benchmark | Path |
+|-----------|------|
+| MLA Decode | `benchmarks/gpu_mode/mla_decode/` |
+| Trimul | `benchmarks/gpu_mode/trimul/` |
+| Grayscale | `benchmarks/gpu_mode/grayscale/` |
+| Vector Addition | `benchmarks/gpu_mode/vecadd/` |
+
+### Competitive Programming (Frontier-CS)
+
+172 algorithmic challenges from the [Frontier-CS](https://frontier-cs.org/) benchmark covering dynamic programming, graph algorithms, geometry, data structures, greedy algorithms, number theory, and combinatorics.
+
+**Setup:**
+
+```bash
+uv sync --extra frontier-cs
+
+# Clone and start the Docker judge
+git clone https://github.com/frontier-cs-org/frontier-cs-judge.git
+cd frontier-cs-judge
+docker compose up -d
+```
+
+**Run a single problem:**
+
+```bash
+FRONTIER_CS_PROBLEM=problem_001 uv run skydiscover-run \
+  benchmarks/frontier-cs-eval/initial_program.cpp \
+  benchmarks/frontier-cs-eval/evaluator.py \
+  -c benchmarks/frontier-cs-eval/config.yaml \
+  -s adaevolve -i 100
+```
+
+### ARC-AGI Reasoning
+
+Visual reasoning tasks from the ARC-AGI benchmark:
+
+**Path:** `benchmarks/arc_benchmark/`
+
+### AI Image Generation
+
+Evolve image generation prompts and parameters:
+
+**Path:** `benchmarks/image_gen/`
+
+### Prompt Optimization (HotPotQA)
+
+Optimize prompts for question-answering tasks:
+
+**Path:** `benchmarks/prompt_optimization/`
+
+```bash
+uv sync --extra prompt-optimization
+uv run skydiscover-run \
+  benchmarks/prompt_optimization/initial_prompt.txt \
+  benchmarks/prompt_optimization/evaluator.py \
+  -c benchmarks/prompt_optimization/config.yaml \
+  -s adaevolve -i 50
+```
+
+## Benchmark Structure
+
+Every benchmark follows the same layout:
+
+```
+benchmark_name/
+├── initial_program.py    # Starting solution with EVOLVE-BLOCK markers
+├── evaluator.py          # Scoring function (evaluate(program_path) -> dict)
+├── config.yaml           # Algorithm and model configuration
+└── README.md             # Problem description and references
+```
+
+- `initial_program.py` — The seed solution. Contains `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END` markers around the region to mutate.
+- `evaluator.py` — Must define `evaluate(program_path)` returning a dict with `combined_score`.
+- `config.yaml` — Sets the LLM, search algorithm, and evaluator parameters.
+
+## Creating Your Own Benchmark
+
+1. **Write an evaluator** with `evaluate(program_path)` that returns `{"combined_score": ...}`.
+2. **Write an initial program** (optional) with EVOLVE-BLOCK markers.
+3. **Create a config YAML** with LLM and search settings.
+4. **Run it:**
+
+```bash
+skydiscover-run my_benchmark/initial_program.py \
+  my_benchmark/evaluator.py \
+  -c my_benchmark/config.yaml \
+  -s adaevolve -i 100
+```
+
+See the [Custom Problems guide](/examples/custom-problems) for detailed instructions.
+
+## Performance Comparison
+
+Across ~200 optimization benchmarks, AdaEvolve and EvoX achieve the strongest open-source results:
+
+| Metric | Result |
+|--------|--------|
+| Frontier-CS (172 problems) | ~34% median score improvement over OpenEvolve, GEPA, ShinkaEvolve |
+| Math + Systems (12 tasks) | Matches/exceeds AlphaEvolve and human SOTA on 12/14 tasks |
+| Cross-cloud transfer cost | 41% lower (CloudCast) |
+| GPU load balance | 14% better (EPLB) |
+| KV-cache pressure | 29% lower (Prism) |
+
+## Category Summary
+
+| Category | Count | Install Extra | Description |
+|----------|-------|---------------|-------------|
+| Math | 14 | `--extra math` | Geometric optimization, combinatorics |
+| Systems | 5 | `--extra adrs` | Cloud, MoE, GPU, database |
+| GPU | 4 | *(base)* | Triton kernel optimization |
+| Algorithms | 172 | `--extra frontier-cs` | Competitive programming |
+| Reasoning | — | *(base)* | ARC-AGI visual reasoning |
+| Creative | 1 | *(base)* | Image generation |
+| Prompts | 1 | `--extra prompt-optimization` | HotPotQA QA |

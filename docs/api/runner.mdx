@@ -1,0 +1,234 @@
+---
+title: "Runner"
+description: "Top-level class for managing discovery runs with checkpointing and monitoring"
+---
+
+## Class Signature
+
+```python
+class Runner:
+    def __init__(
+        self,
+        evaluation_file: str,
+        initial_program_path: Optional[str] = None,
+        config_path: Optional[str] = None,
+        config: Optional[Config] = None,
+        output_dir: Optional[str] = None,
+    )
+```
+
+## Description
+
+`Runner` is the top-level entry point for managing a complete SkyDiscover discovery run. It orchestrates the entire lifecycle: loading configuration, creating the program database, initializing the discovery controller, running the evolutionary loop, saving checkpoints, and producing final reports.
+
+In most cases you will use [`run_discovery`](/api/run-discovery) or [`discover_solution`](/api/discover-solution) instead of `Runner` directly. Use `Runner` when you need fine-grained control over the discovery lifecycle — for example, to access the database mid-run, resume from checkpoints, or integrate with custom monitoring.
+
+## Constructor Parameters
+
+<ParamField path="evaluation_file" type="str" required>
+  Path to the evaluator Python file. Must define an `evaluate(program_path)` function that returns a dictionary with at least a `combined_score` key.
+</ParamField>
+
+<ParamField path="initial_program_path" type="Optional[str]" default="None">
+  Path to the initial program file. When `None`, the LLM generates a solution from scratch.
+</ParamField>
+
+<ParamField path="config_path" type="Optional[str]" default="None">
+  Path to a YAML configuration file. Ignored if `config` is provided directly.
+</ParamField>
+
+<ParamField path="config" type="Optional[Config]" default="None">
+  A [`Config`](/config/overview) object. Takes precedence over `config_path`.
+</ParamField>
+
+<ParamField path="output_dir" type="Optional[str]" default="None">
+  Directory for writing results, checkpoints, and logs. Auto-generated from the search algorithm name and timestamp when not specified.
+</ParamField>
+
+## Key Methods
+
+### `run`
+
+```python
+async def run(
+    self,
+    iterations: Optional[int] = None,
+    checkpoint_path: Optional[str] = None,
+) -> Optional[Program]
+```
+
+The main discovery loop. Initializes (or resumes) the search, evaluates the initial program, runs the controller for the specified number of iterations, and saves the best solution.
+
+<ParamField path="iterations" type="Optional[int]" default="None">
+  Maximum iterations to run. Falls back to `config.max_iterations` when not specified.
+</ParamField>
+
+<ParamField path="checkpoint_path" type="Optional[str]" default="None">
+  Path to a checkpoint directory to resume from. When provided, the database and iteration counter are restored from the checkpoint.
+</ParamField>
+
+**Returns:** The best `Program` found, or `None` if no valid programs were produced.
+
+**What `run` does internally:**
+
+1. **Initialize or resume** — If `checkpoint_path` is provided, loads the database and determines the starting iteration. Otherwise starts fresh.
+2. **Add initial program** — If an initial program was provided and this is a fresh run, evaluates it and adds it to the database.
+3. **Run the controller** — Calls `discovery_controller.run()` which drives the sample → prompt → generate → evaluate loop.
+4. **Save checkpoints** — Periodically saves the database and best program at intervals defined by `config.checkpoint_interval`.
+5. **Save best program** — Writes the best solution to `best_program.py` in the output directory.
+6. **Generate reports** — Produces a summary of the run including metrics history and improvement trajectory.
+
+### `_add_initial_program`
+
+```python
+async def _add_initial_program(self, start_iteration: int) -> None
+```
+
+Evaluates the seed program and adds it to the database as the first entry. This establishes the baseline score (`initial_score` in [`DiscoveryResult`](/api/discovery-result)).
+
+## Responsibilities
+
+The `Runner` class manages:
+
+- **Configuration** — Loads and validates the [`Config`](/config/overview) from a YAML file or `Config` object
+- **Database** — Creates the appropriate `ProgramDatabase` for the selected search algorithm
+- **Controller** — Instantiates the `DiscoveryController` with the evaluator, LLM pool, and context builder
+- **Monitor** — Starts the live monitoring dashboard if `monitor.enabled` is `True`
+- **Loop execution** — Drives the evolutionary loop with parallel iteration support
+- **Checkpointing** — Saves database snapshots at regular intervals for resumability
+- **Best program** — Tracks and saves the best solution found across all iterations
+
+## Usage Examples
+
+### Basic Usage
+
+```python
+import asyncio
+from skydiscover.runner import Runner
+
+async def main():
+    runner = Runner(
+        evaluation_file="evaluator.py",
+        initial_program_path="solution.py",
+        output_dir="outputs/my_run",
+    )
+    best = await runner.run(iterations=100)
+
+    if best:
+        print(f"Best score: {best.metrics.get('combined_score', 0):.4f}")
+        print(f"Solution:\n{best.solution}")
+
+asyncio.run(main())
+```
+
+### With Monitoring
+
+```python
+import asyncio
+from skydiscover.runner import Runner
+from skydiscover.config import Config, MonitorConfig
+
+async def main():
+    config = Config(
+        monitor=MonitorConfig(enabled=True, port=8765),
+    )
+    runner = Runner(
+        evaluation_file="evaluator.py",
+        initial_program_path="solution.py",
+        config=config,
+    )
+    best = await runner.run(iterations=100)
+
+asyncio.run(main())
+```
+
+### Resume from Checkpoint
+
+```python
+import asyncio
+from skydiscover.runner import Runner
+
+async def main():
+    runner = Runner(
+        evaluation_file="evaluator.py",
+        initial_program_path="solution.py",
+        output_dir="outputs/my_run",
+    )
+    best = await runner.run(
+        iterations=200,
+        checkpoint_path="outputs/my_run/checkpoints/checkpoint_100",
+    )
+
+asyncio.run(main())
+```
+
+### Custom Config
+
+```python
+import asyncio
+from skydiscover.runner import Runner
+from skydiscover.config import (
+    Config, LLMConfig, LLMModelConfig,
+    SearchConfig, AdaEvolveDatabaseConfig,
+)
+
+async def main():
+    config = Config(
+        max_iterations=200,
+        checkpoint_interval=25,
+        llm=LLMConfig(
+            models=[
+                LLMModelConfig(name="gpt-5", weight=0.7),
+                LLMModelConfig(name="gemini/gemini-3-pro-preview", weight=0.3),
+            ],
+        ),
+        search=SearchConfig(
+            type="adaevolve",
+            database=AdaEvolveDatabaseConfig(
+                population_size=30,
+                num_islands=3,
+            ),
+        ),
+    )
+    runner = Runner(
+        evaluation_file="evaluator.py",
+        initial_program_path="solution.py",
+        config=config,
+        output_dir="outputs/custom_run",
+    )
+    best = await runner.run()
+
+asyncio.run(main())
+```
+
+### Accessing the Database During a Run
+
+For advanced use cases, you can access the internal database after the run completes:
+
+```python
+import asyncio
+from skydiscover.runner import Runner
+
+async def main():
+    runner = Runner(
+        evaluation_file="evaluator.py",
+        initial_program_path="solution.py",
+    )
+    best = await runner.run(iterations=50)
+
+    db = runner.database
+    all_programs = db.get_all_programs()
+    print(f"Total programs evaluated: {len(all_programs)}")
+
+    for prog in sorted(all_programs, key=lambda p: p.metrics.get("combined_score", 0), reverse=True)[:5]:
+        print(f"  Score: {prog.metrics.get('combined_score', 0):.4f} (gen {prog.generation})")
+
+asyncio.run(main())
+```
+
+## See Also
+
+- [`run_discovery`](/api/run-discovery) — Higher-level function that wraps `Runner`
+- [`discover_solution`](/api/discover-solution) — Convenience wrapper for callable evaluators
+- [`DiscoveryResult`](/api/discovery-result) — Result object returned by discovery functions
+- [Configuration Overview](/config/overview) — Full configuration reference

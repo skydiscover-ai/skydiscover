@@ -1,0 +1,173 @@
+---
+title: "skydiscover-run"
+description: "Main CLI command to run SkyDiscover evolutionary discovery"
+---
+
+## Synopsis
+
+```bash
+skydiscover-run [INITIAL_PROGRAM] EVALUATOR [OPTIONS]
+```
+
+## Description
+
+`skydiscover-run` is the main command for running an evolutionary discovery process from the command line. It takes an evaluator file (and optionally an initial program), selects a search algorithm, and iteratively evolves better solutions using LLM-powered mutations.
+
+## Positional Arguments
+
+<ParamField path="INITIAL_PROGRAM" type="str" required={false}>
+  Path to the initial program file. This is optional — when omitted, the LLM generates a solution from scratch. The file should contain the starting solution with optional `EVOLVE-BLOCK-START` / `EVOLVE-BLOCK-END` markers to restrict which code is mutated.
+</ParamField>
+
+<ParamField path="EVALUATOR" type="str" required>
+  Path to the evaluation file. Must define an `evaluate(program_path)` function that returns a dictionary with at least a `combined_score` key.
+</ParamField>
+
+## Options
+
+### General
+
+| Flag | Short | Type | Default | Description |
+|:---|:---|:---|:---|:---|
+| `--config` | `-c` | `str` | `None` | Path to a YAML configuration file |
+| `--output` | `-o` | `str` | auto | Output directory for results, checkpoints, and logs |
+| `--log-level` | `-l` | `str` | `INFO` | Logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+
+### Discovery
+
+| Flag | Short | Type | Default | Description |
+|:---|:---|:---|:---|:---|
+| `--iterations` | `-i` | `int` | `100` | Maximum number of evolutionary iterations |
+| `--search` | `-s` | `str` | `topk` | Search algorithm (see values below) |
+| `--checkpoint` | — | `str` | `None` | Path to a checkpoint directory to resume from |
+
+**Valid `--search` values:**
+
+| Value | Algorithm |
+|:---|:---|
+| `topk` | Top-K elitist selection |
+| `adaevolve` | Adaptive multi-island evolution |
+| `evox` | Co-evolutionary meta-learning |
+| `beam_search` | Beam search with diversity |
+| `best_of_n` | Best-of-N parallel sampling |
+| `openevolve_native` | OpenEvolve native reimplementation |
+| `gepa_native` | GEPA native reimplementation |
+| `openevolve` | OpenEvolve external backend |
+| `shinkaevolve` | ShinkaEvolve external backend |
+| `gepa` | GEPA external backend |
+
+### Model
+
+| Flag | Short | Type | Default | Description |
+|:---|:---|:---|:---|:---|
+| `--model` | `-m` | `str` | config | LLM model name(s), comma-separated |
+| `--api-base` | — | `str` | `None` | Base URL for an OpenAI-compatible API |
+
+### Mode
+
+| Flag | Type | Default | Description |
+|:---|:---|:---|:---|
+| `--agentic` | flag | `False` | Enable agentic mode (LLM reads files and searches codebase before generating) |
+
+## Examples
+
+### Basic Run
+
+```bash
+uv run skydiscover-run initial_program.py evaluator.py
+```
+
+### With Model and Search Algorithm
+
+```bash
+uv run skydiscover-run initial_program.py evaluator.py \
+  --search adaevolve \
+  --model gpt-5 \
+  --iterations 200
+```
+
+### Multiple Models
+
+Pass comma-separated model names:
+
+```bash
+uv run skydiscover-run initial_program.py evaluator.py \
+  --model "gpt-5,gemini/gemini-3-pro-preview" \
+  --search evox
+```
+
+For weighted model pools, use a YAML config file instead.
+
+### Custom API Endpoint
+
+```bash
+uv run skydiscover-run evaluator.py \
+  --model ollama/llama3 \
+  --api-base http://localhost:11434/v1 \
+  --search topk \
+  --iterations 50
+```
+
+### From-Scratch Generation
+
+Omit the initial program to let the LLM generate a solution from scratch:
+
+```bash
+uv run skydiscover-run evaluator.py \
+  --search evox \
+  --model gpt-5 \
+  --iterations 100
+```
+
+### Agentic Mode
+
+```bash
+uv run skydiscover-run initial_program.py evaluator.py \
+  --search adaevolve \
+  --agentic
+```
+
+### Resume from Checkpoint
+
+```bash
+uv run skydiscover-run initial_program.py evaluator.py \
+  --search adaevolve \
+  --checkpoint outputs/adaevolve/my_run/checkpoints/checkpoint_50
+```
+
+### Full Example with Config
+
+```bash
+uv run skydiscover-run \
+  benchmarks/math/circle_packing/initial_program.py \
+  benchmarks/math/circle_packing/evaluator.py \
+  --config benchmarks/math/circle_packing/config.yaml \
+  --search adaevolve \
+  --model gpt-5 \
+  --iterations 100 \
+  --output outputs/circle_packing_run \
+  --log-level DEBUG
+```
+
+## Output Structure
+
+A completed run produces the following directory structure:
+
+```
+outputs/<algorithm>/<name>_<timestamp>/
+├── best_program.py          # Best solution found
+├── checkpoints/
+│   ├── checkpoint_10/       # Periodic database snapshots
+│   ├── checkpoint_20/
+│   └── ...
+├── logs/
+│   └── run.log              # Full run log
+└── programs/                # All evaluated programs
+```
+
+## See Also
+
+- [Quick Start](/quickstart) — Get started in under 5 minutes
+- [`skydiscover-viewer`](/cli/skydiscover-viewer) — Replay completed runs
+- [CLI Flags Reference](/cli/flags) — Complete flag reference
+- [Configuration Overview](/config/overview) — YAML configuration guide

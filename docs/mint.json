@@ -1,0 +1,136 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "SkyDiscover",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#0D9373",
+    "light": "#07C983",
+    "dark": "#0D9373",
+    "anchors": {
+      "from": "#0D9373",
+      "to": "#07C983"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/skydiscover-ai/skydiscover"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get Started",
+    "url": "/quickstart"
+  },
+  "tabs": [
+    {
+      "name": "Documentation",
+      "url": "/"
+    },
+    {
+      "name": "API Reference",
+      "url": "/api"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/skydiscover-ai/skydiscover"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Get Started",
+      "pages": [
+        "introduction",
+        "quickstart",
+        "installation"
+      ]
+    },
+    {
+      "group": "Core Concepts",
+      "pages": [
+        "concepts/overview",
+        "concepts/architecture",
+        "concepts/algorithms",
+        "concepts/evaluators",
+        "concepts/evolution-blocks"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/running-discovery",
+        "guides/writing-evaluators",
+        "guides/configuration",
+        "guides/model-providers",
+        "guides/monitoring",
+        "guides/benchmarks"
+      ]
+    },
+    {
+      "group": "Examples",
+      "pages": [
+        "examples/overview",
+        "examples/math-optimization",
+        "examples/systems-optimization",
+        "examples/algorithm-design",
+        "examples/custom-problems"
+      ]
+    },
+    {
+      "group": "Extending",
+      "pages": [
+        "extending/custom-algorithms",
+        "extending/custom-benchmarks",
+        "extending/context-builders"
+      ]
+    },
+    {
+      "group": "Algorithms",
+      "pages": [
+        "algorithms/adaevolve",
+        "algorithms/evox",
+        "algorithms/gepa-native",
+        "algorithms/openevolve-native",
+        "algorithms/beam-search",
+        "algorithms/best-of-n",
+        "algorithms/topk"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api/discover-solution",
+        "api/run-discovery",
+        "api/discovery-result",
+        "api/runner"
+      ]
+    },
+    {
+      "group": "CLI Reference",
+      "pages": [
+        "cli/skydiscover-run",
+        "cli/skydiscover-viewer",
+        "cli/flags"
+      ]
+    },
+    {
+      "group": "Configuration",
+      "pages": [
+        "config/overview",
+        "config/llm",
+        "config/search",
+        "config/prompt",
+        "config/monitor"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/skydiscover-ai/skydiscover"
+  }
+}

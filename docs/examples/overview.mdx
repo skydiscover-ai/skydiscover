@@ -1,0 +1,104 @@
+---
+title: "Examples Overview"
+description: "Real-world examples of using SkyDiscover across different optimization domains"
+---
+
+## Example Categories
+
+SkyDiscover ships with benchmarks across several domains:
+
+- **Math Optimization** — Circle packing, Heilbronn problems, geometric optimization, and extremal combinatorics
+- **Systems Optimization** — Cloud scheduling, MoE load balancing, GPU model placement, and database optimization
+- **Algorithm Design** — 172 competitive programming problems from Frontier-CS
+- **Custom Problems** — Build your own evaluator and initial program
+
+## Quick Start
+
+Every benchmark follows the same pattern:
+
+```bash
+skydiscover-run \
+  benchmarks/<category>/<problem>/initial_program.py \
+  benchmarks/<category>/<problem>/evaluator.py \
+  --config benchmarks/<category>/<problem>/config.yaml \
+  --search adaevolve \
+  --iterations 100
+```
+
+## Benchmark Structure
+
+Each benchmark directory contains three files:
+
+### Initial Program
+
+The starting solution with `EVOLVE-BLOCK` markers around the region to mutate:
+
+```python
+# EVOLVE-BLOCK-START
+def solve(input_data):
+    return input_data  # baseline — SkyDiscover will improve this
+# EVOLVE-BLOCK-END
+```
+
+If no markers are present, the entire file is treated as mutable. The initial program is optional — omit it to let the LLM start from scratch.
+
+### Evaluator
+
+A Python module with `evaluate(program_path)` that returns a dict with `combined_score`:
+
+```python
+def evaluate(program_path):
+    score = run_and_grade(program_path)
+    return {
+        "combined_score": score,
+        "validity": 1.0,
+    }
+```
+
+### Config YAML
+
+Sets the LLM, search algorithm, and evaluator parameters:
+
+```yaml
+max_iterations: 100
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+search:
+  type: "adaevolve"
+prompt:
+  system_message: |
+    You are an expert at optimizing algorithms.
+evaluator:
+  timeout: 120
+```
+
+## Available Benchmarks
+
+| Category | Count | Install Extra | Description |
+|----------|-------|---------------|-------------|
+| [Math](/examples/math-optimization) | 14 | `--extra math` | Circle packing, Heilbronn, geometric optimization |
+| [Systems](/examples/systems-optimization) | 5 | `--extra adrs` | Cloud scheduling, load balancing, database |
+| [GPU Kernels](/guides/benchmarks#gpu-kernels) | 4 | *(base)* | Triton kernel optimization |
+| [Algorithms](/examples/algorithm-design) | 172 | `--extra frontier-cs` | Competitive programming (C++) |
+| [Reasoning](/guides/benchmarks#arc-agi-reasoning) | — | *(base)* | ARC-AGI visual reasoning |
+| [Prompts](/guides/benchmarks#prompt-optimization-hotpotqa) | 1 | `--extra prompt-optimization` | HotPotQA question answering |
+
+## Installation
+
+Install the base package and benchmark-specific dependencies:
+
+```bash
+uv sync                              # Base
+uv sync --extra math                 # Math benchmarks
+uv sync --extra adrs                 # ADRS systems benchmarks
+uv sync --extra frontier-cs          # Frontier-CS competitive programming
+uv sync --extra prompt-optimization  # Prompt optimization
+```
+
+Combine extras as needed:
+
+```bash
+uv sync --extra math --extra adrs
+```

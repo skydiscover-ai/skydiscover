@@ -1,0 +1,211 @@
+---
+title: "Installation"
+description: "Install SkyDiscover and configure your development environment"
+---
+
+## System Requirements
+
+| Requirement | Details |
+|:---|:---|
+| **Python** | 3.10 – 3.13 |
+| **RAM** | 4 GB+ recommended |
+| **OS** | Linux, macOS, or Windows (WSL) |
+
+## Method 1: uv (Recommended)
+
+[uv](https://docs.astral.sh/uv/) is a fast Python package manager that handles virtual environments automatically.
+
+### Install uv
+
+```bash
+# macOS / Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+### Clone and Install
+
+```bash
+git clone https://github.com/skydiscover-ai/skydiscover.git
+cd skydiscover
+uv sync
+```
+
+This creates a virtual environment and installs all base dependencies.
+
+## Method 2: pip
+
+```bash
+git clone https://github.com/skydiscover-ai/skydiscover.git
+cd skydiscover
+pip install -e .
+```
+
+## Installing Extras
+
+SkyDiscover uses optional dependency groups for different benchmark suites and backends. Install the ones you need:
+
+```bash
+# Math benchmarks (SciPy, JAX, PyWavelets, etc.)
+uv sync --extra math
+
+# ADRS systems benchmarks
+uv sync --extra adrs
+
+# OpenEvolve / GEPA external backends
+uv sync --extra external
+
+# Frontier-CS competitive programming
+uv sync --extra frontier-cs
+
+# HotPotQA prompt optimization
+uv sync --extra prompt-optimization
+
+# Development tools (pytest, black, mypy)
+uv sync --extra dev
+```
+
+Combine extras as needed:
+
+```bash
+uv sync --extra math --extra external
+```
+
+If a benchmark ships its own `requirements.txt`, also run:
+
+```bash
+uv pip install -r path/to/requirements.txt
+```
+
+### Manual ShinkaEvolve Installation
+
+ShinkaEvolve requires manual installation from its repository:
+
+```bash
+git clone --depth 1 https://github.com/SakanaAI/ShinkaEvolve.git external_repos/ShinkaEvolve
+uv pip install -e external_repos/ShinkaEvolve
+```
+
+## Environment Variables
+
+SkyDiscover resolves API keys from environment variables automatically based on the model provider.
+
+| Variable | Provider | Required When |
+|:---|:---|:---|
+| `OPENAI_API_KEY` | OpenAI | Using GPT models (default) |
+| `GEMINI_API_KEY` | Google Gemini | Using `gemini/` prefixed models |
+| `ANTHROPIC_API_KEY` | Anthropic | Using `anthropic/` prefixed models |
+| `DEEPSEEK_API_KEY` | DeepSeek | Using `deepseek/` prefixed models |
+| `SKYDISCOVER_LOG_LEVEL` | SkyDiscover | Optional — set to `DEBUG`, `INFO`, `WARNING`, or `ERROR` |
+
+Set them in your shell:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+export GEMINI_API_KEY="AIza..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+Or add them to your shell profile (`~/.bashrc`, `~/.zshrc`, etc.) for persistence.
+
+## Verify Installation
+
+```bash
+uv run skydiscover-run --help
+```
+
+You should see the CLI help with available flags. To verify a full end-to-end setup:
+
+```bash
+uv sync --extra math
+uv run skydiscover-run benchmarks/math/circle_packing/initial_program.py \
+  benchmarks/math/circle_packing/evaluator.py \
+  --config benchmarks/math/circle_packing/config.yaml \
+  --search topk \
+  --iterations 1
+```
+
+## Model Configuration
+
+### Single Model
+
+Pass a model via CLI flag:
+
+```bash
+uv run skydiscover-run evaluator.py --model gpt-5
+```
+
+Or set it in a YAML config:
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+```
+
+### Multiple Models with Weighted Sampling
+
+SkyDiscover can sample from a pool of models with configurable weights:
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5-mini"
+      weight: 0.7
+    - name: "gemini/gemini-2.0-flash"
+      weight: 0.3
+```
+
+At each iteration, one model is sampled based on the weights. This lets you balance cost, speed, and capability.
+
+### Supported Providers
+
+Any [LiteLLM](https://docs.litellm.ai/)-compatible model works using the `provider/model` format:
+
+| Provider | Example | Env Variable |
+|:---|:---|:---|
+| **OpenAI** | `gpt-5`, `gpt-5-mini`, `o3` | `OPENAI_API_KEY` |
+| **Gemini** | `gemini/gemini-3-pro-preview` | `GEMINI_API_KEY` |
+| **Anthropic** | `anthropic/claude-sonnet-4-20250514` | `ANTHROPIC_API_KEY` |
+| **Local (Ollama)** | `ollama/llama3` | None |
+| **Local (vLLM)** | `vllm/meta-llama/Llama-3-8B` | None |
+
+For local models, pass the API base:
+
+```bash
+uv run skydiscover-run evaluator.py \
+  --model ollama/llama3 \
+  --api-base http://localhost:11434/v1
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Import errors after installation">
+    Ensure you are running inside the virtual environment created by uv:
+    ```bash
+    uv run python -c "import skydiscover; print('OK')"
+    ```
+    If using pip, make sure you installed in editable mode (`pip install -e .`).
+  </Accordion>
+  <Accordion title="API key not being picked up">
+    Verify the variable is set in your current shell:
+    ```bash
+    echo $OPENAI_API_KEY
+    ```
+    SkyDiscover tries provider-specific variables first (e.g., `GEMINI_API_KEY` for Gemini models), then falls back to `OPENAI_API_KEY`.
+  </Accordion>
+  <Accordion title="Performance is slow">
+    - Use a faster model for initial exploration (`gpt-5-mini` or `gemini/gemini-2.0-flash`).
+    - Enable parallel iterations in your config: `max_parallel_iterations: 4`.
+    - Reduce evaluator timeout if your scoring function is fast.
+  </Accordion>
+  <Accordion title="Platform-specific issues">
+    - **macOS**: JAX may require `jax[cpu]` on Apple Silicon. Install with `uv pip install jax[cpu]`.
+    - **Windows**: Use WSL for full compatibility. Native Windows is not officially supported.
+    - **Linux**: Ensure `python3-dev` and `build-essential` are installed for compiled dependencies.
+  </Accordion>
+</AccordionGroup>

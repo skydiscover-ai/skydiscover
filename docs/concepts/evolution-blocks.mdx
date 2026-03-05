@@ -1,0 +1,251 @@
+---
+title: "Evolution Blocks"
+description: "Control which parts of your code get evolved with EVOLVE-BLOCK markers"
+---
+
+## Why Use Evolution Blocks?
+
+By default, SkyDiscover treats your entire initial program as mutable — the LLM can rewrite any part of it. Evolution blocks let you constrain the search to specific regions:
+
+- **Preserve setup code** — imports, data loading, and configuration stay fixed
+- **Focus evolution** — the LLM concentrates its budget on the algorithm or logic that matters
+- **Maintain interfaces** — function signatures, return types, and test harnesses don't drift
+- **Faster convergence** — a smaller search space means the LLM finds improvements faster
+
+## Basic Usage
+
+Wrap the mutable region with `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END` comments:
+
+```python
+import numpy as np
+from utils import load_data
+
+# Fixed setup
+data = load_data("input.csv")
+
+# EVOLVE-BLOCK-START
+def solve(data):
+    """This function will be improved by SkyDiscover."""
+    result = np.mean(data, axis=0)
+    return result
+# EVOLVE-BLOCK-END
+
+# Fixed test harness
+if __name__ == "__main__":
+    output = solve(data)
+    print(f"Result: {output}")
+```
+
+Everything between the markers is mutated by the LLM. Everything outside stays exactly as written.
+
+## Real Examples
+
+### Circle Packing
+
+The circle packing benchmark evolves the `construct_packing` function while keeping the `run_packing` entry point and visualization code fixed:
+
+```python
+# EVOLVE-BLOCK-START
+"""Constructor-based circle packing for n=26 circles"""
+import numpy as np
+
+
+def construct_packing():
+    """
+    Construct a specific arrangement of 26 circles in a unit square
+    that attempts to maximize the sum of their radii.
+
+    Returns:
+        Tuple of (centers, radii, sum_of_radii)
+    """
+    n = 26
+    centers = np.zeros((n, 2))
+
+    centers[0] = [0.5, 0.5]
+    for i in range(8):
+        angle = 2 * np.pi * i / 8
+        centers[i + 1] = [0.5 + 0.3 * np.cos(angle), 0.5 + 0.3 * np.sin(angle)]
+    for i in range(16):
+        angle = 2 * np.pi * i / 16
+        centers[i + 9] = [0.5 + 0.7 * np.cos(angle), 0.5 + 0.7 * np.sin(angle)]
+
+    centers = np.clip(centers, 0.01, 0.99)
+    radii = compute_max_radii(centers)
+    return centers, radii, np.sum(radii)
+
+
+def compute_max_radii(centers):
+    """Compute maximum valid radii for the given positions."""
+    n = centers.shape[0]
+    radii = np.ones(n)
+    for i in range(n):
+        x, y = centers[i]
+        radii[i] = min(x, y, 1 - x, 1 - y)
+    for i in range(n):
+        for j in range(i + 1, n):
+            dist = np.sqrt(np.sum((centers[i] - centers[j]) ** 2))
+            if radii[i] + radii[j] > dist:
+                scale = dist / (radii[i] + radii[j])
+                radii[i] *= scale
+                radii[j] *= scale
+    return radii
+# EVOLVE-BLOCK-END
+
+
+# This part remains fixed (not evolved)
+def run_packing():
+    """Run the circle packing constructor for n=26"""
+    centers, radii, sum_radii = construct_packing()
+    return centers, radii, sum_radii
+```
+
+The LLM can completely redesign the packing strategy — switching from concentric rings to hexagonal grids, spiral patterns, or gradient-based optimization — while the `run_packing()` interface remains stable for the evaluator.
+
+### GPU Load Balancing
+
+For systems optimization, you might evolve only the scheduling logic:
+
+```python
+import torch
+from dataclasses import dataclass
+
+@dataclass
+class ExpertConfig:
+    num_experts: int = 64
+    num_gpus: int = 8
+    capacity_per_gpu: int = 8
+
+config = ExpertConfig()
+
+# EVOLVE-BLOCK-START
+def assign_experts_to_gpus(routing_weights, config):
+    """Assign MoE experts to GPUs to minimize load imbalance."""
+    num_experts = config.num_experts
+    num_gpus = config.num_gpus
+
+    # Baseline: round-robin assignment
+    assignment = [i % num_gpus for i in range(num_experts)]
+    return assignment
+# EVOLVE-BLOCK-END
+
+def evaluate_assignment(assignment, routing_weights, config):
+    """Measure load balance quality."""
+    loads = [0.0] * config.num_gpus
+    for expert_id, gpu_id in enumerate(assignment):
+        loads[gpu_id] += routing_weights[expert_id]
+    return 1.0 - (max(loads) - min(loads)) / max(loads)
+```
+
+### Prompt Optimization
+
+Evolution blocks also work for non-code content like prompts:
+
+```python
+# EVOLVE-BLOCK-START
+SYSTEM_PROMPT = """You are a helpful assistant that answers multi-hop
+questions by breaking them down into sub-questions and reasoning step
+by step. Always cite your sources."""
+# EVOLVE-BLOCK-END
+
+def run_qa(question, context):
+    response = call_llm(SYSTEM_PROMPT, question, context)
+    return response
+```
+
+## Advanced Patterns
+
+### Multiple Evolution Blocks
+
+You can have multiple evolution blocks in a single file. Each one is independently mutable:
+
+```python
+import numpy as np
+
+# EVOLVE-BLOCK-START
+def preprocess(data):
+    """Data preprocessing step."""
+    return np.log1p(data)
+# EVOLVE-BLOCK-END
+
+def fixed_transform(data):
+    """This transform is not evolved."""
+    return data / data.max()
+
+# EVOLVE-BLOCK-START
+def postprocess(result):
+    """Post-processing step."""
+    return np.clip(result, 0, 1)
+# EVOLVE-BLOCK-END
+```
+
+### Nested Functions
+
+Helper functions used inside the evolve block should be defined inside it:
+
+```python
+# EVOLVE-BLOCK-START
+def helper_distance(a, b):
+    return np.sqrt(np.sum((a - b) ** 2))
+
+def solve(points):
+    distances = [[helper_distance(p1, p2) for p2 in points] for p1 in points]
+    # ... optimization logic ...
+    return result
+# EVOLVE-BLOCK-END
+```
+
+### Imports Inside Blocks
+
+If the evolved code needs specific imports, include them inside the block:
+
+```python
+# EVOLVE-BLOCK-START
+import numpy as np
+from scipy.optimize import minimize
+
+def optimize(objective, x0):
+    result = minimize(objective, x0, method="L-BFGS-B")
+    return result.x
+# EVOLVE-BLOCK-END
+```
+
+This is important because the LLM might switch to a completely different library (e.g., from `scipy.optimize` to `torch.optim`), and having the import inside the block allows that.
+
+## No Markers = Full File Evolves
+
+If your initial program has no `EVOLVE-BLOCK` markers, the entire file is treated as mutable. This is the simplest setup and works well when the whole solution is what you want to improve:
+
+```python
+def solve(input_data):
+    # The entire file gets rewritten by the LLM
+    return sorted(input_data)
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Do" icon="check">
+    - Keep function interfaces fixed outside the block
+    - Preserve expensive setup (data loading, imports)
+    - Include helper functions inside the block
+    - Document the expected interface (inputs/outputs)
+  </Card>
+  <Card title="Don't" icon="xmark">
+    - Put imports outside if they might need to change
+    - Split a single function across markers
+    - Put test/evaluation code inside the evolve block
+    - Make the evolve block too small (give the LLM room)
+  </Card>
+</CardGroup>
+
+## How It Works Internally
+
+When SkyDiscover processes a file with evolution blocks:
+
+1. **Parse** — The file is split into fixed regions and evolve blocks based on the markers
+2. **Build prompt** — Only the evolve block content is included in the LLM prompt, along with context about the fixed regions' interfaces
+3. **Generate mutation** — The LLM produces an improved version of the evolve block (as a full rewrite or diff)
+4. **Reconstruct file** — The new evolve block content is spliced back into the fixed regions, reconstructing a complete file
+5. **Evaluate** — The reconstructed file is passed to your evaluator for scoring
+
+This means the evaluator always receives a complete, runnable file — it never sees the markers or partial content.

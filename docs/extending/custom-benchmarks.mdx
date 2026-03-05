@@ -1,0 +1,304 @@
+---
+title: "Custom Benchmarks"
+description: "Add your own optimization tasks by writing an evaluator and optional seed program"
+---
+
+A benchmark in SkyDiscover is just a directory with an evaluator. Everything else is optional.
+
+## Minimum Requirements
+
+| File | Required | Purpose |
+|:-----|:---------|:--------|
+| `evaluator.py` | Yes | Scores candidate solutions |
+| `initial_program.py` | No | Starting solution with `EVOLVE-BLOCK` markers |
+| `config.yaml` | No | Search parameters, LLM settings, system prompt |
+
+## Writing an Evaluator
+
+The evaluator is a Python file with an `evaluate(program_path)` function. It receives the path to a candidate solution file and returns a dict with at least `combined_score`:
+
+```python
+def evaluate(program_path: str) -> dict:
+    """Score a candidate solution. Returns a dict with combined_score."""
+    ...
+    return {"combined_score": 0.85}
+```
+
+### Complete Example: Heilbronn Triangle
+
+This evaluator scores a function that places 11 points in a triangle to maximize the minimum sub-triangle area:
+
+```python
+import importlib.util
+import os
+import sys
+import time
+import numpy as np
+from itertools import combinations
+
+BENCHMARK = 0.0327  # known best for n=11
+
+
+def evaluate(program_path: str) -> dict:
+    try:
+        module_name = os.path.splitext(os.path.basename(program_path))[0]
+        spec = importlib.util.spec_from_file_location(module_name, program_path)
+        program = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = program
+        spec.loader.exec_module(program)
+
+        start = time.time()
+        points = program.heilbronn_triangle11()
+        eval_time = time.time() - start
+
+        points = np.array(points, dtype=np.float64)
+        if points.shape != (11, 2):
+            return {"combined_score": 0.0, "error": "Expected shape (11, 2)"}
+
+        # Validate all points inside reference triangle
+        for p in points:
+            if not point_in_triangle(p):
+                return {"combined_score": 0.0, "error": "Point outside triangle"}
+
+        # Compute minimum triangle area over all triples
+        min_area = float("inf")
+        for i, j, k in combinations(range(11), 3):
+            area = triangle_area(points[i], points[j], points[k])
+            min_area = min(min_area, area)
+
+        min_area_normalized = min_area / reference_area()
+
+        return {
+            "combined_score": float(min_area_normalized / BENCHMARK),
+            "min_area_normalized": float(min_area_normalized),
+            "eval_time": float(eval_time),
+        }
+
+    except Exception as e:
+        return {"combined_score": 0.0, "error": str(e)}
+```
+
+### Key Points
+
+- **Dynamic import pattern** — use `importlib.util.spec_from_file_location` to load the candidate solution as a module. This avoids import caching issues across iterations.
+- **`combined_score` is required** — this is the primary metric that drives evolution. Values should be in the 0–1 range where higher is better.
+- **Return on error, don't raise** — wrap everything in try/except and return `{"combined_score": 0.0, "error": str(e)}`. Exceptions that escape the evaluator will crash the run.
+- **Add optional metrics** — any extra keys (like `min_area_normalized`, `eval_time`) are stored with the solution and shown in the monitoring dashboard.
+
+---
+
+## Seed Program
+
+The initial program gives the LLM a starting point. Use `EVOLVE-BLOCK` markers to define which region is mutated.
+
+### Code Tasks
+
+For Python or C++ solutions, wrap the mutable region with markers:
+
+```python
+import numpy as np
+
+# EVOLVE-BLOCK-START
+def heilbronn_triangle11() -> np.ndarray:
+    n = 11
+    points = np.zeros((n, 2))
+    # Simple grid baseline — SkyDiscover will improve this
+    for i in range(n):
+        points[i] = [i / n, (i % 3) / 3]
+    return points
+# EVOLVE-BLOCK-END
+
+def validate(points):
+    """This stays fixed across all iterations."""
+    assert points.shape == (11, 2)
+```
+
+Everything between `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END` is mutated by the LLM. Everything outside is preserved. If no markers are present, the entire file is treated as mutable.
+
+### Prompt Tasks
+
+For prompt optimization (e.g., HotPotQA), use plain text without markers and set `language: text` in your config:
+
+```text
+Answer the following question step by step.
+Think carefully about each part before giving your final answer.
+
+Question: {question}
+```
+
+```yaml
+language: text
+diff_based_generation: false
+```
+
+---
+
+## Configuration
+
+The optional `config.yaml` sets search parameters, LLM settings, and evaluator behavior:
+
+```yaml
+language: python
+max_iterations: 100
+checkpoint_interval: 10
+diff_based_generation: true
+max_solution_length: 60000
+
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+  max_tokens: 32000
+  timeout: 600
+
+prompt:
+  system_message: |
+    You are an expert mathematician optimizing point placements.
+    Maximize the minimum triangle area formed by any three points.
+
+search:
+  type: "adaevolve"
+
+evaluator:
+  timeout: 360
+  max_retries: 3
+  cascade_evaluation: false
+```
+
+### Cascade Evaluation
+
+For expensive evaluators, enable two-stage cascade evaluation. Define both `evaluate_stage1` (quick validation) and `evaluate_stage2` (full evaluation) in your evaluator:
+
+```python
+def evaluate_stage1(program_path):
+    """Quick check — reject obviously bad solutions."""
+    ...
+    return {"combined_score": quick_score}
+
+def evaluate_stage2(program_path):
+    """Full evaluation — only called if stage 1 passes."""
+    return evaluate(program_path)
+```
+
+```yaml
+evaluator:
+  cascade_evaluation: true
+  cascade_thresholds: [0.3, 0.6]
+```
+
+---
+
+## Directory Structure
+
+```
+my_benchmark/
+├── evaluator.py           # Required — scoring function
+├── initial_program.py     # Optional — starting solution
+├── config.yaml            # Optional — search and LLM config
+└── requirements.txt       # Optional — extra dependencies
+```
+
+For benchmarks with multiple variants (e.g., different problem sizes), use numbered subdirectories:
+
+```
+heilbronn_convex/
+├── 13/
+│   ├── initial_program.py
+│   ├── evaluator.py
+│   └── config.yaml
+└── 14/
+    ├── initial_program.py
+    ├── evaluator.py
+    └── config.yaml
+```
+
+---
+
+## Running Your Benchmark
+
+### With a Seed Program
+
+```bash
+uv run skydiscover-run my_benchmark/initial_program.py \
+  my_benchmark/evaluator.py \
+  --config my_benchmark/config.yaml \
+  --search adaevolve \
+  --iterations 100
+```
+
+### Without a Seed Program
+
+When no initial program is provided, the LLM generates a solution from scratch:
+
+```bash
+uv run skydiscover-run my_benchmark/evaluator.py \
+  --search evox \
+  --model gpt-5 \
+  --iterations 100
+```
+
+---
+
+## Advanced: Docker Evaluation
+
+For tasks that require sandboxed execution (e.g., competitive programming), use a Docker-based evaluator:
+
+```python
+import subprocess
+import json
+import tempfile
+import shutil
+
+
+def evaluate(program_path: str) -> dict:
+    try:
+        with open(program_path) as f:
+            code = f.read()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            solution_path = f"{tmpdir}/solution.py"
+            with open(solution_path, "w") as f:
+                f.write(code)
+
+            result = subprocess.run(
+                [
+                    "docker", "run", "--rm",
+                    "-v", f"{tmpdir}:/workspace",
+                    "--network=none",
+                    "--memory=512m",
+                    "--cpus=2",
+                    "python:3.12-slim",
+                    "python", "/workspace/solution.py",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+
+            passed = result.returncode == 0
+            return {
+                "combined_score": 1.0 if passed else 0.0,
+                "stdout": result.stdout[:500],
+                "stderr": result.stderr[:500],
+            }
+
+    except subprocess.TimeoutExpired:
+        return {"combined_score": 0.0, "error": "Timeout"}
+    except Exception as e:
+        return {"combined_score": 0.0, "error": str(e)}
+```
+
+The Frontier-CS benchmark uses a similar pattern with a Docker Compose judge server.
+
+---
+
+## Benchmark Types
+
+| Type | Language | Evaluator Pattern | Examples |
+|:-----|:---------|:------------------|:---------|
+| **Math** | Python | Import module, call entry point, compute metrics | Circle packing, Heilbronn triangle, Erdős problems |
+| **Systems** | Python | Import module, run on workloads, measure performance | Cloud scheduling, MoE load balancing, model placement |
+| **Algorithms** | C++ | Docker judge or subprocess execution | Frontier-CS (172 problems), ALE-Bench (10 contests) |
+| **Prompts** | Text | Run prompt through LLM, grade output | HotPotQA prompt optimization |
+| **GPU** | Python | Run Triton kernel, benchmark against reference | Vector add, matrix multiply, MLA decode |
+| **Creative** | Image | LLM-as-judge on generated output | Image generation evolution |

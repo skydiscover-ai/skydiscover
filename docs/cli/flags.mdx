@@ -1,0 +1,187 @@
+---
+title: "CLI Flags Reference"
+description: "Complete reference for all SkyDiscover command-line flags and arguments"
+---
+
+## Positional Arguments
+
+| Argument | Required | Description |
+|:---|:---|:---|
+| `INITIAL_PROGRAM` | No | Path to the initial program file. When omitted, the LLM generates from scratch. |
+| `EVALUATOR` | Yes | Path to the evaluation file (must define an `evaluate` function). |
+
+<Note>
+  When both positional arguments are provided, the first is the initial program and the second is the evaluator. When only one is provided, it is treated as the evaluator.
+</Note>
+
+## Flags by Category
+
+### General
+
+| Flag | Short | Type | Default | Description |
+|:---|:---|:---|:---|:---|
+| `--config` | `-c` | `str` | — | Path to a YAML configuration file |
+| `--output` | `-o` | `str` | auto | Output directory for results, checkpoints, and logs |
+| `--log-level` | `-l` | `str` | `INFO` | Logging verbosity level |
+
+**`--log-level` values:** `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
+
+**`--output` auto-format:** `outputs/<algorithm>/<name>_<MMDD>_<HHMM>/`
+
+### Discovery
+
+| Flag | Short | Type | Default | Description |
+|:---|:---|:---|:---|:---|
+| `--iterations` | `-i` | `int` | `100` | Maximum number of evolutionary iterations |
+| `--search` | `-s` | `str` | `topk` | Search algorithm to use |
+| `--checkpoint` | — | `str` | — | Checkpoint directory to resume from |
+
+**`--search` valid values:**
+
+| Value | Algorithm | Description |
+|:---|:---|:---|
+| `topk` | Top-K | Elitist selection — keeps top-K programs |
+| `adaevolve` | AdaEvolve | Adaptive multi-island evolution with UCB selection |
+| `evox` | EvoX | Co-evolutionary meta-learning |
+| `beam_search` | Beam Search | Beam search with diversity-weighted selection |
+| `best_of_n` | Best-of-N | Generate N variants, keep the best |
+| `openevolve_native` | OpenEvolve Native | Native reimplementation of OpenEvolve |
+| `gepa_native` | GEPA Native | Native reimplementation of GEPA |
+| `openevolve` | OpenEvolve | External OpenEvolve backend |
+| `shinkaevolve` | ShinkaEvolve | External ShinkaEvolve backend |
+| `gepa` | GEPA | External GEPA backend |
+
+### Model
+
+| Flag | Short | Type | Default | Description |
+|:---|:---|:---|:---|:---|
+| `--model` | `-m` | `str` | config | Model name(s), comma-separated |
+| `--api-base` | — | `str` | — | Base URL for an OpenAI-compatible API |
+
+**`--model` examples:**
+
+```bash
+--model gpt-5                                # Single model
+--model "gpt-5,gemini/gemini-3-pro-preview"  # Multiple models (equal weight)
+--model ollama/llama3                        # Local model
+```
+
+For weighted model pools, use a [YAML config](/config/llm) instead.
+
+### Mode
+
+| Flag | Type | Default | Description |
+|:---|:---|:---|:---|
+| `--agentic` | flag | `False` | Enable agentic mode |
+
+When `--agentic` is set, the LLM can read files and search the codebase before generating each solution. The codebase root is derived from the initial program's location.
+
+## Flag Details
+
+### `--config` / `-c`
+
+Path to a YAML configuration file. All other flags override values set in the config.
+
+```bash
+uv run skydiscover-run solution.py evaluator.py -c config.yaml
+```
+
+See [Configuration Overview](/config/overview) for the full YAML schema.
+
+### `--iterations` / `-i`
+
+Maximum number of evolutionary iterations. Each iteration generates one candidate solution (or more with parallel iterations enabled in config).
+
+```bash
+uv run skydiscover-run evaluator.py -i 200
+```
+
+### `--search` / `-s`
+
+Select the search algorithm. This determines how parent programs are sampled, how context is built, and how the population is managed.
+
+```bash
+uv run skydiscover-run evaluator.py -s adaevolve
+```
+
+### `--model` / `-m`
+
+Specify one or more LLM models. Multiple models are comma-separated and sampled with equal weight.
+
+```bash
+uv run skydiscover-run evaluator.py -m "gpt-5,gemini/gemini-3-pro-preview"
+```
+
+### `--api-base`
+
+Custom API endpoint for OpenAI-compatible providers. Required for local models via Ollama or vLLM.
+
+```bash
+uv run skydiscover-run evaluator.py \
+  --model ollama/llama3 \
+  --api-base http://localhost:11434/v1
+```
+
+### `--checkpoint`
+
+Resume a previous run from a checkpoint directory. The database and iteration counter are restored.
+
+```bash
+uv run skydiscover-run solution.py evaluator.py \
+  --checkpoint outputs/adaevolve/run_0305/checkpoints/checkpoint_50
+```
+
+### `--agentic`
+
+Enable agentic mode. The LLM uses tool calls to read files and search the codebase before generating solutions.
+
+```bash
+uv run skydiscover-run solution.py evaluator.py --agentic
+```
+
+### `--output` / `-o`
+
+Set a custom output directory. Without this flag, output goes to `outputs/<algorithm>/<name>_<timestamp>/`.
+
+```bash
+uv run skydiscover-run evaluator.py -o outputs/my_experiment
+```
+
+### `--log-level` / `-l`
+
+Control logging verbosity. `DEBUG` is useful for troubleshooting LLM calls and evaluator issues.
+
+```bash
+uv run skydiscover-run evaluator.py -l DEBUG
+```
+
+## Environment Variable Overrides
+
+SkyDiscover reads the following environment variables:
+
+| Variable | Description |
+|:---|:---|
+| `OPENAI_API_KEY` | API key for OpenAI models (default provider) |
+| `GEMINI_API_KEY` | API key for Google Gemini models |
+| `ANTHROPIC_API_KEY` | API key for Anthropic Claude models |
+| `DEEPSEEK_API_KEY` | API key for DeepSeek models |
+| `SKYDISCOVER_LOG_LEVEL` | Default log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+| `SKYDISCOVER_OUTPUT_DIR` | Default output directory |
+| `OPENAI_BASE_URL` | Default API base URL |
+
+## Precedence Rules
+
+When the same setting is specified in multiple places, SkyDiscover uses this order (highest priority first):
+
+1. **CLI flag** — Always wins
+2. **YAML config file** — Applied when a flag is not set
+3. **Environment variable** — Fallback for API keys and default directories
+4. **Built-in default** — Used when nothing else is specified
+
+For example, `--model gpt-5` on the command line overrides any model specified in `config.yaml`, which in turn overrides the built-in default.
+
+## See Also
+
+- [`skydiscover-run`](/cli/skydiscover-run) — Main command usage and examples
+- [`skydiscover-viewer`](/cli/skydiscover-viewer) — Replay completed runs
+- [Configuration Overview](/config/overview) — Full YAML configuration reference

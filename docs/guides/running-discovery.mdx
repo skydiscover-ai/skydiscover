@@ -1,0 +1,283 @@
+---
+title: "Running Discovery"
+description: "Learn how to run SkyDiscover to evolve solutions using the CLI and Python API"
+---
+
+## CLI Quick Start
+
+Run a discovery with a single command:
+
+```bash
+skydiscover-run initial_program.py evaluator.py \
+  -c config.yaml \
+  -s adaevolve \
+  -i 100
+```
+
+The initial program is **optional** — omit it to let the LLM generate a solution from scratch:
+
+```bash
+skydiscover-run evaluator.py -s evox -m gpt-5 -i 100
+```
+
+## CLI Flags
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--config FILE` | `-c` | Path to YAML configuration file |
+| `--search TYPE` | `-s` | Search algorithm (`topk`, `adaevolve`, `evox`, `beam_search`, `best_of_n`, `openevolve_native`, `gepa_native`) |
+| `--iterations N` | `-i` | Maximum number of iterations |
+| `--model MODEL` | `-m` | LLM model name (overrides config). Comma-separated for multiple models |
+| `--output DIR` | `-o` | Output directory for results and checkpoints |
+| `--agentic` | — | Enable agentic mode (LLM can read your project files) |
+| `--api-base URL` | — | Override the LLM API endpoint |
+| `--checkpoint DIR` | — | Resume a run from a checkpoint directory |
+| `--log-level LEVEL` | `-l` | Logging verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+
+## Python API
+
+### `run_discovery` — File-Based
+
+Pass file paths for the initial program and evaluator:
+
+```python
+from skydiscover import run_discovery
+
+result = run_discovery(
+    initial_program="initial_program.py",
+    evaluator="evaluator.py",
+    search="adaevolve",
+    model="gpt-5",
+    iterations=100,
+)
+
+print(f"Best score: {result.best_score}")
+print(result.best_solution)
+```
+
+### `run_discovery` — With a Config Object
+
+Build a `Config` object programmatically:
+
+```python
+from skydiscover import run_discovery
+from skydiscover.config import Config, LLMConfig, LLMModelConfig
+
+config = Config(
+    max_iterations=200,
+    llm=LLMConfig(
+        models=[LLMModelConfig(name="gpt-5", weight=1.0)],
+        temperature=0.8,
+    ),
+)
+
+result = run_discovery(
+    initial_program="initial_program.py",
+    evaluator="evaluator.py",
+    config=config,
+    search="evox",
+)
+```
+
+### `discover_solution` — Inline Solutions
+
+Use `discover_solution` for string-based solutions and callable evaluators:
+
+```python
+from skydiscover import discover_solution
+
+result = discover_solution(
+    initial_solution="def solve(x): return x",
+    evaluator=lambda path: {"combined_score": run_tests(path)},
+    iterations=50,
+    search="evox",
+)
+```
+
+The `initial_solution` parameter is optional — omit it to start from scratch.
+
+## Search Algorithms
+
+SkyDiscover ships with multiple search algorithms. Choose one with `--search` or the `search` parameter:
+
+| Algorithm | Flag | Description |
+|-----------|------|-------------|
+| **Top-K** | `topk` | Selects top-K solutions to refine each iteration |
+| **AdaEvolve** | `adaevolve` | Multi-island adaptive search with UCB selection, migration, and paradigm breakthroughs |
+| **Beam Search** | `beam_search` | Breadth-first expansion of a beam of top solutions |
+| **Best-of-N** | `best_of_n` | Generates N variants per iteration, keeps the best |
+| **EvoX** | `evox` | Self-evolving paradigm that co-adapts solution generation and experience management |
+| **OpenEvolve Native** | `openevolve_native` | MAP-Elites + island-based evolutionary search |
+| **GEPA Native** | `gepa_native` | Pareto-efficient search with reflective prompting and LLM-mediated merge |
+
+External backends (`openevolve`, `gepa`, `shinkaevolve`) are also available — install with `uv sync --extra external`.
+
+## CLI Examples
+
+**Basic run with defaults:**
+
+```bash
+skydiscover-run initial_program.py evaluator.py -i 50
+```
+
+**Specify model and search algorithm:**
+
+```bash
+skydiscover-run initial_program.py evaluator.py \
+  -s adaevolve \
+  -m gpt-5 \
+  -i 100
+```
+
+**Multiple models (comma-separated):**
+
+```bash
+skydiscover-run initial_program.py evaluator.py \
+  -m "gpt-5,gemini/gemini-3-pro-preview" \
+  -s evox \
+  -i 200
+```
+
+**Custom API endpoint (e.g., local model):**
+
+```bash
+skydiscover-run initial_program.py evaluator.py \
+  -m ollama/llama3 \
+  --api-base http://localhost:11434/v1 \
+  -s topk \
+  -i 50
+```
+
+**Agentic mode (LLM reads your project files for context):**
+
+```bash
+skydiscover-run initial_program.py evaluator.py \
+  --agentic \
+  -s adaevolve \
+  -i 100
+```
+
+**Resume from checkpoint:**
+
+```bash
+skydiscover-run initial_program.py evaluator.py \
+  --checkpoint output/checkpoints/checkpoint_50 \
+  -i 100
+```
+
+## Understanding Results
+
+### Output Directory Structure
+
+After a run completes, the output directory contains:
+
+```
+output/
+├── best_program.py          # Best solution found
+├── all_programs/             # Every candidate evaluated
+│   ├── program_0001.py
+│   ├── program_0002.py
+│   └── ...
+├── checkpoints/              # Periodic snapshots for resumption
+│   ├── checkpoint_10/
+│   ├── checkpoint_20/
+│   └── ...
+└── logs/                     # Run logs and prompt traces
+```
+
+### DiscoveryResult Fields
+
+The `run_discovery` and `discover_solution` functions return a `DiscoveryResult`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `best_program` | `Program` or `None` | The best program object found |
+| `best_score` | `float` | The highest `combined_score` achieved |
+| `best_solution` | `str` | Source code of the best solution |
+| `metrics` | `dict` | All metrics from the best program's evaluation |
+| `output_dir` | `str` or `None` | Path to the output directory |
+| `initial_score` | `float` or `None` | Score of the initial program (baseline) |
+
+## Environment Variables
+
+SkyDiscover reads API keys from environment variables:
+
+| Variable | Provider |
+|----------|----------|
+| `OPENAI_API_KEY` | OpenAI (default fallback for all providers) |
+| `GEMINI_API_KEY` | Google Gemini |
+| `ANTHROPIC_API_KEY` | Anthropic |
+| `DEEPSEEK_API_KEY` | DeepSeek |
+| `MISTRAL_API_KEY` | Mistral |
+
+Per-model `api_key` in config takes priority over environment variables.
+
+## From-Scratch Generation
+
+You can omit the initial program entirely. SkyDiscover will prompt the LLM to generate a solution from scratch using only the evaluator and system prompt:
+
+```bash
+skydiscover-run evaluator.py -s evox -m gpt-5 -i 100
+```
+
+```python
+result = run_discovery(
+    evaluator="evaluator.py",
+    search="evox",
+    model="gpt-5",
+    iterations=100,
+)
+```
+
+This is useful when you want the LLM to explore the solution space without any human-written starting point.
+
+## Performance Tips
+
+<AccordionGroup>
+  <Accordion title="Run iterations in parallel">
+    Set `max_parallel_iterations` in your config to evaluate multiple candidates simultaneously:
+
+    ```yaml
+    max_parallel_iterations: 4
+    ```
+
+    This is especially effective when your evaluator is I/O-bound or calls external services.
+  </Accordion>
+
+  <Accordion title="Use cascade evaluation">
+    Enable cascade evaluation to run a cheap pre-filter before the full evaluator:
+
+    ```yaml
+    evaluator:
+      cascade_evaluation: true
+      cascade_thresholds: [0.3, 0.6]
+    ```
+
+    Define `evaluate_stage1` and `evaluate_stage2` in your evaluator file.
+  </Accordion>
+
+  <Accordion title="Checkpoint frequently">
+    Set a lower `checkpoint_interval` for long runs so you can resume if interrupted:
+
+    ```yaml
+    checkpoint_interval: 5
+    ```
+  </Accordion>
+
+  <Accordion title="Use diff-based generation">
+    `diff_based_generation: true` (the default) sends only the EVOLVE-BLOCK region to the LLM, reducing token usage and cost.
+  </Accordion>
+
+  <Accordion title="Mix fast and powerful models">
+    Use a weighted model pool to balance cost and quality:
+
+    ```yaml
+    llm:
+      models:
+        - name: "gpt-5-mini"
+          weight: 0.7
+        - name: "gpt-5"
+          weight: 0.3
+    ```
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,268 @@
+---
+title: "Quick Start"
+description: "Get started with SkyDiscover in under 5 minutes"
+---
+
+## Prerequisites
+
+Before you begin, make sure you have:
+
+- **Python 3.10+** installed
+- **[uv](https://docs.astral.sh/uv/)** package manager (recommended) or pip
+- An **LLM API key** (OpenAI, Gemini, or Anthropic)
+
+## 1. Install SkyDiscover
+
+```bash
+git clone https://github.com/skydiscover-ai/skydiscover.git
+cd skydiscover
+uv sync
+```
+
+## 2. Set Your API Key
+
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+For other providers, see [Installation — Environment Variables](/installation#environment-variables).
+
+## 3. Run the Circle Packing Example
+
+Install the math benchmark dependencies, then run:
+
+```bash
+uv sync --extra math
+
+uv run skydiscover-run benchmarks/math/circle_packing/initial_program.py \
+  benchmarks/math/circle_packing/evaluator.py \
+  --config benchmarks/math/circle_packing/config.yaml \
+  --search adaevolve \
+  --iterations 100
+```
+
+SkyDiscover will iteratively improve a circle packing solution for 26 circles in a unit square, trying to maximize the sum of their radii.
+
+## Understanding the Example
+
+The circle packing problem has three components that illustrate how SkyDiscover works:
+
+### Initial Program
+
+The starting solution in `initial_program.py` uses `EVOLVE-BLOCK` markers to tell SkyDiscover which part of the code to improve:
+
+```python
+# EVOLVE-BLOCK-START
+def construct_packing():
+    """Construct 26 circles in a unit square, maximizing sum of radii."""
+    n = 26
+    centers = np.zeros((n, 2))
+
+    # Simple baseline — SkyDiscover will improve this
+    centers[0] = [0.5, 0.5]
+    for i in range(8):
+        angle = 2 * np.pi * i / 8
+        centers[i + 1] = [0.5 + 0.3 * np.cos(angle), 0.5 + 0.3 * np.sin(angle)]
+    # ... more circles ...
+
+    radii = compute_max_radii(centers)
+    return centers, radii, np.sum(radii)
+# EVOLVE-BLOCK-END
+
+# This part stays fixed
+def run_packing():
+    centers, radii, sum_radii = construct_packing()
+    return centers, radii, sum_radii
+```
+
+Everything between `EVOLVE-BLOCK-START` and `EVOLVE-BLOCK-END` is mutated by the LLM. Everything outside stays fixed.
+
+### Evaluator
+
+The evaluator in `evaluator.py` defines how solutions are scored:
+
+```python
+def evaluate(program_path):
+    """Score a circle packing solution."""
+    centers, radii, sum_radii = run_with_timeout(program_path)
+
+    valid = validate_packing(centers, radii)
+    target_ratio = sum_radii / 2.635 if valid else 0.0  # AlphaEvolve target
+
+    return {
+        "combined_score": target_ratio * (1.0 if valid else 0.0),
+        "sum_radii": float(sum_radii),
+        "validity": 1.0 if valid else 0.0,
+    }
+```
+
+The evaluator must return a dict with `combined_score` — the primary metric that drives evolution. Higher is better.
+
+### Config
+
+The YAML config in `config.yaml` sets the LLM, search algorithm, and evaluation parameters:
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+search:
+  type: "adaevolve"
+evaluator:
+  timeout: 360
+  cascade_evaluation: true
+```
+
+## Try Your Own Problem
+
+### Start from Scratch
+
+You only need an evaluator. SkyDiscover will generate the initial solution from scratch:
+
+```bash
+uv run skydiscover-run evaluator.py \
+  --search evox \
+  --model gpt-5 \
+  --iterations 100
+```
+
+### Python API
+
+Use `run_discovery` for programmatic access:
+
+```python
+from skydiscover import run_discovery
+
+result = run_discovery(
+    evaluator="evaluator.py",
+    initial_program="initial_program.py",  # optional
+    search="adaevolve",
+    model="gpt-5",
+    iterations=100,
+)
+
+print(result.best_score, result.best_solution)
+```
+
+Or use `discover_solution` for inline strings and callable evaluators:
+
+```python
+from skydiscover import discover_solution
+
+result = discover_solution(
+    initial_solution="def solve(x): return x",
+    evaluator=lambda path: {"combined_score": run_tests(path)},
+    iterations=50,
+    search="evox",
+)
+```
+
+### Custom Evaluator
+
+Write a Python file with an `evaluate(program_path)` function:
+
+```python
+def evaluate(program_path):
+    score = run_and_grade(program_path)
+    return {
+        "combined_score": score,        # required — drives evolution
+        "artifacts": {                  # optional — fed back to the LLM
+            "feedback": "Off by one in the loop boundary",
+        },
+    }
+```
+
+## Choose a Search Algorithm
+
+| Use Case | Algorithm | Flag |
+|:---|:---|:---|
+| **Most problems** | AdaEvolve | `--search adaevolve` |
+| **Complex / multi-objective** | EvoX | `--search evox` |
+| **Discrete / structured** | Beam Search | `--search beam_search` |
+| **Quick baseline** | TopK | `--search topk` |
+| **N parallel variants** | Best-of-N | `--search best_of_n` |
+
+## Common Workflows
+
+### Resume from Checkpoint
+
+```bash
+uv run skydiscover-run initial_program.py evaluator.py \
+  --search adaevolve \
+  --checkpoint outputs/adaevolve/circle_packing_0305_1430/checkpoints/checkpoint_50
+```
+
+### Use Multiple Models
+
+Define a weighted model pool in your config:
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 0.7
+    - name: "gemini/gemini-3-pro-preview"
+      weight: 0.3
+```
+
+### Enable Live Monitoring
+
+Add to your config:
+
+```yaml
+monitor:
+  enabled: true
+```
+
+The dashboard URL prints at run start. It shows a scatter plot of all programs, code diffs, metrics, and an AI summary. A **Human Feedback** panel lets you steer evolution in real time.
+
+To replay a completed run:
+
+```bash
+uv run skydiscover-viewer /path/to/checkpoints/checkpoint_100
+```
+
+### Enable Agentic Mode
+
+Let the LLM read your files and search your codebase before generating solutions:
+
+```bash
+uv run skydiscover-run initial_program.py evaluator.py \
+  --search adaevolve \
+  --agentic
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="API key not found">
+    Make sure your API key is exported in the current shell session:
+    ```bash
+    export OPENAI_API_KEY="sk-..."
+    ```
+    For Gemini or Anthropic, use `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` respectively.
+  </Accordion>
+  <Accordion title="ModuleNotFoundError for benchmark dependencies">
+    Many benchmarks require extra dependencies. Install them with:
+    ```bash
+    uv sync --extra math       # Math benchmarks
+    uv sync --extra adrs       # Systems benchmarks
+    uv sync --extra external   # OpenEvolve / GEPA backends
+    ```
+  </Accordion>
+  <Accordion title="Evaluation times out">
+    Increase the evaluator timeout in your config:
+    ```yaml
+    evaluator:
+      timeout: 600
+    ```
+  </Accordion>
+  <Accordion title="LLM returns empty responses">
+    Check that your model name and API base are correct. You can test with:
+    ```bash
+    uv run skydiscover-run evaluator.py --model gpt-5 --iterations 1
+    ```
+    If using a local model, pass `--api-base http://localhost:11434/v1`.
+  </Accordion>
+</AccordionGroup>

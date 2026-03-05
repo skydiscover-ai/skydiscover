@@ -1,0 +1,252 @@
+---
+title: "Math Optimization Examples"
+description: "Mathematical optimization problems including circle packing, Heilbronn problems, and more"
+---
+
+## Overview
+
+SkyDiscover includes 14 mathematical optimization problems inspired by the AlphaEvolve paper. These problems span circle packing, geometric optimization, extremal combinatorics, and signal processing.
+
+Install the math dependencies:
+
+```bash
+uv sync --extra math
+```
+
+## Circle Packing
+
+**Path:** `benchmarks/math/circle_packing/`
+
+Pack 26 circles inside a unit square to maximize the sum of their radii. The target optimum is 2.635 (AlphaEvolve result).
+
+### Initial Program
+
+The initial program provides a naive baseline — circles placed in concentric rings with a greedy radius computation:
+
+```python
+# EVOLVE-BLOCK-START
+"""Constructor-based circle packing for n=26 circles"""
+import numpy as np
+
+
+def construct_packing():
+    """
+    Construct a specific arrangement of 26 circles in a unit square
+    that attempts to maximize the sum of their radii.
+
+    Returns:
+        Tuple of (centers, radii, sum_of_radii)
+        centers: np.array of shape (26, 2) with (x, y) coordinates
+        radii: np.array of shape (26) with radius of each circle
+        sum_of_radii: Sum of all radii
+    """
+    n = 26
+    centers = np.zeros((n, 2))
+
+    centers[0] = [0.5, 0.5]
+
+    for i in range(8):
+        angle = 2 * np.pi * i / 8
+        centers[i + 1] = [0.5 + 0.3 * np.cos(angle), 0.5 + 0.3 * np.sin(angle)]
+
+    for i in range(16):
+        angle = 2 * np.pi * i / 16
+        centers[i + 9] = [0.5 + 0.7 * np.cos(angle), 0.5 + 0.7 * np.sin(angle)]
+
+    centers = np.clip(centers, 0.01, 0.99)
+
+    radii = compute_max_radii(centers)
+    sum_radii = np.sum(radii)
+
+    return centers, radii, sum_radii
+
+
+def compute_max_radii(centers):
+    """
+    Compute the maximum possible radii for each circle position
+    such that they don't overlap and stay within the unit square.
+    """
+    n = centers.shape[0]
+    radii = np.ones(n)
+
+    for i in range(n):
+        x, y = centers[i]
+        radii[i] = min(x, y, 1 - x, 1 - y)
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            dist = np.sqrt(np.sum((centers[i] - centers[j]) ** 2))
+            if radii[i] + radii[j] > dist:
+                scale = dist / (radii[i] + radii[j])
+                radii[i] *= scale
+                radii[j] *= scale
+
+    return radii
+
+
+# EVOLVE-BLOCK-END
+
+
+def run_packing():
+    """Run the circle packing constructor for n=26"""
+    centers, radii, sum_radii = construct_packing()
+    return centers, radii, sum_radii
+```
+
+### Evaluator
+
+The evaluator runs the program in a subprocess, validates the packing (no overlaps, circles inside the square), and scores against the target:
+
+```python
+TARGET_VALUE = 2.635
+
+def evaluate(program_path):
+    try:
+        centers, radii, reported_sum = run_with_timeout(
+            program_path, timeout_seconds=600
+        )
+
+        if not isinstance(centers, np.ndarray):
+            centers = np.array(centers)
+        if not isinstance(radii, np.ndarray):
+            radii = np.array(radii)
+
+        if np.isnan(centers).any() or np.isnan(radii).any():
+            return {"combined_score": 0.0, "validity": 0.0}
+
+        valid = validate_packing(centers, radii)
+        shape_valid = centers.shape == (26, 2) and radii.shape == (26,)
+        if not shape_valid:
+            valid = False
+
+        sum_radii = np.sum(radii) if valid else 0.0
+        target_ratio = sum_radii / TARGET_VALUE if valid else 0.0
+        validity = 1.0 if valid else 0.0
+        combined_score = target_ratio * validity
+
+        return {
+            "sum_radii": float(sum_radii),
+            "target_ratio": float(target_ratio),
+            "validity": float(validity),
+            "combined_score": float(combined_score),
+        }
+
+    except Exception as e:
+        return {"combined_score": 0.0, "error": str(e)}
+```
+
+The evaluator also supports cascade evaluation with `evaluate_stage1` (quick validation) and `evaluate_stage2` (full evaluation).
+
+### Run
+
+```bash
+uv run skydiscover-run \
+  benchmarks/math/circle_packing/initial_program.py \
+  benchmarks/math/circle_packing/evaluator.py \
+  -c benchmarks/math/circle_packing/config.yaml \
+  -s adaevolve -i 100
+```
+
+## Heilbronn Triangle
+
+**Path:** `benchmarks/math/heilbronn_triangle/`
+
+Place 11 points inside an equilateral triangle to maximize the area of the smallest triangle formed by any three points.
+
+### Initial Program
+
+```python
+# EVOLVE-BLOCK-START
+import numpy as np
+
+
+def heilbronn_triangle11() -> np.ndarray:
+    """
+    Construct an arrangement of n points on or inside a convex region
+    in order to maximize the area of the smallest triangle formed by
+    these points. Here n = 11.
+
+    Returns:
+        points: np.ndarray of shape (11,2) with the x,y coordinates of the points.
+    """
+    n = 11
+    points = np.zeros((n, 2))
+    return points
+
+
+# EVOLVE-BLOCK-END
+```
+
+### Evaluator
+
+The evaluator checks that all points are inside the equilateral triangle, computes the minimum triangle area over all triples, and normalizes against a known benchmark:
+
+```python
+BENCHMARK = 0.036529889880030156
+NUM_POINTS = 11
+
+def evaluate(program_path: str):
+    try:
+        # ... load module, call heilbronn_triangle11() ...
+        points = program.heilbronn_triangle11()
+
+        if points.shape != (NUM_POINTS, 2):
+            raise ValueError(f"Invalid shapes: points = {points.shape}")
+
+        check_inside_triangle_wtol(points, TOL)
+
+        min_triangle_area = min(
+            [triangle_area(p1, p2, p3)
+             for p1, p2, p3 in itertools.combinations(points, 3)]
+        )
+        a = np.array([0, 0])
+        b = np.array([1, 0])
+        c = np.array([0.5, np.sqrt(3) / 2])
+        min_area_normalized = min_triangle_area / triangle_area(a, b, c)
+
+        return {
+            "min_area_normalized": float(min_area_normalized),
+            "combined_score": float(min_area_normalized / BENCHMARK),
+        }
+    except Exception as e:
+        return {"combined_score": 0.0, "error": str(e)}
+```
+
+### Run
+
+```bash
+uv run skydiscover-run \
+  benchmarks/math/heilbronn_triangle/initial_program.py \
+  benchmarks/math/heilbronn_triangle/evaluator.py \
+  -c benchmarks/math/heilbronn_triangle/config.yaml \
+  -s adaevolve -i 100
+```
+
+## All Math Benchmarks
+
+| Benchmark | Path | Problem |
+|-----------|------|---------|
+| Signal Processing | `benchmarks/math/signal_processing/` | Signal design optimization |
+| Autocorrelation Inequality (1st) | `benchmarks/math/autocorrelation_inequality_1st/` | Extremal autocorrelation |
+| Autocorrelation Inequality (2nd) | `benchmarks/math/autocorrelation_inequality_2nd/` | Second variant |
+| Autocorrelation Inequality (3rd) | `benchmarks/math/autocorrelation_inequality_3rd/` | Third variant |
+| Uncertainty Inequality | `benchmarks/math/uncertainty_inequality/` | Uncertainty principle bounds |
+| Erdos Min Overlap | `benchmarks/math/erdos_min_overlap/` | Minimize overlap in finite sets |
+| Sums/Diffs of Finite Sets | `benchmarks/math/sums_diffs_finite_sets/` | Set arithmetic optimization |
+| Hexagon Packing (11) | `benchmarks/math/hexagon_packing_11/` | Pack 11 hexagons |
+| Hexagon Packing (12) | `benchmarks/math/hexagon_packing_12/` | Pack 12 hexagons |
+| Max/Min Distance | `benchmarks/math/max_min_distance/` | Geometric distance optimization |
+| Heilbronn Convex (13) | `benchmarks/math/heilbronn_convex_13/` | Convex Heilbronn, 13 points |
+| Heilbronn Convex (14) | `benchmarks/math/heilbronn_convex_14/` | Convex Heilbronn, 14 points |
+| Circle Packing in Rectangle | `benchmarks/math/circle_packing_in_rectangle/` | Variant with rectangular domain |
+| Matrix Multiplication | `benchmarks/math/matrix_multiplication/` | Optimized matrix multiply |
+
+Each benchmark follows the same structure: `initial_program.py`, `evaluator.py`, and `config.yaml`.
+
+## Tips
+
+- **Start with AdaEvolve or EvoX** — these consistently outperform simpler strategies on math problems.
+- **Use cascade evaluation** — enable `evaluate_stage1` to quickly reject invalid solutions before running expensive computations.
+- **Increase iterations for hard problems** — 200–500 iterations gives the algorithms more room to discover novel approaches.
+- **Check the config** — each benchmark ships with a tuned config including a domain-specific system prompt.
+- **Examine the output directory** — look at intermediate solutions to understand the evolution trajectory.

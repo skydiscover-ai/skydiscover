@@ -1,0 +1,198 @@
+---
+title: "Prompt Configuration"
+description: "Configure system messages, prompt templates, and context building in SkyDiscover"
+---
+
+## Overview
+
+The prompt configuration controls how SkyDiscover assembles prompts for the LLM. This includes the system message, template selection, evaluator system messages, and human feedback integration.
+
+In the YAML config, prompt settings are under the `prompt` key (mapped to `ContextBuilderConfig` internally):
+
+```yaml
+prompt:
+  system_message: "system_message"
+  evaluator_system_message: "evaluator_system_message"
+  template: "default"
+  template_dir: null
+  suggest_simplification_after_chars: 500
+```
+
+## System Message
+
+The system message provides domain context to the LLM. It can be an inline string or a reference to a file:
+
+### Inline String
+
+```yaml
+prompt:
+  system_message: |
+    You are an expert Python programmer specializing in numerical optimization.
+    Focus on writing correct, efficient, and well-documented code.
+    Always include type hints and docstrings.
+```
+
+### File Reference
+
+```yaml
+prompt:
+  system_message: "path/to/system_prompt.txt"
+```
+
+### CLI Override
+
+The `system_prompt` parameter in `run_discovery` overrides the config:
+
+```python
+result = run_discovery(
+    evaluator="evaluator.py",
+    system_prompt="Focus on memory-efficient algorithms for large datasets.",
+)
+```
+
+## Template Selection
+
+SkyDiscover uses prompt templates to structure the LLM input. Two built-in templates are available:
+
+```yaml
+prompt:
+  template: "default"  # or "evox"
+```
+
+| Template | Description |
+|:---|:---|
+| `default` | Standard template with parent solution, metrics, and context programs |
+| `evox` | EvoX-specific template that includes variation operators and search strategy context |
+
+## Custom Template Directory
+
+Point to a directory with your own Jinja2 templates:
+
+```yaml
+prompt:
+  template: "my_template"
+  template_dir: "path/to/templates/"
+```
+
+The template directory should contain `.j2` files matching the template name.
+
+## Evaluator System Message
+
+When using LLM-as-judge (`evaluator.llm_as_judge: true`), this system message instructs the judge model:
+
+```yaml
+prompt:
+  evaluator_system_message: |
+    You are evaluating Python solutions for correctness, efficiency, and code quality.
+    Score each solution on a scale of 0 to 1.
+    Provide specific feedback on what can be improved.
+
+evaluator:
+  llm_as_judge: true
+```
+
+If not specified, a default evaluator system message is used.
+
+## Simplification Suggestion
+
+When the solution exceeds a character threshold, SkyDiscover adds a simplification hint to the prompt:
+
+```yaml
+prompt:
+  suggest_simplification_after_chars: 500
+```
+
+| Parameter | Type | Default | Description |
+|:---|:---|:---|:---|
+| `suggest_simplification_after_chars` | `int` | `500` | Character threshold for simplification suggestion. Set to `null` to disable. |
+
+## Human Feedback Integration
+
+Human feedback from the monitoring dashboard can be injected into prompts:
+
+```yaml
+human_feedback_enabled: true
+human_feedback_file: "feedback.txt"
+human_feedback_mode: "append"  # "append" or "replace"
+```
+
+| Parameter | Type | Default | Description |
+|:---|:---|:---|:---|
+| `human_feedback_enabled` | `bool` | `false` | Enable human feedback in prompts |
+| `human_feedback_file` | `str` | `null` | Path to file containing human feedback |
+| `human_feedback_mode` | `str` | `"append"` | How to handle new feedback: `"append"` adds to existing, `"replace"` overwrites |
+
+When enabled, the most recent human feedback is appended to the LLM prompt, steering evolution toward the user's goals.
+
+## Example Configurations
+
+### Minimal — Custom System Prompt
+
+```yaml
+prompt:
+  system_message: "You are optimizing a circle packing algorithm. Maximize the sum of radii."
+```
+
+### Research — Detailed Domain Context
+
+```yaml
+prompt:
+  system_message: |
+    You are working on a graph coloring problem.
+    The goal is to minimize the number of colors used while ensuring no two adjacent nodes share a color.
+    Consider greedy algorithms, backtracking, and metaheuristic approaches.
+    The graph may have up to 10,000 nodes.
+  template: "default"
+  suggest_simplification_after_chars: 1000
+```
+
+### With LLM Judge
+
+```yaml
+prompt:
+  system_message: "Optimize the sorting algorithm for large arrays."
+  evaluator_system_message: |
+    Evaluate this sorting implementation on:
+    1. Correctness (does it sort correctly?)
+    2. Time complexity (is it efficient?)
+    3. Space complexity (does it minimize memory usage?)
+    Return a score between 0 and 1.
+
+evaluator:
+  llm_as_judge: true
+```
+
+### With Human Feedback
+
+```yaml
+prompt:
+  system_message: "Optimize the neural network architecture."
+
+human_feedback_enabled: true
+human_feedback_file: "feedback.txt"
+human_feedback_mode: "append"
+
+monitor:
+  enabled: true
+```
+
+## Context Builder Config Reference
+
+The full `ContextBuilderConfig` dataclass:
+
+```python
+@dataclass
+class ContextBuilderConfig:
+    template: str = "default"
+    template_dir: Optional[str] = None
+    system_message: str = "system_message"
+    evaluator_system_message: str = "evaluator_system_message"
+    suggest_simplification_after_chars: Optional[int] = 500
+```
+
+## See Also
+
+- [Configuration Overview](/config/overview) — Full configuration hierarchy
+- [LLM Configuration](/config/llm) — Model and generation settings
+- [Monitor Configuration](/config/monitor) — Dashboard and human feedback panel
+- [Writing Evaluators](/guides/writing-evaluators) — How evaluators feed back into prompts

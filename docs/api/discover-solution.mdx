@@ -1,0 +1,242 @@
+---
+title: "discover_solution"
+description: "Convenience wrapper for evolving string solutions with callable evaluators"
+---
+
+## Function Signature
+
+```python
+def discover_solution(
+    evaluator: Callable[[str], Dict[str, Any]],
+    initial_solution: Optional[str] = None,
+    iterations: int = 100,
+    search: Optional[str] = None,
+    model: Optional[str] = None,
+    **kwargs: Any,
+) -> DiscoveryResult
+```
+
+## Description
+
+`discover_solution` is a convenience wrapper around [`run_discovery`](/api/run-discovery) designed for programmatic use where the evaluator is a Python callable and the solution is passed as an inline string rather than a file path.
+
+This is the simplest way to use SkyDiscover from Python code. You provide a callable that scores solution strings and, optionally, a starting solution. SkyDiscover handles the rest — writing temp files, running the evolutionary loop, and returning the best result.
+
+## Parameters
+
+<ParamField path="evaluator" type="Callable[[str], Dict[str, Any]]" required>
+  A callable that receives the solution source code as a string and returns a dictionary of metrics. The dictionary **must** include a `combined_score` key (higher is better).
+</ParamField>
+
+<ParamField path="initial_solution" type="Optional[str]" default="None">
+  Starting solution as a string of source code. When omitted, the LLM generates a solution from scratch.
+</ParamField>
+
+<ParamField path="iterations" type="int" default="100">
+  Maximum number of evolutionary iterations to run.
+</ParamField>
+
+<ParamField path="search" type="Optional[str]" default="None">
+  Search algorithm name. One of `"topk"`, `"adaevolve"`, `"beam_search"`, `"evox"`, `"gepa_native"`, `"openevolve_native"`. Defaults to `"topk"` when not specified.
+</ParamField>
+
+<ParamField path="model" type="Optional[str]" default="None">
+  LLM model name(s), comma-separated. For example `"gpt-5"` or `"gpt-5,gemini/gemini-3-pro"`. Defaults to the model in your config or `"gpt-5"`.
+</ParamField>
+
+<ParamField path="**kwargs" type="Any">
+  Additional keyword arguments passed directly to `run_discovery`. Common options include:
+
+  | Kwarg | Type | Description |
+  |:---|:---|:---|
+  | `cleanup` | `bool` | Remove temp files after the run (default `True`) |
+  | `api_base` | `str` | Base URL for an OpenAI-compatible API |
+  | `agentic` | `bool` | Enable agentic mode |
+  | `system_prompt` | `str` | Domain-specific context for the LLM |
+  | `output_dir` | `str` | Where to write results |
+  | `config` | `str \| Config` | YAML path or Config object |
+</ParamField>
+
+## Returns
+
+Returns a [`DiscoveryResult`](/api/discovery-result) with the following fields:
+
+| Field | Type | Description |
+|:---|:---|:---|
+| `best_program` | `Program` | The best program found during the run |
+| `best_score` | `float` | The highest `combined_score` achieved |
+| `best_solution` | `str` | Source code of the best solution |
+| `metrics` | `Dict` | Full metrics dictionary for the best solution |
+| `output_dir` | `str` | Path to the output directory |
+| `initial_score` | `Optional[float]` | Score of the initial solution (if provided) |
+
+## Examples
+
+### Basic Usage — Fibonacci
+
+```python
+from skydiscover import discover_solution
+
+def evaluate_fibonacci(solution: str) -> dict:
+    """Score a Fibonacci implementation by correctness and speed."""
+    exec_globals = {}
+    exec(solution, exec_globals)
+    fib = exec_globals.get("fibonacci")
+
+    correct = sum(1 for n in range(20) if fib(n) == expected[n])
+    return {"combined_score": correct / 20}
+
+result = discover_solution(
+    evaluator=evaluate_fibonacci,
+    initial_solution="def fibonacci(n):\n    if n <= 1: return n\n    return fibonacci(n-1) + fibonacci(n-2)",
+    iterations=50,
+    search="adaevolve",
+    model="gpt-5",
+)
+
+print(f"Best score: {result.best_score}")
+print(result.best_solution)
+```
+
+### Starting from Scratch — Sorting
+
+When you omit `initial_solution`, the LLM generates a solution from scratch:
+
+```python
+from skydiscover import discover_solution
+
+def evaluate_sort(solution: str) -> dict:
+    exec_globals = {}
+    exec(solution, exec_globals)
+    sort_fn = exec_globals.get("sort_list")
+
+    test_cases = [[3, 1, 2], [5, 4, 3, 2, 1], [], [1]]
+    correct = sum(1 for tc in test_cases if sort_fn(tc.copy()) == sorted(tc))
+    return {"combined_score": correct / len(test_cases)}
+
+result = discover_solution(
+    evaluator=evaluate_sort,
+    iterations=30,
+    search="evox",
+    model="gpt-5",
+)
+```
+
+### Multi-Objective — Code Quality
+
+Return multiple metrics alongside `combined_score` to track secondary objectives:
+
+```python
+import time
+
+def evaluate_with_quality(solution: str) -> dict:
+    exec_globals = {}
+    exec(solution, exec_globals)
+    solve = exec_globals["solve"]
+
+    start = time.time()
+    result = solve([3, 1, 4, 1, 5])
+    elapsed = time.time() - start
+
+    correctness = 1.0 if result == [1, 1, 3, 4, 5] else 0.0
+    brevity = max(0, 1.0 - len(solution) / 500)
+    speed = max(0, 1.0 - elapsed / 1.0)
+
+    return {
+        "combined_score": 0.6 * correctness + 0.2 * brevity + 0.2 * speed,
+        "correctness": correctness,
+        "brevity": brevity,
+        "speed": speed,
+    }
+
+result = discover_solution(
+    evaluator=evaluate_with_quality,
+    iterations=100,
+    search="adaevolve",
+)
+```
+
+### Custom Configuration
+
+Pass a `Config` object or YAML path for fine-grained control:
+
+```python
+from skydiscover import discover_solution
+from skydiscover.config import Config, LLMConfig, SearchConfig
+
+config = Config(
+    llm=LLMConfig(temperature=0.9, max_tokens=16000),
+    search=SearchConfig(type="adaevolve", num_context_programs=6),
+)
+
+result = discover_solution(
+    evaluator=my_evaluator,
+    initial_solution=my_code,
+    config=config,
+    iterations=200,
+)
+```
+
+### Trying Different Search Algorithms
+
+```python
+from skydiscover import discover_solution
+
+algorithms = ["topk", "adaevolve", "evox", "beam_search"]
+
+for algo in algorithms:
+    result = discover_solution(
+        evaluator=my_evaluator,
+        initial_solution=my_code,
+        search=algo,
+        iterations=50,
+    )
+    print(f"{algo}: {result.best_score:.4f}")
+```
+
+## Error Handling
+
+### Invalid Evaluator Return Type
+
+The evaluator **must** return a dictionary with a `combined_score` key. Returning anything else raises a runtime error:
+
+```python
+# Bad — returns a float instead of a dict
+def bad_evaluator(solution: str) -> float:
+    return 0.5  # TypeError during evaluation
+
+# Good — returns a dict with combined_score
+def good_evaluator(solution: str) -> dict:
+    return {"combined_score": 0.5}
+```
+
+### Timeout Handling
+
+If evaluation takes too long, wrap your evaluator with a timeout:
+
+```python
+import signal
+
+def evaluate_with_timeout(solution: str) -> dict:
+    signal.alarm(30)  # 30-second timeout
+    try:
+        score = run_expensive_eval(solution)
+        return {"combined_score": score}
+    except Exception:
+        return {"combined_score": 0.0}
+    finally:
+        signal.alarm(0)
+```
+
+## Notes
+
+- `discover_solution` is a thin wrapper around [`run_discovery`](/api/run-discovery). It passes all arguments through, mapping `evaluator` and `initial_solution` to the corresponding `run_discovery` parameters.
+- The evaluator receives the solution as a **string** (source code), not a file path. This differs from file-based evaluators used with `run_discovery` or the CLI.
+- The `combined_score` metric is the primary driver of evolution. Higher values are always better.
+
+## See Also
+
+- [`run_discovery`](/api/run-discovery) — The underlying function for file-based discovery
+- [`DiscoveryResult`](/api/discovery-result) — Result object returned by discovery runs
+- [`Runner`](/api/runner) — Low-level class for managing discovery runs
+- [Writing Evaluators](/guides/writing-evaluators) — Guide to building effective evaluators

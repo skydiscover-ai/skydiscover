@@ -1,0 +1,515 @@
+---
+title: "Configuration"
+description: "Comprehensive guide to SkyDiscover YAML configuration files"
+---
+
+## Overview
+
+SkyDiscover uses YAML configuration files to control every aspect of a discovery run. Pass a config file with `-c` / `--config`:
+
+```bash
+skydiscover-run initial_program.py evaluator.py -c config.yaml
+```
+
+All fields are optional — sensible defaults are applied for anything you omit.
+
+## Full YAML Structure
+
+```yaml
+# General settings
+max_iterations: 100
+checkpoint_interval: 10
+log_level: "INFO"
+language: null            # auto-detected from file_suffix
+file_suffix: ".py"
+diff_based_generation: true
+max_solution_length: 60000
+max_parallel_iterations: 1
+
+# LLM configuration
+llm:
+  api_base: "https://api.openai.com/v1"
+  temperature: 0.7
+  top_p: 0.95
+  max_tokens: 32000
+  timeout: 600
+  retries: 3
+  retry_delay: 5
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+
+# Search algorithm
+search:
+  type: "topk"
+  num_context_programs: 4
+
+# Prompt configuration
+context_builder:
+  template: "default"
+  system_message: "system_message"
+
+# Evaluator
+evaluator:
+  timeout: 360
+  max_retries: 3
+  cascade_evaluation: true
+  cascade_thresholds: [0.3, 0.6]
+  llm_as_judge: false
+
+# Agentic mode
+agentic:
+  enabled: false
+
+# Live dashboard
+monitor:
+  enabled: false
+  port: 8765
+
+# Human feedback
+human_feedback_enabled: false
+```
+
+## General Settings
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `max_iterations` | int | 100 | Total number of evolution iterations |
+| `checkpoint_interval` | int | 10 | Save a checkpoint every N iterations |
+| `log_level` | str | `"INFO"` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+| `language` | str | `null` | Programming language (`"python"`, `"cpp"`, `"text"`). Auto-detected from `file_suffix` |
+| `file_suffix` | str | `".py"` | File extension for generated solutions |
+| `diff_based_generation` | bool | `true` | Send only the EVOLVE-BLOCK region to the LLM |
+| `max_solution_length` | int | 60000 | Maximum character length for generated solutions |
+| `max_parallel_iterations` | int | 1 | Number of candidates to evaluate in parallel |
+
+## LLM Configuration
+
+### Basic Setup
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+  temperature: 0.7
+  max_tokens: 32000
+```
+
+### Multiple Models with Weights
+
+Models are sampled proportionally to their weights:
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 0.5
+    - name: "gemini/gemini-3-pro-preview"
+      weight: 0.3
+    - name: "gpt-5-mini"
+      weight: 0.2
+```
+
+### Per-Model Configuration
+
+Each model can override global LLM settings:
+
+```yaml
+llm:
+  temperature: 0.7
+  models:
+    - name: "gpt-5"
+      weight: 0.6
+      temperature: 0.9
+      max_tokens: 64000
+      api_key: "${GPT5_API_KEY}"
+    - name: "gemini/gemini-3-pro-preview"
+      weight: 0.4
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai"
+      api_key: "${GEMINI_API_KEY}"
+```
+
+### Evaluator and Guide Models
+
+Separate models can be used for LLM-as-judge evaluation and guide prompts:
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+  evaluator_models:
+    - name: "gpt-5-mini"
+      weight: 1.0
+  guide_models:
+    - name: "gpt-5-mini"
+      weight: 1.0
+```
+
+### All LLM Parameters
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `api_base` | str | `"https://api.openai.com/v1"` | API endpoint URL |
+| `temperature` | float | 0.7 | Sampling temperature |
+| `top_p` | float | 0.95 | Nucleus sampling threshold |
+| `max_tokens` | int | 32000 | Maximum tokens in the response |
+| `timeout` | int | 600 | Request timeout in seconds |
+| `retries` | int | 3 | Number of retries on failure |
+| `retry_delay` | int | 5 | Delay between retries in seconds |
+
+Per-model fields (override global):
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | str | — | Model identifier (e.g., `"gpt-5"`, `"gemini/gemini-3-pro-preview"`) |
+| `weight` | float | 1.0 | Sampling weight relative to other models |
+| `api_base` | str | inherited | Override API endpoint for this model |
+| `api_key` | str | inherited | Override API key for this model |
+| `temperature` | float | inherited | Override temperature |
+| `top_p` | float | inherited | Override top_p |
+| `max_tokens` | int | inherited | Override max tokens |
+| `timeout` | int | inherited | Override timeout |
+| `retries` | int | inherited | Override retries |
+| `retry_delay` | int | inherited | Override retry delay |
+| `reasoning_effort` | str | `null` | For reasoning models (`"low"`, `"medium"`, `"high"`) |
+| `system_message` | str | `null` | Per-model system message override |
+
+## Search Configuration
+
+### Top-K (default)
+
+```yaml
+search:
+  type: "topk"
+  num_context_programs: 4
+  database:
+    log_prompts: true
+```
+
+### AdaEvolve
+
+AdaEvolve is an adaptive multi-island search algorithm with UCB selection, migration, and paradigm breakthroughs:
+
+```yaml
+search:
+  type: "adaevolve"
+  num_context_programs: 4
+  database:
+    population_size: 20
+    num_islands: 2
+    decay: 0.9
+    intensity_min: 0.15
+    intensity_max: 0.5
+
+    # Adaptive features
+    use_adaptive_search: true
+    use_ucb_selection: true
+    use_migration: true
+    use_unified_archive: true
+    migration_interval: 15
+    migration_count: 5
+
+    # Island management
+    local_context_program_ratio: 0.6
+    archive_elite_ratio: 0.2
+
+    # Fitness and diversity
+    fitness_weight: 1.0
+    novelty_weight: 0.0
+    pareto_weight: 0.4
+    k_neighbors: 5
+    diversity_strategy: "code"
+
+    # Dynamic islands
+    use_dynamic_islands: true
+    max_islands: 5
+    spawn_productivity_threshold: 0.015
+    spawn_cooldown_iterations: 30
+
+    # Paradigm breakthrough
+    use_paradigm_breakthrough: true
+    paradigm_window_size: 10
+    paradigm_improvement_threshold: 0.12
+    paradigm_max_uses: 2
+    paradigm_num_to_generate: 3
+    paradigm_max_tried: 10
+
+    # Stagnation handling
+    stagnation_threshold: 10
+    stagnation_multi_child_count: 3
+    enable_error_retry: true
+    max_error_retries: 2
+
+    # Archive
+    archive_size: 100
+```
+
+Key AdaEvolve concepts:
+
+- **Adaptive intensity**: Mutation strength adjusts between `intensity_min` and `intensity_max` based on progress.
+- **Migration**: Solutions move between islands every `migration_interval` iterations to share good ideas.
+- **Dynamic islands**: New islands spawn when productivity exceeds `spawn_productivity_threshold`.
+- **Paradigm breakthrough**: When improvement stalls below `paradigm_improvement_threshold` for `paradigm_window_size` iterations, the LLM is asked to generate fundamentally different approaches.
+- **UCB selection**: Upper confidence bound balances exploitation of good islands vs. exploration of under-sampled ones.
+
+### Beam Search
+
+```yaml
+search:
+  type: "beam_search"
+  database:
+    beam_width: 5
+    beam_selection_strategy: "diversity_weighted"
+    beam_diversity_weight: 0.3
+    beam_temperature: 1.0
+    beam_depth_penalty: 0.0
+```
+
+### Best-of-N
+
+```yaml
+search:
+  type: "best_of_n"
+  database:
+    best_of_n: 5
+```
+
+### EvoX
+
+```yaml
+search:
+  type: "evox"
+  database:
+    auto_generate_variation_operators: true
+```
+
+### OpenEvolve Native
+
+```yaml
+search:
+  type: "openevolve_native"
+  database:
+    num_islands: 5
+    population_size: 40
+    archive_size: 100
+    exploration_ratio: 0.2
+    exploitation_ratio: 0.7
+    elite_selection_ratio: 0.1
+    feature_bins: 10
+    diversity_reference_size: 20
+    migration_interval: 10
+    migration_rate: 0.1
+    random_seed: 42
+```
+
+### GEPA Native
+
+```yaml
+search:
+  type: "gepa_native"
+  database:
+    population_size: 40
+    candidate_selection_strategy: "epsilon_greedy"
+    epsilon: 0.1
+    max_rejection_history: 20
+    acceptance_gating: true
+    use_merge: true
+    merge_after_stagnation: 15
+    max_merge_attempts: 10
+    max_recent_failures: 5
+    random_seed: 42
+```
+
+## Prompt Configuration
+
+```yaml
+context_builder:
+  template: "default"
+  system_message: "system_message"
+  evaluator_system_message: "evaluator_system_message"
+  suggest_simplification_after_chars: null
+```
+
+### Custom System Message
+
+Inline:
+
+```yaml
+context_builder:
+  system_message: |
+    You are an expert at optimizing numerical algorithms.
+    Focus on mathematical correctness and computational efficiency.
+```
+
+### Template Selection
+
+SkyDiscover ships with built-in templates. Use `template` to select one:
+
+```yaml
+context_builder:
+  template: "default"
+```
+
+### Simplification Suggestion
+
+Prompt the LLM to simplify solutions that exceed a character count:
+
+```yaml
+context_builder:
+  suggest_simplification_after_chars: 5000
+```
+
+## Evaluator Configuration
+
+```yaml
+evaluator:
+  timeout: 360
+  max_retries: 3
+  cascade_evaluation: true
+  cascade_thresholds: [0.3, 0.6]
+  llm_as_judge: false
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `timeout` | int | 360 | Max seconds per evaluation |
+| `max_retries` | int | 3 | Retry count on evaluation failure |
+| `cascade_evaluation` | bool | `true` | Enable multi-stage evaluation |
+| `cascade_thresholds` | list | `[0.3, 0.6]` | Score thresholds to proceed to next stage |
+| `llm_as_judge` | bool | `false` | Use an LLM to score solutions |
+
+## Agentic Configuration
+
+When enabled, the LLM can browse your project files for context:
+
+```yaml
+agentic:
+  enabled: true
+  codebase_root: null          # defaults to project directory
+  max_steps: 5
+  per_step_timeout: 60.0
+  overall_timeout: 300.0
+  max_context_chars: 400000
+  max_file_chars: 50000
+  max_search_results: 50
+  max_files_read: 20
+  repo_map_max_depth: 4
+```
+
+## Monitor Configuration
+
+```yaml
+monitor:
+  enabled: true
+  port: 8765
+  host: "127.0.0.1"
+  max_solution_length: 10000
+  summary_model: "gpt-5-mini"
+  summary_api_base: "https://api.openai.com/v1"
+  summary_top_k: 3
+  summary_interval: 0          # 0 = manual only
+```
+
+See the [Monitoring guide](/guides/monitoring) for full dashboard documentation.
+
+## Human Feedback Configuration
+
+```yaml
+human_feedback_enabled: true
+human_feedback_file: "feedback.md"
+human_feedback_mode: "append"  # or "replace"
+```
+
+## Environment Variable Expansion
+
+Use `${VAR_NAME}` in your config to reference environment variables:
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5"
+      api_key: "${OPENAI_API_KEY}"
+    - name: "gemini/gemini-3-pro-preview"
+      api_key: "${GEMINI_API_KEY}"
+```
+
+## Example Configurations
+
+### Minimal
+
+```yaml
+max_iterations: 50
+llm:
+  models:
+    - name: "gpt-5"
+```
+
+### Production
+
+```yaml
+max_iterations: 500
+checkpoint_interval: 10
+max_parallel_iterations: 4
+log_level: "INFO"
+
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 0.6
+    - name: "gpt-5-mini"
+      weight: 0.4
+  temperature: 0.8
+  max_tokens: 64000
+
+search:
+  type: "adaevolve"
+  database:
+    population_size: 30
+    num_islands: 3
+    use_paradigm_breakthrough: true
+
+evaluator:
+  timeout: 120
+  cascade_evaluation: true
+  cascade_thresholds: [0.2, 0.5]
+
+monitor:
+  enabled: true
+  port: 8765
+  summary_model: "gpt-5-mini"
+  summary_interval: 10
+```
+
+### Multi-Model
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 0.4
+      temperature: 0.9
+    - name: "gemini/gemini-3-pro-preview"
+      weight: 0.3
+    - name: "anthropic/claude-sonnet-4-20250514"
+      weight: 0.3
+```
+
+### LLM Judge
+
+```yaml
+evaluator:
+  llm_as_judge: true
+
+llm:
+  evaluator_models:
+    - name: "gpt-5"
+      weight: 1.0
+
+context_builder:
+  evaluator_system_message: |
+    Evaluate the solution for correctness and efficiency.
+    Return JSON with numeric scores (0-1):
+    {"correctness": ..., "efficiency": ..., "readability": ...}
+```

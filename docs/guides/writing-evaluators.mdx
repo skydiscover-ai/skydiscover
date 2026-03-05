@@ -1,0 +1,304 @@
+---
+title: "Writing Evaluators"
+description: "Create scoring functions that guide SkyDiscover toward better solutions"
+---
+
+## Overview
+
+An evaluator is a Python module with an `evaluate(program_path)` function. SkyDiscover calls it on every candidate solution and uses the returned score to guide evolution. The only hard requirement is returning a dictionary with numeric metrics — `combined_score` is the primary optimization target.
+
+## Basic Structure
+
+```python
+def evaluate(program_path):
+    """Score a candidate solution.
+
+    Args:
+        program_path: Path to the generated program file.
+
+    Returns:
+        A dict with at least 'combined_score' (float, higher is better).
+    """
+    score = run_and_grade(program_path)
+    return {
+        "combined_score": score,
+    }
+```
+
+If you omit `combined_score`, SkyDiscover averages all numeric values in the returned dict.
+
+## Complete Example: Circle Packing
+
+This evaluator runs a circle-packing program in a subprocess, validates the output, and returns a normalized score:
+
+```python
+import subprocess
+import sys
+import time
+
+TARGET_VALUE = 2.635
+
+def evaluate(program_path):
+    start_time = time.time()
+    try:
+        result = subprocess.run(
+            [sys.executable, program_path],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+        if result.returncode != 0:
+            return {
+                "combined_score": 0.0,
+                "validity": 0.0,
+                "error": result.stderr[:500],
+            }
+
+        output = result.stdout.strip()
+        sum_radii = float(output)
+
+        if sum_radii <= 0 or sum_radii != sum_radii:  # NaN check
+            return {"combined_score": 0.0, "validity": 0.0}
+
+        score = min(sum_radii / TARGET_VALUE, 1.0)
+
+        return {
+            "combined_score": score,
+            "sum_radii": sum_radii,
+            "target_ratio": sum_radii / TARGET_VALUE,
+            "validity": 1.0,
+            "eval_time": time.time() - start_time,
+        }
+
+    except subprocess.TimeoutExpired:
+        return {"combined_score": 0.0, "error": "timeout"}
+    except Exception as e:
+        return {"combined_score": 0.0, "error": str(e)}
+```
+
+## Best Practices
+
+### Handle Errors Gracefully
+
+Never let your evaluator raise an unhandled exception. Always return a zero score with an error message:
+
+```python
+def evaluate(program_path):
+    try:
+        score = run_tests(program_path)
+        return {"combined_score": score}
+    except Exception as e:
+        return {"combined_score": 0.0, "error": str(e)}
+```
+
+### Use Timeouts
+
+Candidate programs may contain infinite loops or be extremely slow. Always use `subprocess.run` with a `timeout`:
+
+```python
+result = subprocess.run(
+    [sys.executable, program_path],
+    capture_output=True,
+    text=True,
+    timeout=30,
+)
+```
+
+### Validate Outputs
+
+Check for NaN, infinity, unexpected types, and invalid shapes before computing a score:
+
+```python
+import math
+
+value = float(output)
+if math.isnan(value) or math.isinf(value):
+    return {"combined_score": 0.0, "validity": 0.0}
+```
+
+### Normalize Scores
+
+Keep `combined_score` in the 0–1 range when possible. This makes it easier to compare across benchmarks and helps search algorithms tune their exploration-exploitation trade-off:
+
+```python
+score = min(raw_value / target_value, 1.0)
+```
+
+## Multi-Stage Cascade Evaluation
+
+For expensive evaluators, define a cheap first stage that filters out obviously bad solutions. SkyDiscover runs `evaluate_stage1` first and only proceeds to `evaluate_stage2` if the score exceeds a threshold.
+
+```python
+def evaluate_stage1(program_path):
+    """Quick syntax and basic correctness check."""
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", f"import py_compile; py_compile.compile('{program_path}', doraise=True)"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode != 0:
+            return {"combined_score": 0.0, "error": "syntax error"}
+
+        result = subprocess.run(
+            [sys.executable, program_path],
+            capture_output=True, text=True, timeout=10,
+        )
+        runs = 1.0 if result.returncode == 0 else 0.0
+        return {"combined_score": runs * 0.5, "runs_successfully": runs}
+    except Exception as e:
+        return {"combined_score": 0.0, "error": str(e)}
+
+
+def evaluate_stage2(program_path):
+    """Full evaluation with expensive computation."""
+    score = run_full_test_suite(program_path)
+    return {"combined_score": score}
+```
+
+Enable cascade evaluation in your config:
+
+```yaml
+evaluator:
+  cascade_evaluation: true
+  cascade_thresholds: [0.3, 0.6]
+```
+
+The thresholds control the minimum score from stage 1 required to proceed to stage 2.
+
+## LLM-as-Judge
+
+Instead of (or in addition to) running code, you can have an LLM evaluate solutions. Enable it in your config:
+
+```yaml
+evaluator:
+  llm_as_judge: true
+
+context_builder:
+  evaluator_system_message: |
+    You are an expert code reviewer. Evaluate the following program
+    for correctness, efficiency, and code quality.
+    Return a JSON object with numeric scores (0-1) for each criterion.
+
+llm:
+  evaluator_models:
+    - name: "gpt-5"
+      weight: 1.0
+```
+
+The LLM returns JSON with numeric scores, which are merged into the evaluation metrics (prefixed with `llm_`).
+
+## Prompt Optimization Evaluators
+
+When optimizing prompts instead of code, your evaluator receives a `.txt` file path:
+
+```python
+def evaluate(prompt_path):
+    with open(prompt_path) as f:
+        prompt = f.read()
+
+    accuracy = run_qa_benchmark(prompt, test_questions)
+    return {"combined_score": accuracy}
+```
+
+Set the language in your config:
+
+```yaml
+language: "text"
+file_suffix: ".txt"
+```
+
+## Metric Guidelines
+
+Return a dictionary with these fields:
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `combined_score` | Recommended | Primary optimization target (higher is better) |
+| `validity` | Optional | Whether the solution is valid (0.0 or 1.0) |
+| `error` | Optional | Error message string (not used in scoring) |
+| `eval_time` | Optional | Evaluation time in seconds |
+| `artifacts` | Optional | Dict of extra context passed to the LLM in subsequent prompts |
+| *(custom keys)* | Optional | Any task-specific metrics (e.g., `sum_radii`, `total_cost`) |
+
+The `artifacts` field is special — its contents are injected into the LLM prompt as context for future iterations:
+
+```python
+return {
+    "combined_score": score,
+    "artifacts": {
+        "feedback": "The solution handles edge cases but is O(n^3)",
+        "test_results": "15/20 tests passed",
+    },
+}
+```
+
+## Testing Your Evaluator
+
+Test your evaluator locally before running discovery:
+
+```python
+if __name__ == "__main__":
+    import sys
+    result = evaluate(sys.argv[1])
+    print(result)
+```
+
+```bash
+python evaluator.py initial_program.py
+# {'combined_score': 0.45, 'validity': 1.0, 'eval_time': 2.3}
+```
+
+## Common Patterns
+
+### Unit Test Evaluator
+
+```python
+def evaluate(program_path):
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/", "--tb=short", "-q"],
+        capture_output=True, text=True, timeout=60,
+        env={**os.environ, "SOLUTION_PATH": program_path},
+    )
+    lines = result.stdout.strip().split("\n")
+    passed = sum(1 for l in lines if "PASSED" in l)
+    total = passed + sum(1 for l in lines if "FAILED" in l)
+    score = passed / max(total, 1)
+    return {"combined_score": score, "passed": passed, "total": total}
+```
+
+### Optimization Benchmark
+
+```python
+def evaluate(program_path):
+    spec = importlib.util.spec_from_file_location("solution", program_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    value = module.optimize(test_data)
+    return {
+        "combined_score": value / KNOWN_OPTIMUM,
+        "raw_value": value,
+    }
+```
+
+### RL Environment
+
+```python
+def evaluate(program_path):
+    spec = importlib.util.spec_from_file_location("agent", program_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    total_reward = 0
+    for episode in range(10):
+        obs = env.reset()
+        done = False
+        while not done:
+            action = module.act(obs)
+            obs, reward, done, _ = env.step(action)
+            total_reward += reward
+
+    avg_reward = total_reward / 10
+    return {"combined_score": avg_reward / MAX_REWARD}
+```

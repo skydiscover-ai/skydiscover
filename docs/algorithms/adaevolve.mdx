@@ -1,0 +1,204 @@
+---
+title: "AdaEvolve"
+description: "Multi-island adaptive search with UCB-based island selection and paradigm breakthroughs"
+---
+
+## Overview
+
+AdaEvolve is an adaptive evolutionary search algorithm that dynamically adjusts its optimization behavior based on observed progress. It combines multi-island populations, UCB-based island selection, adaptive search intensity, and paradigm breakthroughs to avoid local optima and sustain improvement over long runs.
+
+<Note>
+  **Paper:** [AdaEvolve: Adaptive Evolutionary Search for AI-Driven Scientific Discovery](https://arxiv.org/abs/2602.20133)
+</Note>
+
+### Key Features
+
+- **Multi-island evolution** — independent populations evolve in parallel, preventing premature convergence
+- **Adaptive search intensity** — automatically adjusts exploration vs. exploitation based on an accumulated improvement signal
+- **UCB island selection** — uses Upper Confidence Bound to balance trying underexplored islands with exploiting productive ones
+- **Paradigm breakthroughs** — detects stagnation and generates entirely new algorithmic strategies via the LLM
+
+---
+
+## How It Works
+
+### Adaptive Search Intensity
+
+AdaEvolve tracks an improvement signal to decide how aggressively to explore:
+
+1. **Improvement signal (delta):** After each iteration, compute the relative improvement over the parent's score.
+2. **Accumulated signal (G):** Exponentially decayed sum of recent improvement signals: `G = gamma * G + delta`
+3. **Search intensity:** When G is high (recent improvements), the algorithm shifts toward exploitation. When G is low (stagnation), it shifts toward exploration.
+
+The `gamma_decay` parameter controls how quickly past improvements are forgotten.
+
+### Island-Based Evolution
+
+Each island maintains an independent population with its own unified archive:
+
+- **Independent populations** — islands evolve separately, maintaining diversity across the search space
+- **Migration** — periodically, top programs migrate between islands (ring topology), injecting successful strategies from one population into another
+- **Round-robin UCB selection** — the controller cycles through islands using Upper Confidence Bound scores, balancing exploitation of productive islands with exploration of underused ones
+
+### Paradigm Breakthroughs
+
+When the search stagnates (no improvement for `stagnation_threshold` iterations):
+
+1. The `ParadigmTracker` detects stagnation based on a rolling window of scores
+2. The `ParadigmGenerator` asks the LLM to propose a fundamentally new algorithmic strategy
+3. The new paradigm is injected into the population, providing a fresh starting point
+4. This allows escape from local optima without manual intervention
+
+---
+
+## Usage
+
+### CLI
+
+```bash
+uv run skydiscover-run initial_program.py evaluator.py \
+  --search adaevolve \
+  --iterations 200
+```
+
+### Full Configuration
+
+```yaml
+max_iterations: 200
+diff_based_generation: true
+
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+
+search:
+  type: "adaevolve"
+  database:
+    num_islands: 2
+    population_size: 20
+    use_adaptive_search: true
+    gamma_decay: 0.9
+    intensity_min: 0.15
+    intensity_max: 0.5
+    use_ucb_selection: true
+    use_migration: true
+    migration_interval: 15
+    migration_count: 5
+    use_unified_archive: true
+    archive_size: 100
+    use_dynamic_islands: true
+    max_islands: 5
+    use_paradigm_breakthrough: true
+    paradigm_window_size: 10
+    stagnation_threshold: 10
+    local_context_program_ratio: 0.6
+    archive_elite_ratio: 0.2
+    pareto_weight: 0.4
+    fitness_weight: 1.0
+    novelty_weight: 0.0
+    k_neighbors: 5
+    diversity_strategy: "code"
+
+prompt:
+  system_message: |
+    You are an expert algorithm designer.
+```
+
+### Config Options
+
+| Option | Default | Description |
+|:-------|:--------|:------------|
+| `num_islands` | `2` | Number of independent island populations |
+| `population_size` | `20` | Maximum programs per island |
+| `use_adaptive_search` | `true` | Enable adaptive intensity based on improvement signal |
+| `gamma_decay` | `0.9` | Decay rate for the accumulated improvement signal G |
+| `intensity_min` | `0.15` | Minimum search intensity (more exploitation) |
+| `intensity_max` | `0.5` | Maximum search intensity (more exploration) |
+| `use_ucb_selection` | `true` | Use UCB to select islands |
+| `use_migration` | `true` | Enable migration between islands |
+| `migration_interval` | `15` | Iterations between migration events |
+| `migration_count` | `5` | Number of programs to migrate |
+| `use_paradigm_breakthrough` | `true` | Enable paradigm-level strategy generation on stagnation |
+| `stagnation_threshold` | `10` | Iterations without improvement before triggering paradigm |
+| `paradigm_window_size` | `10` | Rolling window for stagnation detection |
+| `use_dynamic_islands` | `true` | Dynamically spawn new islands during search |
+| `max_islands` | `5` | Maximum number of islands when using dynamic islands |
+| `archive_size` | `100` | Maximum programs in the unified archive per island |
+| `local_context_program_ratio` | `0.6` | Fraction of context programs from the local island |
+| `archive_elite_ratio` | `0.2` | Fraction of context from the archive elite |
+| `diversity_strategy` | `"code"` | How to measure diversity: `"code"` or `"metric"` |
+
+---
+
+## When to Use AdaEvolve
+
+<CardGroup cols={2}>
+  <Card title="Best For" icon="check">
+    - Complex optimization with many local optima
+    - Long runs (100+ iterations)
+    - Problems where exploration/exploitation balance matters
+    - Multi-objective optimization
+  </Card>
+  <Card title="Avoid When" icon="xmark">
+    - Very short runs (< 20 iterations) — overhead of islands isn't amortized
+    - Simple problems where greedy Top-K suffices
+    - When you want deterministic reproducibility
+  </Card>
+</CardGroup>
+
+---
+
+## Performance
+
+Across ~200 benchmarks, AdaEvolve achieves:
+
+| Metric | Result |
+|:-------|:-------|
+| **Frontier-CS (172 problems)** | ~34% median improvement over OpenEvolve, GEPA, ShinkaEvolve |
+| **Systems optimization** | Matches or exceeds AlphaEvolve on 6/6 tasks |
+| **Math optimization** | Matches or exceeds human SOTA on 6/8 tasks |
+
+### Example: Circle Packing
+
+```bash
+uv run skydiscover-run benchmarks/math/circle_packing/initial_program.py \
+  benchmarks/math/circle_packing/evaluator.py \
+  --config benchmarks/math/circle_packing/config.yaml \
+  --search adaevolve \
+  --iterations 200
+```
+
+---
+
+## Advanced Features
+
+### Sibling Context
+
+During prompt construction, AdaEvolve includes programs from the same island as "sibling context," helping the LLM understand what nearby solutions look like and how to differentiate.
+
+### Mode-Aware Prompting
+
+The `AdaEvolveContextBuilder` adjusts the prompt style based on the current search mode:
+
+- **Exploration mode** — emphasizes novelty, different approaches, structural changes
+- **Exploitation mode** — emphasizes refinement, parameter tuning, incremental improvement
+- **Balanced mode** — neutral guidance
+
+### Comprehensive Logging
+
+AdaEvolve logs detailed iteration data to a JSONL file, including:
+
+- Island selection decisions and UCB scores
+- Search mode and intensity values
+- Migration events
+- Paradigm breakthrough triggers and outcomes
+- Per-iteration timing and scoring
+
+---
+
+## Related Algorithms
+
+- [EvoX](/algorithms/evox) — co-evolves the search strategy itself
+- [GEPA Native](/algorithms/gepa-native) — Pareto-efficient search with acceptance gating
+- [Top-K](/algorithms/topk) — simple greedy baseline

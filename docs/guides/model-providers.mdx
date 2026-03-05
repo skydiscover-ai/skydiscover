@@ -1,0 +1,381 @@
+---
+title: "Model Providers"
+description: "Configure OpenAI, Gemini, Anthropic, DeepSeek, and local models with SkyDiscover"
+---
+
+## Overview
+
+SkyDiscover works with any OpenAI-compatible API through [LiteLLM](https://docs.litellm.ai/). You can use cloud providers, local models, or mix them in a single run. Model names use the `provider/model` format where the provider prefix is optional for OpenAI models.
+
+## Supported Providers
+
+| Provider | Prefix | Environment Variable | Example Model |
+|----------|--------|---------------------|---------------|
+| OpenAI | *(none)* | `OPENAI_API_KEY` | `gpt-5` |
+| Google Gemini | `gemini/` | `GEMINI_API_KEY` | `gemini/gemini-3-pro-preview` |
+| Anthropic | `anthropic/` | `ANTHROPIC_API_KEY` | `anthropic/claude-sonnet-4-20250514` |
+| DeepSeek | `deepseek/` | `DEEPSEEK_API_KEY` | `deepseek/deepseek-chat` |
+| Mistral | `mistral/` | `MISTRAL_API_KEY` | `mistral/mistral-large-latest` |
+| Azure OpenAI | `azure/` | `AZURE_API_KEY` | `azure/gpt-4o` |
+| Ollama | `ollama/` | — | `ollama/llama3` |
+
+## OpenAI
+
+### Setup
+
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+### Config
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+```
+
+### CLI
+
+```bash
+skydiscover-run evaluator.py -m gpt-5 -s adaevolve -i 100
+```
+
+### Python API
+
+```python
+result = run_discovery(
+    evaluator="evaluator.py",
+    model="gpt-5",
+    search="adaevolve",
+    iterations=100,
+)
+```
+
+### Supported Models
+
+| Model | Notes |
+|-------|-------|
+| `gpt-5` | Most capable |
+| `gpt-5-mini` | Fast and cost-effective |
+| `gpt-4o` | Strong multimodal model |
+| `gpt-4o-mini` | Lightweight |
+| `o1` | Reasoning model |
+| `o3` | Advanced reasoning |
+| `o4-mini` | Compact reasoning |
+
+For reasoning models, set `reasoning_effort`:
+
+```yaml
+llm:
+  models:
+    - name: "o3"
+      reasoning_effort: "high"
+```
+
+## Google Gemini
+
+### Setup
+
+```bash
+export GEMINI_API_KEY="..."
+```
+
+### Config
+
+```yaml
+llm:
+  models:
+    - name: "gemini/gemini-3-pro-preview"
+      weight: 1.0
+```
+
+All Gemini models use the `gemini/` prefix.
+
+### CLI
+
+```bash
+skydiscover-run evaluator.py -m gemini/gemini-3-pro-preview -s evox -i 100
+```
+
+### Supported Models
+
+| Model | Notes |
+|-------|-------|
+| `gemini/gemini-3-pro-preview` | Most capable Gemini model |
+| `gemini/gemini-2.5-pro-preview-05-06` | Strong reasoning |
+| `gemini/gemini-2.0-flash` | Fast and affordable |
+| `gemini/gemini-2.0-flash-lite` | Lightest Gemini model |
+
+## Anthropic
+
+### Setup
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+### Config
+
+```yaml
+llm:
+  models:
+    - name: "anthropic/claude-sonnet-4-20250514"
+      weight: 1.0
+```
+
+### CLI
+
+```bash
+skydiscover-run evaluator.py -m anthropic/claude-sonnet-4-20250514 -s adaevolve -i 100
+```
+
+### Supported Models
+
+| Model | Notes |
+|-------|-------|
+| `anthropic/claude-sonnet-4-20250514` | Latest Sonnet |
+| `anthropic/claude-3-7-sonnet-20250219` | Extended thinking |
+| `anthropic/claude-3-5-haiku-20241022` | Fast and compact |
+
+## DeepSeek
+
+### Setup
+
+```bash
+export DEEPSEEK_API_KEY="..."
+```
+
+### Config
+
+```yaml
+llm:
+  models:
+    - name: "deepseek/deepseek-chat"
+      weight: 1.0
+```
+
+### CLI
+
+```bash
+skydiscover-run evaluator.py -m deepseek/deepseek-chat -s topk -i 100
+```
+
+## Mistral
+
+### Setup
+
+```bash
+export MISTRAL_API_KEY="..."
+```
+
+### Config
+
+```yaml
+llm:
+  models:
+    - name: "mistral/mistral-large-latest"
+      weight: 1.0
+```
+
+## Azure OpenAI
+
+### Setup
+
+```bash
+export AZURE_API_KEY="..."
+export AZURE_API_BASE="https://your-resource.openai.azure.com"
+export AZURE_API_VERSION="2024-02-01"
+```
+
+### Config
+
+```yaml
+llm:
+  models:
+    - name: "azure/your-deployment-name"
+      api_base: "https://your-resource.openai.azure.com"
+      api_key: "${AZURE_API_KEY}"
+```
+
+## Local Models
+
+### Ollama
+
+Install and start Ollama, then pull a model:
+
+```bash
+ollama pull llama3
+ollama serve
+```
+
+Config:
+
+```yaml
+llm:
+  api_base: "http://localhost:11434/v1"
+  models:
+    - name: "ollama/llama3"
+      weight: 1.0
+```
+
+CLI:
+
+```bash
+skydiscover-run evaluator.py \
+  -m ollama/llama3 \
+  --api-base http://localhost:11434/v1 \
+  -s topk -i 50
+```
+
+### vLLM
+
+Install and start the vLLM server:
+
+```bash
+pip install vllm
+vllm serve meta-llama/Meta-Llama-3-8B-Instruct --port 8000
+```
+
+Config:
+
+```yaml
+llm:
+  api_base: "http://localhost:8000/v1"
+  models:
+    - name: "meta-llama/Meta-Llama-3-8B-Instruct"
+      weight: 1.0
+```
+
+### LM Studio
+
+Start LM Studio's local server (default port 1234):
+
+```yaml
+llm:
+  api_base: "http://localhost:1234/v1"
+  models:
+    - name: "local-model"
+      weight: 1.0
+```
+
+## Multiple Providers
+
+Mix models from different providers in a single config. Models are sampled proportionally to their weights:
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 0.4
+    - name: "gemini/gemini-3-pro-preview"
+      weight: 0.3
+      api_key: "${GEMINI_API_KEY}"
+    - name: "anthropic/claude-sonnet-4-20250514"
+      weight: 0.2
+      api_key: "${ANTHROPIC_API_KEY}"
+    - name: "ollama/llama3"
+      weight: 0.1
+      api_base: "http://localhost:11434/v1"
+```
+
+## Per-Model Parameters
+
+Each model can have its own temperature, token limit, and other settings:
+
+```yaml
+llm:
+  temperature: 0.7
+  models:
+    - name: "gpt-5"
+      weight: 0.5
+      temperature: 0.9
+      max_tokens: 64000
+    - name: "gpt-5-mini"
+      weight: 0.5
+      temperature: 0.5
+      max_tokens: 16000
+```
+
+## Provider Auto-Detection
+
+SkyDiscover detects the provider from the model name prefix:
+
+| Prefix | Provider | API Key Env Var |
+|--------|----------|-----------------|
+| *(no prefix)* | OpenAI | `OPENAI_API_KEY` |
+| `gemini/` | Google | `GEMINI_API_KEY` |
+| `anthropic/` | Anthropic | `ANTHROPIC_API_KEY` |
+| `deepseek/` | DeepSeek | `DEEPSEEK_API_KEY` |
+| `mistral/` | Mistral | `MISTRAL_API_KEY` |
+| `azure/` | Azure OpenAI | `AZURE_API_KEY` |
+| `ollama/` | Ollama | — |
+
+## API Key Priority
+
+API keys are resolved in this order:
+
+1. Per-model `api_key` in config
+2. Provider-specific environment variable (e.g., `GEMINI_API_KEY`)
+3. `OPENAI_API_KEY` (fallback for all providers)
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Authentication error">
+    Verify your API key is set and valid:
+
+    ```bash
+    echo $OPENAI_API_KEY
+    ```
+
+    Check that the correct environment variable is exported for your provider.
+  </Accordion>
+
+  <Accordion title="Connection refused">
+    For local models, ensure the server is running:
+
+    ```bash
+    curl http://localhost:11434/v1/models
+    ```
+
+    Check that `api_base` in your config matches the server URL.
+  </Accordion>
+
+  <Accordion title="Model not found">
+    Verify the model name matches the provider's naming convention. Use the `provider/model` format for non-OpenAI models.
+
+    For Ollama, ensure the model is pulled: `ollama pull llama3`.
+  </Accordion>
+
+  <Accordion title="Rate limiting">
+    Reduce `max_parallel_iterations` or add a lower-weight fallback model:
+
+    ```yaml
+    max_parallel_iterations: 2
+    llm:
+      models:
+        - name: "gpt-5"
+          weight: 0.5
+        - name: "gpt-5-mini"
+          weight: 0.5
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+- **Use environment variables** for API keys — never hardcode them in config files.
+- **Mix local and cloud models** to reduce costs: use a local model for most iterations and a cloud model for paradigm breakthroughs.
+- **Set appropriate timeouts** for local models, which may be slower than cloud APIs:
+
+```yaml
+llm:
+  timeout: 1200
+  models:
+    - name: "ollama/llama3"
+      timeout: 1800
+```
+
+- **Monitor costs** when using expensive cloud models over many iterations. The dashboard shows which model generated each solution.

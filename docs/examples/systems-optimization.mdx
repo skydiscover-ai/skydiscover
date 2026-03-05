@@ -1,0 +1,287 @@
+---
+title: "Systems Optimization Examples"
+description: "Real-world systems benchmarks from the ADRS initiative including cloud scheduling, load balancing, and database optimization"
+---
+
+## Overview
+
+The ADRS (AI-Driven Real-world Systems) benchmarks apply SkyDiscover to real computer systems problems. These are not toy problems — they model production workloads including multi-cloud data transfer, Mixture-of-Experts inference, GPU model placement, and database query optimization.
+
+Install the ADRS dependencies:
+
+```bash
+uv sync --extra adrs
+```
+
+## CloudCast: Multi-Cloud Data Transfer
+
+**Path:** `benchmarks/ADRS/cloudcast/`
+
+Optimize broadcast topology for multi-cloud data transfer to minimize cost. The algorithm must route data partitions from a source region to multiple destination regions across cloud providers (AWS, Azure, GCP), respecting bandwidth and cost constraints.
+
+### Initial Program
+
+The initial program uses Dijkstra's shortest path as a baseline:
+
+```python
+# EVOLVE-BLOCK-START
+import networkx as nx
+from typing import Dict, List
+
+
+def search_algorithm(src, dsts, G, num_partitions):
+    h = G.copy()
+    h.remove_edges_from(list(h.in_edges(src)) + list(nx.selfloop_edges(h)))
+    bc_topology = BroadCastTopology(src, dsts, num_partitions)
+
+    for dst in dsts:
+        path = nx.dijkstra_path(h, src, dst, weight="cost")
+        for i in range(0, len(path) - 1):
+            s, t = path[i], path[i + 1]
+            for j in range(bc_topology.num_partitions):
+                bc_topology.append_dst_partition_path(dst, j, [s, t, G[s][t]])
+
+    return bc_topology
+
+
+class BroadCastTopology:
+    def __init__(self, src: str, dsts: List[str], num_partitions: int = 4,
+                 paths: Dict[str, dict] = None):
+        self.src = src
+        self.dsts = dsts
+        self.num_partitions = num_partitions
+        if paths is not None:
+            self.paths = paths
+        else:
+            self.paths = {
+                dst: {str(i): None for i in range(num_partitions)}
+                for dst in dsts
+            }
+
+    def set_num_partitions(self, num_partitions: int):
+        self.num_partitions = num_partitions
+
+    def set_dst_partition_paths(self, dst, partition, paths):
+        self.paths[dst][str(partition)] = paths
+
+    def append_dst_partition_path(self, dst, partition, path):
+        partition = str(partition)
+        if self.paths[dst][partition] is None:
+            self.paths[dst][partition] = []
+        self.paths[dst][partition].append(path)
+# EVOLVE-BLOCK-END
+```
+
+### Evaluator
+
+The evaluator loads the evolved algorithm, runs it against multiple cloud configurations (intra-AWS, intra-Azure, intra-GCP, cross-cloud), validates the broadcast topology, and simulates the transfer cost:
+
+```python
+def evaluate(program_path):
+    try:
+        spec = importlib.util.spec_from_file_location("program", program_path)
+        program = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(program)
+
+        total_cost = 0.0
+        successful_configs = 0
+
+        for jsonfile in config_files:
+            config = json.load(open(jsonfile))
+            G = make_nx_graph(num_vms=2)
+
+            bc_t = program.search_algorithm(
+                config["source_node"],
+                config["dest_nodes"],
+                G,
+                config["num_partitions"],
+            )
+
+            is_valid, error = validate_broadcast_topology(
+                bc_t, config["source_node"],
+                config["dest_nodes"],
+                config["num_partitions"], G,
+            )
+
+            if not is_valid:
+                return {"combined_score": 0.0, "error": error}
+
+            simulator = BCSimulator(2, output_dir)
+            _, cost = simulator.evaluate_path(outf, config)
+            total_cost += cost
+            successful_configs += 1
+
+        cost_score = 1.0 / (1.0 + total_cost)
+
+        return {
+            "combined_score": cost_score,
+            "total_cost": total_cost,
+            "successful_configs": successful_configs,
+        }
+
+    except Exception as e:
+        return {"combined_score": 0.0, "error": str(e)}
+```
+
+### Run
+
+```bash
+uv run skydiscover-run \
+  benchmarks/ADRS/cloudcast/initial_program.py \
+  benchmarks/ADRS/cloudcast/evaluator.py \
+  -c benchmarks/ADRS/cloudcast/config.yaml \
+  -s adaevolve -i 100
+```
+
+## EPLB: Mixture-of-Experts Load Balancing
+
+**Path:** `benchmarks/ADRS/eplb/`
+
+Optimize expert-parallelism load balancing for vLLM inference. The algorithm replicates and assigns logical experts to physical GPU slots to balance inference load across GPUs in a multi-node cluster.
+
+### Initial Program
+
+The initial program implements a hierarchical load-balancing policy adapted from DeepSeek EPLB:
+
+```python
+# EVOLVE-BLOCK-START
+import torch
+
+
+def balanced_packing(weight: torch.Tensor,
+                     num_packs: int) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Pack n weighted objects to m packs, such that each bin contains exactly
+    n/m objects and the weights of all packs are as balanced as possible.
+    """
+    num_layers, num_groups = weight.shape
+    assert num_groups % num_packs == 0
+    groups_per_pack = num_groups // num_packs
+    # ... greedy assignment by descending weight ...
+    return pack_index, rank_in_pack
+
+
+def replicate_experts(
+        weight: torch.Tensor,
+        num_phy: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Replicate num_log experts to num_phy replicas, such that the maximum
+    load of all replicas is minimized.
+    """
+    # ... greedily replicate the most loaded expert ...
+    return phy2log, rank, logcnt
+
+
+def rebalance_experts(
+    weight: torch.Tensor,
+    num_replicas: int,
+    num_groups: int,
+    num_nodes: int,
+    num_gpus: int,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Entry point for expert-parallelism load balancer.
+    """
+    # Step 1: Pack groups to nodes
+    # Step 2: Construct redundant experts within nodes
+    # Step 3: Pack physical experts to GPUs
+    return phy2log, log2phy, logcnt
+# EVOLVE-BLOCK-END
+```
+
+### Evaluator
+
+The evaluator replays real expert-load traces (288 replicas, 8 groups, 32 GPUs, 4 nodes), simulates inference load distribution, and measures balancedness:
+
+```python
+def evaluate(program_path: str) -> dict:
+    workloads = load_workloads(WORKLOAD_PATH)
+
+    try:
+        spec = importlib.util.spec_from_file_location("program", program_path)
+        program = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(program)
+
+        balancedness_scores = []
+        for i in range(len(workloads) - 1):
+            _, log2phy, logcnt = program.rebalance_experts(
+                workloads[i], NUM_REPLICAS, NUM_GROUPS, NUM_NODES, NUM_GPUS,
+            )
+            score_gpu, score_expert = simulate_inference(
+                log2phy, logcnt, workloads[i + 1]
+            )
+            balancedness_scores.append(score_expert)
+
+        avg_score = sum(balancedness_scores) / len(balancedness_scores)
+        return {
+            "combined_score": float(avg_score),
+            "balancedness_score_expert": float(avg_score),
+        }
+    except Exception as e:
+        return {"combined_score": 0.0, "error": str(e)}
+```
+
+### Run
+
+```bash
+uv run skydiscover-run \
+  benchmarks/ADRS/eplb/initial_program.py \
+  benchmarks/ADRS/eplb/evaluator.py \
+  -c benchmarks/ADRS/eplb/config.yaml \
+  -s adaevolve -i 100
+```
+
+## All Systems Benchmarks
+
+| Benchmark | Path | Problem |
+|-----------|------|---------|
+| CloudCast | `benchmarks/ADRS/cloudcast/` | Multi-cloud broadcast topology optimization |
+| EPLB | `benchmarks/ADRS/eplb/` | MoE expert-parallelism load balancing |
+| Prism | `benchmarks/ADRS/prism/` | GPU model placement for KV-cache pressure |
+| LLM-SQL | `benchmarks/ADRS/llm_sql/` | Column reordering for LLM-based SQL queries |
+| Transaction Scheduling | `benchmarks/ADRS/transaction_scheduling/` | Database transaction ordering |
+
+## Key Concepts
+
+### System Constraints
+
+Unlike math benchmarks, systems problems have hard constraints:
+- Graph connectivity (CloudCast)
+- GPU memory limits (Prism)
+- Data partitioning rules (EPLB)
+- Solutions that violate constraints get a zero score.
+
+### Multi-Objective Optimization
+
+Systems benchmarks often balance multiple objectives:
+- Cost vs. latency (CloudCast)
+- Balancedness vs. speed (EPLB)
+- Memory vs. throughput (Prism)
+
+The evaluator combines these into a single `combined_score`.
+
+### Simulation-Based Evaluation
+
+Each evaluator runs a simulator to measure real-world impact:
+- CloudCast simulates network transfer costs
+- EPLB replays production MoE inference traces
+- Prism models GPU memory and cache behavior
+
+### Real Workloads
+
+All ADRS benchmarks use real-world data:
+- Cloud pricing and throughput profiles (CloudCast)
+- Expert load histories from production serving (EPLB)
+- GPU memory and bandwidth measurements (Prism)
+
+## Installation
+
+```bash
+uv sync --extra adrs
+```
+
+If a benchmark ships its own `requirements.txt`:
+
+```bash
+uv pip install -r benchmarks/ADRS/<benchmark>/requirements.txt
+```

@@ -1,0 +1,105 @@
+---
+title: "skydiscover-viewer"
+description: "Replay and visualize completed SkyDiscover runs"
+---
+
+## Synopsis
+
+```bash
+skydiscover-viewer OUTPUT_DIR [OPTIONS]
+```
+
+## Description
+
+`skydiscover-viewer` replays a completed SkyDiscover run without re-running the discovery process. It starts a read-only dashboard that lets you explore the results — inspect individual programs, view metrics over time, and browse the evolutionary tree.
+
+<Note>
+  The viewer is a planned feature for future releases. Currently, the best way to visualize results is to enable the live monitor during a run via `monitor.enabled: true` in your config. The live monitor provides the same dashboard with real-time updates as the run progresses.
+</Note>
+
+## Positional Argument
+
+<ParamField path="OUTPUT_DIR" type="str" required>
+  Path to a completed run's output directory or checkpoint path. This is the directory containing checkpoints, logs, and the best program file.
+</ParamField>
+
+## Options
+
+| Flag | Type | Default | Description |
+|:---|:---|:---|:---|
+| `--port` | `int` | `8765` | Port number for the viewer dashboard |
+| `--host` | `str` | `127.0.0.1` | Host address to bind to |
+| `--summary-model` | `str` | `gpt-5-mini` | LLM model for per-program AI summaries (requires `OPENAI_API_KEY`) |
+
+## Usage Examples
+
+### Basic Replay
+
+```bash
+uv run skydiscover-viewer outputs/adaevolve/circle_packing_0305_1430
+```
+
+Then open `http://127.0.0.1:8765` in your browser.
+
+### Custom Port
+
+```bash
+uv run skydiscover-viewer outputs/my_run --port 9000
+```
+
+### From a Checkpoint
+
+```bash
+uv run skydiscover-viewer outputs/adaevolve/my_run/checkpoints/checkpoint_100
+```
+
+### Remote Access
+
+Bind to all interfaces to access the viewer from another machine:
+
+```bash
+uv run skydiscover-viewer outputs/my_run --host 0.0.0.0 --port 8765
+```
+
+### With AI Summaries
+
+```bash
+uv run skydiscover-viewer outputs/my_run --summary-model gpt-5-mini
+```
+
+## Dashboard Features
+
+The viewer dashboard provides the same interface as the live monitor, but in read-only mode:
+
+<CardGroup cols={2}>
+  <Card title="Scatter Plot" icon="chart-scatter">
+    Visualize all programs by score and iteration. Click any point to inspect the program.
+  </Card>
+  <Card title="Metrics Timeline" icon="chart-line">
+    Track how the best score, average score, and other metrics evolve over iterations.
+  </Card>
+  <Card title="Code Inspector" icon="code">
+    View the source code of any program. Compare parent and child solutions side-by-side.
+  </Card>
+  <Card title="Progress Chart" icon="chart-area">
+    See the overall improvement trajectory and convergence behavior.
+  </Card>
+</CardGroup>
+
+## Using the Live Monitor Instead
+
+Until the viewer reaches full release, you can use the live monitoring dashboard during runs:
+
+```yaml
+monitor:
+  enabled: true
+  port: 8765
+```
+
+The dashboard URL prints at run start. It provides real-time scatter plots, code diffs, metrics, AI summaries, and a **Human Feedback** panel to steer evolution as it runs.
+
+## See Also
+
+- [`skydiscover-run`](/cli/skydiscover-run) — Main CLI command to run discovery
+- [Monitor Configuration](/config/monitor) — Configure the live dashboard
+- [Monitoring Guide](/guides/monitoring) — Detailed monitoring walkthrough

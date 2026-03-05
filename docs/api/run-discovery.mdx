@@ -1,0 +1,220 @@
+---
+title: "run_discovery"
+description: "Run a discovery process and return the best result"
+---
+
+## Function Signature
+
+```python
+def run_discovery(
+    evaluator: Union[str, Path, Callable],
+    initial_program: Optional[Union[str, Path, List[str]]] = None,
+    model: Optional[str] = None,
+    iterations: Optional[int] = None,
+    search: Optional[str] = None,
+    config: Union[str, Path, Config, None] = None,
+    agentic: bool = False,
+    output_dir: Optional[str] = None,
+    system_prompt: Optional[str] = None,
+    api_base: Optional[str] = None,
+    cleanup: bool = True,
+) -> DiscoveryResult
+```
+
+## Description
+
+`run_discovery` is the main entry point for running a SkyDiscover evolutionary discovery process from Python. It supports both file-based and callable evaluators, handles configuration merging, creates temporary directories as needed, and returns a [`DiscoveryResult`](/api/discovery-result) with the best solution found.
+
+Under the hood, it builds a [`Config`](/config/overview) object, instantiates a [`Runner`](/api/runner), and calls `runner.run()` in an asyncio event loop.
+
+## Parameters
+
+<ParamField path="evaluator" type="Union[str, Path, Callable]" required>
+  The evaluation function. Can be:
+  - **File path** (`str` or `Path`) — path to a Python file containing an `evaluate(program_path)` function
+  - **Callable** — a function `(program_path: str) -> Dict[str, Any]` that scores a candidate
+
+  The evaluator must return a dictionary with at least a `combined_score` key.
+</ParamField>
+
+<ParamField path="initial_program" type="Optional[Union[str, Path, List[str]]]" default="None">
+  The starting solution. Can be:
+  - **File path** — path to an existing Python file
+  - **Inline string** — source code as a string
+  - **List of strings** — lines of source code
+  - **None** — the LLM generates a solution from scratch
+</ParamField>
+
+<ParamField path="model" type="Optional[str]" default="None">
+  Model name(s), comma-separated. For example `"gpt-5"` or `"gpt-5,gemini/gemini-3-pro"`. Overrides models defined in the config.
+</ParamField>
+
+<ParamField path="iterations" type="Optional[int]" default="None">
+  Maximum number of iterations. Overrides `max_iterations` in the config.
+</ParamField>
+
+<ParamField path="search" type="Optional[str]" default="None">
+  Search algorithm name. One of `"topk"`, `"adaevolve"`, `"beam_search"`, `"evox"`, `"gepa_native"`, `"openevolve_native"`. Overrides `search.type` in the config.
+</ParamField>
+
+<ParamField path="config" type="Union[str, Path, Config, None]" default="None">
+  Configuration source. Can be:
+  - **YAML file path** — loaded and parsed automatically
+  - **`Config` object** — used directly
+  - **None** — defaults are used
+</ParamField>
+
+<ParamField path="agentic" type="bool" default="False">
+  Enable agentic mode. When `True`, the LLM can read files and search the codebase before generating solutions. The codebase root is derived from the initial program location.
+</ParamField>
+
+<ParamField path="output_dir" type="Optional[str]" default="None">
+  Directory for writing results, checkpoints, and logs. A temporary directory is created when not specified.
+</ParamField>
+
+<ParamField path="system_prompt" type="Optional[str]" default="None">
+  Domain-specific context injected into the LLM system message. Use this to describe your problem, constraints, or desired solution style.
+</ParamField>
+
+<ParamField path="api_base" type="Optional[str]" default="None">
+  Base URL for an OpenAI-compatible API. Useful for local models (Ollama, vLLM) or custom endpoints.
+</ParamField>
+
+<ParamField path="cleanup" type="bool" default="True">
+  Remove temporary files (evaluator wrapper, temp programs) after the run completes.
+</ParamField>
+
+## Returns
+
+Returns a [`DiscoveryResult`](/api/discovery-result) containing:
+
+| Field | Type | Description |
+|:---|:---|:---|
+| `best_program` | `Optional[Program]` | The best program found, or `None` if no valid programs were produced |
+| `best_score` | `float` | Highest `combined_score` achieved |
+| `best_solution` | `str` | Source code of the best solution |
+| `metrics` | `Dict[str, Any]` | Full metrics dictionary for the best solution |
+| `output_dir` | `Optional[str]` | Path to the output directory |
+| `initial_score` | `Optional[float]` | Score of the initial program, if one was provided |
+
+## Examples
+
+### Basic File-Based Usage
+
+```python
+from skydiscover import run_discovery
+
+result = run_discovery(
+    evaluator="benchmarks/math/circle_packing/evaluator.py",
+    initial_program="benchmarks/math/circle_packing/initial_program.py",
+    search="adaevolve",
+    model="gpt-5",
+    iterations=100,
+)
+
+print(f"Best score: {result.best_score:.4f}")
+print(f"Initial score: {result.initial_score:.4f}")
+print(f"Output: {result.output_dir}")
+```
+
+### With a Config Object
+
+```python
+from skydiscover import run_discovery
+from skydiscover.config import Config, LLMConfig, LLMModelConfig, SearchConfig
+
+config = Config(
+    max_iterations=200,
+    llm=LLMConfig(
+        models=[
+            LLMModelConfig(name="gpt-5", weight=0.7),
+            LLMModelConfig(name="gemini/gemini-3-pro-preview", weight=0.3),
+        ],
+        temperature=0.8,
+    ),
+    search=SearchConfig(type="adaevolve"),
+)
+
+result = run_discovery(
+    evaluator="evaluator.py",
+    initial_program="solution.py",
+    config=config,
+)
+```
+
+### From-Scratch Generation
+
+Omit `initial_program` to let the LLM generate a solution from scratch:
+
+```python
+from skydiscover import run_discovery
+
+result = run_discovery(
+    evaluator="evaluator.py",
+    search="evox",
+    model="gpt-5",
+    iterations=50,
+    system_prompt="Generate a Python function that solves the traveling salesman problem using a heuristic approach.",
+)
+```
+
+### With Monitoring
+
+Enable the live dashboard to watch progress in real time:
+
+```python
+from skydiscover import run_discovery
+from skydiscover.config import Config, MonitorConfig
+
+config = Config(
+    monitor=MonitorConfig(enabled=True, port=8765),
+)
+
+result = run_discovery(
+    evaluator="evaluator.py",
+    initial_program="solution.py",
+    config=config,
+    search="adaevolve",
+    iterations=100,
+)
+```
+
+### Async Usage
+
+`run_discovery` wraps an async implementation. If you are already in an async context, use the internal `_run_discovery_async` directly:
+
+```python
+import asyncio
+from skydiscover.api import _run_discovery_async
+
+async def main():
+    result = await _run_discovery_async(
+        initial_program="solution.py",
+        evaluator="evaluator.py",
+        config=None,
+        iterations=100,
+        search="adaevolve",
+    )
+    print(result.best_score)
+
+asyncio.run(main())
+```
+
+## How It Works
+
+Internally, `run_discovery` performs the following steps:
+
+1. **Build configuration** — Loads the config from the provided YAML path, `Config` object, or defaults. CLI-style overrides (`model`, `search`, `iterations`, `api_base`, `system_prompt`, `agentic`) are applied on top.
+2. **Prepare files** — If the evaluator is a callable, it wraps it in a temporary Python file. If the initial program is an inline string, it writes it to a temp file.
+3. **Instantiate Runner** — Creates a [`Runner`](/api/runner) with the evaluation file, initial program path, config, and output directory.
+4. **Run the loop** — Calls `runner.run()` which drives the full sample → prompt → generate → evaluate loop for the specified number of iterations.
+5. **Collect results** — Reads the best program from the database and returns a [`DiscoveryResult`](/api/discovery-result).
+6. **Cleanup** — Removes temporary files if `cleanup=True`.
+
+## See Also
+
+- [`discover_solution`](/api/discover-solution) — Convenience wrapper for callable evaluators with string solutions
+- [`DiscoveryResult`](/api/discovery-result) — Result object returned by discovery runs
+- [`Runner`](/api/runner) — Low-level class for managing discovery runs
+- [Running Discovery](/guides/running-discovery) — Step-by-step guide
+- [Configuration Overview](/config/overview) — Full configuration reference

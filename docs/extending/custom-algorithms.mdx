@@ -1,0 +1,333 @@
+---
+title: "Custom Search Algorithms"
+description: "Implement your own search strategies by extending ProgramDatabase and DiscoveryController"
+---
+
+SkyDiscover's search algorithms are composed of two parts: a **ProgramDatabase** that stores and samples solutions, and a **DiscoveryController** that drives the sample-prompt-generate-evaluate loop. You can customize at either level.
+
+## Two Levels of Customization
+
+| Level | What you write | When to use |
+|:------|:---------------|:------------|
+| **Database only** | Custom `ProgramDatabase` subclass | Different sampling/selection strategy, custom data structures |
+| **Database + Controller** | Custom `ProgramDatabase` + custom `DiscoveryController` | Custom acceptance logic, multi-phase search, stagnation handling |
+
+---
+
+## Level 1: Database Only
+
+Most custom algorithms only need a new database. The default `DiscoveryController` handles the iteration loop, LLM calls, and evaluation — you just control how programs are stored and sampled.
+
+### Program Dataclass
+
+Every solution in the database is a `Program`:
+
+```python
+@dataclass
+class Program:
+    id: str
+    solution: str
+    language: str = "python"
+    metrics: Dict[str, Any] = field(default_factory=dict)
+    iteration_found: int = 0
+    parent_id: Optional[str] = None
+    other_context_ids: Optional[List[str]] = None
+    parent_info: Optional[Tuple[str, str]] = None
+    context_info: Optional[List[Tuple[str, str]]] = None
+    timestamp: float = field(default_factory=time.time)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    artifacts: Dict[str, Any] = field(default_factory=dict)
+    prompts: Optional[Dict[str, Any]] = None
+    generation: int = 0
+```
+
+### Complete Example: TopKDatabase
+
+The simplest built-in algorithm — always picks the best program as the parent:
+
+```python
+from skydiscover.search.base_database import ProgramDatabase, Program
+from skydiscover.config import DatabaseConfig
+from typing import Any, Dict, List, Optional, Tuple
+
+
+class TopKDatabase(ProgramDatabase):
+    def __init__(self, name: str, config: DatabaseConfig, **kwargs: Any):
+        super().__init__(name, config, **kwargs)
+        self.programs: Dict[str, Program] = {}
+        self.initial_program: Optional[Program] = None
+        self.last_iteration: int = 0
+
+    def add(
+        self,
+        program: Program,
+        iteration: Optional[int] = None,
+        **kwargs: Any,
+    ) -> str:
+        self.programs[program.id] = program
+
+        if iteration == 0:
+            self.initial_program = program
+
+        self._update_best_program(program)
+
+        if self.config.db_path:
+            self._save_program(program)
+
+        if iteration is not None:
+            self.last_iteration = iteration
+
+        return program.id
+
+    def sample(
+        self,
+        num_context_programs: Optional[int] = 4,
+        **kwargs: Any,
+    ) -> Tuple[Program, List[Program]]:
+        sorted_programs = sorted(
+            self.programs.values(),
+            key=lambda p: p.metrics.get("combined_score", 0.0),
+            reverse=True,
+        )
+
+        parent = sorted_programs[0]
+
+        k = num_context_programs or 4
+        context_programs = sorted_programs[1 : k + 1]
+
+        return parent, context_programs
+```
+
+### What `add()` Must Do
+
+1. **Store the program** in your internal data structure
+2. **Update the best program** via `self._update_best_program(program)`
+3. **Persist to disk** via `self._save_program(program)` when `self.config.db_path` is set
+4. **Track the iteration** for checkpoint/resume support
+
+### What `sample()` Must Return
+
+A tuple of `(parent, context_programs)`:
+
+- **parent** — the `Program` (or `Dict[str, Program]` for multi-island) selected for mutation
+- **context_programs** — a `List[Program]` (or `Dict[str, List[Program]]`) of related solutions provided as context to the LLM
+
+### Inherited Helper Methods
+
+Your database inherits these from `ProgramDatabase`:
+
+| Method | Description |
+|:-------|:------------|
+| `_update_best_program(program)` | Track the best program seen so far |
+| `_is_better(p1, p2)` | Compare two programs by `combined_score` |
+| `get_best_program(metric=None)` | Return the current best program |
+| `get_top_programs(n, metric=None)` | Return the top N programs |
+| `_save_program(program, base_path=None)` | Write a program to disk |
+| `save(path, iteration)` | Checkpoint the entire database |
+| `load(path)` | Restore from a checkpoint |
+| `get_statistics(num_recent_iterations, k)` | Compute summary statistics |
+| `log_prompt(program_id, template_key, prompt)` | Store the prompt used for a program |
+
+### Registration
+
+Register your database in `route.py` so it can be selected via `--search`:
+
+```python
+from skydiscover.search.registry import register_database
+from my_algorithm.database import TopKDatabase
+
+register_database("topk", TopKDatabase)
+```
+
+Then run with:
+
+```bash
+uv run skydiscover-run evaluator.py --search topk
+```
+
+---
+
+## Level 2: Database + Controller
+
+For algorithms that need custom iteration logic — acceptance gating, multi-phase search, stagnation detection — you also extend `DiscoveryController`.
+
+### Controller Template
+
+```python
+from skydiscover.search.default_discovery_controller import (
+    DiscoveryController,
+    DiscoveryControllerInput,
+)
+from skydiscover.search.utils.discovery_utils import SerializableResult
+from typing import Optional, Union
+from skydiscover.search.base_database import Program
+
+
+class MyController(DiscoveryController):
+    def __init__(self, controller_input: DiscoveryControllerInput):
+        super().__init__(controller_input)
+        self.stagnation_counter = 0
+
+    async def run_discovery(
+        self,
+        start_iteration: int,
+        max_iterations: int,
+        checkpoint_callback=None,
+        post_process_result=True,
+        retry_times=3,
+    ) -> Optional[Union[Program, SerializableResult]]:
+
+        for iteration in range(start_iteration, max_iterations):
+            if self.shutdown_event.is_set():
+                break
+
+            result = await self._run_iteration(iteration, retry_times=retry_times)
+
+            # Custom acceptance logic
+            if result.child_program_dict:
+                child_score = result.child_program_dict.get("metrics", {}).get(
+                    "combined_score", 0.0
+                )
+                best = self.database.get_best_program()
+                best_score = best.metrics.get("combined_score", 0.0) if best else 0.0
+
+                if child_score > best_score:
+                    self.stagnation_counter = 0
+                else:
+                    self.stagnation_counter += 1
+
+            self._process_iteration_result(
+                result, iteration, checkpoint_callback, verbose=True
+            )
+
+            # Stagnation-driven diversification
+            if self.stagnation_counter > 20:
+                self._diversify()
+                self.stagnation_counter = 0
+
+        return self._finalize_discovery()
+
+    def _diversify(self):
+        """Inject diversity when search stagnates."""
+        pass
+```
+
+### Controller Primitives
+
+| Method | Description |
+|:-------|:------------|
+| `_run_iteration(iteration, retry_times)` | Run one full sample → prompt → LLM → evaluate cycle. Returns `SerializableResult` |
+| `_process_iteration_result(result, iteration, callback, verbose)` | Add the result to the database, checkpoint, log |
+| `get_best_program()` | Shortcut to `self.database.get_best_program()` |
+| `shutdown_event` | `asyncio.Event` — set when the run should stop |
+| `_build_prompt(current_program, context, failed_attempts)` | Build `{"system": ..., "user": ...}` from templates |
+| `_call_llm(system_message, user_message)` | Call the LLM pool and return a response |
+| `_finalize_discovery()` | Return the best program at end of run |
+
+### SerializableResult Fields
+
+Each iteration produces a `SerializableResult`:
+
+```python
+@dataclass
+class SerializableResult:
+    child_program_dict: Optional[Dict[str, Any]] = None
+    parent_id: Optional[str] = None
+    other_context_ids: Optional[List[str]] = None
+    iteration_time: float = 0.0
+    prompt: Optional[Dict[str, str]] = None
+    llm_response: Optional[str] = None
+    iteration: int = 0
+    error: Optional[str] = None
+    attempts_used: int = 1
+```
+
+### Registration
+
+Register both the database and controller:
+
+```python
+from skydiscover.search.registry import register_database, register_controller
+
+register_database("my_algorithm", MyDatabase)
+register_controller("my_algorithm", MyController)
+```
+
+---
+
+## Custom Configuration
+
+Define a config dataclass for your algorithm and add it to the config mapping:
+
+```python
+from dataclasses import dataclass, field
+from skydiscover.config import DatabaseConfig
+
+@dataclass
+class MyDatabaseConfig(DatabaseConfig):
+    population_size: int = 20
+    mutation_rate: float = 0.1
+    elite_ratio: float = 0.2
+```
+
+Then register it in the `_DB_CONFIG_BY_TYPE` mapping in `skydiscover/config.py`:
+
+```python
+_DB_CONFIG_BY_TYPE = {
+    "topk": DatabaseConfig,
+    "beam_search": BeamSearchDatabaseConfig,
+    "best_of_n": BestOfNDatabaseConfig,
+    "adaevolve": AdaEvolveDatabaseConfig,
+    "openevolve_native": OpenEvolveNativeDatabaseConfig,
+    "gepa_native": GEPANativeDatabaseConfig,
+    "my_algorithm": MyDatabaseConfig,
+}
+```
+
+Use it in your YAML config:
+
+```yaml
+search:
+  type: "my_algorithm"
+  database:
+    population_size: 50
+    mutation_rate: 0.2
+    elite_ratio: 0.1
+```
+
+---
+
+## ProgramDatabase API Reference
+
+| Method | Signature | Description |
+|:-------|:----------|:------------|
+| `__init__` | `(name, config, **kwargs)` | Initialize with name and config |
+| `add` | `(program, iteration=None, **kwargs) -> str` | **Abstract.** Store a program, return its ID |
+| `sample` | `(num_context_programs=4, **kwargs) -> (parent, context)` | **Abstract.** Sample parent + context programs |
+| `save` | `(path=None, iteration=0)` | Checkpoint the database to disk |
+| `load` | `(path)` | Restore from a checkpoint |
+| `_save_program` | `(program, base_path=None, prompts=None)` | Write one program to disk |
+| `_is_better` | `(p1, p2) -> bool` | Compare two programs by score |
+| `_update_best_program` | `(program)` | Track the global best |
+| `get_best_program` | `(metric=None) -> Program` | Return the best program |
+| `get_top_programs` | `(n=10, metric=None) -> List[Program]` | Return top N programs |
+| `get` | `(program_id) -> Program` | Look up a program by ID |
+| `log_prompt` | `(program_id, template_key, prompt, responses=None)` | Store prompt metadata |
+| `log_status` | `()` | Log database statistics |
+| `get_statistics` | `(num_recent_iterations=100, k=20, improvement_threshold=0.10) -> Dict` | Compute summary stats |
+
+## DiscoveryController API Reference
+
+| Method | Signature | Description |
+|:-------|:----------|:------------|
+| `__init__` | `(controller_input: DiscoveryControllerInput)` | Initialize with config, database, evaluator |
+| `run_discovery` | `(start_iteration, max_iterations, checkpoint_callback, post_process_result, retry_times) -> Program` | Main entry point — override this for custom logic |
+| `_run_iteration` | `(iteration, retry_times=1) -> SerializableResult` | One full iteration cycle |
+| `_run_from_scratch_iteration` | `(iteration) -> SerializableResult` | Generate a solution from scratch (no parent) |
+| `_process_iteration_result` | `(result, iteration, callback, verbose)` | Add result to database and checkpoint |
+| `_build_prompt` | `(current_program, context, failed_attempts) -> Dict[str, str]` | Build system + user prompt |
+| `_call_llm` | `(system_message, user_message, **kwargs) -> LLMResponse` | Call the LLM pool |
+| `_init_context_builder` | `()` | Initialize the context builder |
+| `_finalize_discovery` | `() -> Program` | Return the best program |
+| `request_shutdown` | `()` | Signal the run to stop |
+| `postprocess_result` | `(result, iteration_number, verbose)` | Post-process an iteration result |

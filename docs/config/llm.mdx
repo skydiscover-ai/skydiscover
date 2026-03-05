@@ -1,0 +1,269 @@
+---
+title: "LLM Configuration"
+description: "Configure language models, API settings, and generation parameters for SkyDiscover"
+---
+
+## Basic Model Setup
+
+The simplest LLM config specifies a single model:
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+```
+
+## Multiple Models with Weighted Sampling
+
+SkyDiscover samples a model at each iteration based on the weights. This lets you balance cost, speed, and capability:
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 0.7
+    - name: "gemini/gemini-3-pro-preview"
+      weight: 0.3
+```
+
+With these weights, `gpt-5` is selected ~70% of the time and `gemini-3-pro-preview` ~30%.
+
+## Per-Model Configuration
+
+Each model in the pool can have its own generation parameters:
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 0.7
+      temperature: 0.7
+      max_tokens: 32000
+
+    - name: "gemini/gemini-3-pro-preview"
+      weight: 0.3
+      temperature: 0.9
+      max_tokens: 16000
+      api_key: "${GEMINI_API_KEY}"
+
+    - name: "anthropic/claude-sonnet-4-20250514"
+      weight: 0.2
+      api_key: "${ANTHROPIC_API_KEY}"
+      max_tokens: 16000
+```
+
+## All LLM Parameters
+
+### Shared Parameters
+
+These apply to all models as defaults. Per-model values override them.
+
+| Parameter | Type | Default | Description |
+|:---|:---|:---|:---|
+| `api_base` | `str` | provider default | Base URL for the API endpoint |
+| `api_key` | `str` | from env var | API key (auto-resolved from environment) |
+| `temperature` | `float` | `0.7` | Sampling temperature (0–2). Higher = more creative |
+| `top_p` | `float` | `0.95` | Nucleus sampling threshold |
+| `max_tokens` | `int` | `32000` | Maximum tokens in the generated response |
+| `timeout` | `int` | `600` | Request timeout in seconds |
+| `retries` | `int` | `3` | Number of retry attempts on failure |
+| `retry_delay` | `int` | `5` | Delay between retries in seconds |
+| `reasoning_effort` | `str` | `None` | Reasoning effort level for o-series models (`"low"`, `"medium"`, `"high"`) |
+
+### Per-Model Parameters
+
+Each model entry supports:
+
+| Parameter | Type | Default | Description |
+|:---|:---|:---|:---|
+| `name` | `str` | — | Model name (with optional `provider/` prefix) |
+| `weight` | `float` | `1.0` | Sampling weight relative to other models |
+| `api_base` | `str` | inherited | Override API base for this model |
+| `api_key` | `str` | inherited | Override API key for this model |
+| `temperature` | `float` | inherited | Override temperature for this model |
+| `top_p` | `float` | inherited | Override top_p for this model |
+| `max_tokens` | `int` | inherited | Override max_tokens for this model |
+| `timeout` | `int` | inherited | Override timeout for this model |
+| `retries` | `int` | inherited | Override retries for this model |
+| `retry_delay` | `int` | inherited | Override retry_delay for this model |
+| `reasoning_effort` | `str` | inherited | Override reasoning effort for this model |
+| `system_message` | `str` | inherited | Override system message for this model |
+
+## Evaluator Models
+
+Define a separate model pool for LLM-as-judge evaluation. When `evaluator.llm_as_judge` is `True`, these models score programs alongside the evaluator function:
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+
+  evaluator_models:
+    - name: "gpt-5-mini"
+      weight: 1.0
+
+evaluator:
+  llm_as_judge: true
+```
+
+If `evaluator_models` is not specified, SkyDiscover falls back to using the main `models` list.
+
+## Guide Models
+
+Guide models are used for higher-level tasks like idea generation and paradigm breakthroughs in AdaEvolve:
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5-mini"
+      weight: 1.0
+
+  guide_models:
+    - name: "gpt-5"
+      weight: 1.0
+```
+
+If `guide_models` is not specified, SkyDiscover falls back to using the main `models` list.
+
+## Provider Auto-Detection
+
+SkyDiscover automatically detects the provider from the model name and resolves the API base and key:
+
+| Model Name Pattern | Detected Provider | API Base | Env Variable |
+|:---|:---|:---|:---|
+| `gpt-*`, `o1*`, `o3*`, `o4*` | OpenAI | `api.openai.com/v1` | `OPENAI_API_KEY` |
+| `gemini/*`, `gemini-*` | Google Gemini | `generativelanguage.googleapis.com` | `GEMINI_API_KEY` |
+| `anthropic/*`, `claude-*` | Anthropic | `api.anthropic.com/v1` | `ANTHROPIC_API_KEY` |
+| `deepseek/*`, `deepseek-*` | DeepSeek | `api.deepseek.com/v1` | `DEEPSEEK_API_KEY` |
+| `mistral/*`, `mistral-*` | Mistral | `api.mistral.ai/v1` | `MISTRAL_API_KEY` |
+| `ollama/*` | Ollama (local) | user-provided | — |
+| `vllm/*` | vLLM (local) | user-provided | — |
+
+Use the `provider/model` format for explicit provider selection: `gemini/gemini-3-pro-preview`, `anthropic/claude-sonnet-4-20250514`.
+
+## Custom Client Initialization
+
+For advanced use cases, you can provide a custom async client factory in Python:
+
+```python
+from openai import AsyncOpenAI
+from skydiscover.config import Config, LLMConfig, LLMModelConfig
+
+def my_client_factory():
+    return AsyncOpenAI(
+        api_key="sk-...",
+        base_url="https://my-proxy.example.com/v1",
+        default_headers={"X-Custom-Header": "value"},
+    )
+
+config = Config(
+    llm=LLMConfig(
+        models=[
+            LLMModelConfig(
+                name="gpt-5",
+                init_client=my_client_factory,
+            ),
+        ],
+    ),
+)
+```
+
+## Provider Examples
+
+### OpenAI
+
+```yaml
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+```
+
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+### Google Gemini
+
+```yaml
+llm:
+  models:
+    - name: "gemini/gemini-3-pro-preview"
+      weight: 1.0
+```
+
+```bash
+export GEMINI_API_KEY="AIza..."
+```
+
+### Anthropic
+
+```yaml
+llm:
+  models:
+    - name: "anthropic/claude-sonnet-4-20250514"
+      weight: 1.0
+```
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+### DeepSeek
+
+```yaml
+llm:
+  models:
+    - name: "deepseek/deepseek-chat"
+      weight: 1.0
+```
+
+```bash
+export DEEPSEEK_API_KEY="sk-..."
+```
+
+### Local Models (Ollama)
+
+```yaml
+llm:
+  api_base: "http://localhost:11434/v1"
+  models:
+    - name: "ollama/llama3"
+      weight: 1.0
+```
+
+No API key required.
+
+### Local Models (vLLM)
+
+```yaml
+llm:
+  api_base: "http://localhost:8000/v1"
+  models:
+    - name: "vllm/meta-llama/Llama-3-8B"
+      weight: 1.0
+```
+
+### Mixed Provider Pool
+
+```yaml
+llm:
+  temperature: 0.7
+  max_tokens: 32000
+  models:
+    - name: "gpt-5"
+      weight: 0.5
+    - name: "gemini/gemini-3-pro-preview"
+      weight: 0.3
+    - name: "anthropic/claude-sonnet-4-20250514"
+      weight: 0.2
+```
+
+## See Also
+
+- [Configuration Overview](/config/overview) — Full configuration hierarchy
+- [Search Configuration](/config/search) — Algorithm-specific settings
+- [Model Providers Guide](/guides/model-providers) — Detailed provider setup
+- [Installation — Environment Variables](/installation#environment-variables) — Setting API keys
