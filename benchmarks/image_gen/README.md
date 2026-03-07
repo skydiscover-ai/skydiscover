@@ -1,6 +1,6 @@
 # Image Generation Benchmark
 
-This benchmark evaluates whether SkyDiscover can optimize images, not just code or text. Each "solution" in the population is an image, evolved by generating and scoring variants from a candidate pool stored in the database. The evolutionary loop is the same as for code — parent selection, mutation via LLM, crossover via other context images from other islands — but instead of evolving Python programs, SkyDiscover evolves text prompts fed to GPT-4o's native image generation. The VLM receives actual parent and other context images alongside text guidance, reasons about what to improve, and generates a new image. Setting `language: "image"` in the config is the only change needed.
+This benchmark evaluates whether SkyDiscover can optimize images, not just code or text. Each "solution" in the population is an image, evolved by generating and scoring variants from a candidate pool stored in the database. The evolutionary loop is the same as for code — parent selection, mutation via LLM, crossover via other context images from other islands — but instead of evolving Python programs, SkyDiscover evolves text prompts fed to GPT-5's native image generation. The VLM receives actual parent and other context images alongside text guidance, reasons about what to improve, and generates a new image. Setting `language: "image"` in the config is the only change needed.
 
 ## Benchmark: Sky Festival
 
@@ -18,7 +18,7 @@ The system must generate a floating sky-festival image where many details must m
    export OPENAI_API_KEY=...
    ```
 
-   Both the image generator (GPT-4o) and the evaluator judge (GPT-5) use the OpenAI API.
+   Both the image generator (GPT-5) and the evaluator judge (GPT-5) use the OpenAI API.
 
 ## Run
 
@@ -28,7 +28,7 @@ From the repo root:
 uv run skydiscover-run \
   benchmarks/image_gen/sky_festival/image_instruction.txt \
   benchmarks/image_gen/sky_festival/evaluator.py \
-  -c benchmarks/image_gen/sky_festival/config_adaevolve.yaml \
+  -c benchmarks/image_gen/sky_festival/config.yaml \
   -o sky_festival_output
 ```
 
@@ -37,13 +37,13 @@ Or from this directory:
 ```bash
 cd benchmarks/image_gen/sky_festival
 uv run skydiscover-run image_instruction.txt evaluator.py \
-  -c config_adaevolve.yaml -o sky_festival_output
+  -c config.yaml -o sky_festival_output
 ```
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `sky_festival/image_instruction.txt` | 2000-word scene specification describing the target image |
+| `sky_festival/image_instruction.txt` | Seed description of the target image (the detailed spec lives in the config's system message) |
 | `sky_festival/evaluator.py` | GPT-5 vision judge that scores images against the 100-point rubric |
-| `sky_festival/config_adaevolve.yaml` | Run configuration (AdaEvolve, 3 islands, paradigm breakthrough enabled) |
+| `sky_festival/config.yaml` | Run configuration (AdaEvolve, 3 islands, paradigm breakthrough enabled) |
