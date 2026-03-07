@@ -8,7 +8,7 @@ max_iterations: 100
 checkpoint_interval: 1
 log_level: "INFO"
 diff_based_generation: false  # Full rewrite mode (essential for prompt optimization — can't diff free text)
-max_code_length: 10000
+max_solution_length: 10000
 language: "text"  # Tells framework this is plain text, not code
 
 llm:
@@ -19,11 +19,6 @@ llm:
   temperature: 0.7
   max_tokens: 16000
   timeout: 300
-  paradigm_models:
-    - name: "gpt-5-mini"
-      api_base: "https://api.openai.com/v1"
-      max_tokens: 16000
-      timeout: 300
 
 search:
   type: adaevolve

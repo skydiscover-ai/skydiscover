@@ -1,8 +1,8 @@
-# Sky Festival Benchmark — AdaEvolve + Paradigm Breakthrough with GPT-5 LLM judge
+# Sky Festival Benchmark
 #
 # Usage:
 #   cd benchmarks/image_gen/sky_festival
-#   skydiscover-run image_instruction.txt evaluator.py -c config_adaevolve_paradigm.yaml -o sky_festival_paradigm_output
+#   skydiscover-run evaluator.py -c config.yaml -s adaevolve -o sky_festival_output
 
 language: "image"
 diff_based_generation: false
@@ -16,20 +16,6 @@ llm:
   temperature: 0.9
   max_tokens: 16384
   timeout: 300
-
-search:
-  type: "adaevolve"
-  num_context_programs: 3
-  database:
-    num_islands: 3
-    population_size: 20
-    diversity_strategy: "metric"
-    use_paradigm_breakthrough: true
-    paradigm_window_size: 15
-    paradigm_improvement_threshold: 0.03
-    paradigm_max_uses: 5
-    paradigm_num_to_generate: 3
-    paradigm_max_tried: 10
 
 evaluator:
   timeout: 300

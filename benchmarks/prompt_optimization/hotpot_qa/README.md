@@ -44,10 +44,8 @@ uv run skydiscover-run \
   benchmarks/prompt_optimization/hotpot_qa/evaluator.py \
   -c benchmarks/prompt_optimization/hotpot_qa/config_evox.yaml -i 100
 
-# Or use the run scripts:
-bash benchmarks/prompt_optimization/run_adaevolve.sh
-bash benchmarks/prompt_optimization/run_evox.sh
-bash benchmarks/prompt_optimization/run_baselines.sh   # GEPA + OpenEvolve in parallel
+# Or use the reproduce script (runs AdaEvolve + EvoX in parallel):
+bash scripts/reproduce/prompt_opt.sh
 ```
 
 ## Scoring
@@ -62,9 +60,8 @@ bash benchmarks/prompt_optimization/run_baselines.sh   # GEPA + OpenEvolve in pa
 |------|-------------|
 | `initial_prompt.txt` | Seed prompt: "Given the fields `question`, `passages`, produce the fields `answer`." |
 | `evaluator.py` | DSPy-based evaluator with BM25 retrieval and exact match scoring |
-| `config.yaml` | Base config (prompt engineering system message, evaluator settings) |
-| `config_adaevolve.yaml` | AdaEvolve config (multi-island, UCB selection, paradigm breakthrough) |
-| `config_evox.yaml` | EvoX config (co-evolutionary search) |
+| `config_adaevolve.yaml` | AdaEvolve config |
+| `config_evox.yaml` | EvoX config |
 | `requirements.txt` | Python dependencies |
 
 ## Notes
