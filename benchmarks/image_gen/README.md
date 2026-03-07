@@ -22,20 +22,14 @@ The system must generate a floating sky-festival image where many details must m
 
 ## Run
 
-From the repo root:
-
-```bash
-uv run skydiscover-run \
-  benchmarks/image_gen/sky_festival/evaluator.py \
-  -c benchmarks/image_gen/sky_festival/config.yaml \
-  -o sky_festival_output
-```
-
-Or from this directory:
-
 ```bash
 cd benchmarks/image_gen/sky_festival
-uv run skydiscover-run evaluator.py -c config.yaml -o sky_festival_output
+
+# AdaEvolve
+uv run skydiscover-run evaluator.py -c config.yaml -s adaevolve -o sky_festival_output
+
+# EvoX
+uv run skydiscover-run evaluator.py -c config.yaml -s evox -o sky_festival_output
 ```
 
 ## Files
@@ -43,4 +37,4 @@ uv run skydiscover-run evaluator.py -c config.yaml -o sky_festival_output
 | File | Description |
 |------|-------------|
 | `sky_festival/evaluator.py` | GPT-5 vision judge that scores images against the 100-point rubric |
-| `sky_festival/config.yaml` | Run configuration — includes the 2000-word target scene specification in `prompt.system_message` (AdaEvolve, 3 islands, paradigm breakthrough enabled) |
+| `sky_festival/config.yaml` | Config — scene specification in `prompt.system_message` |

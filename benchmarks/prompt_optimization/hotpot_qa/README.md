@@ -60,8 +60,8 @@ bash scripts/reproduce/prompt_opt.sh
 |------|-------------|
 | `initial_prompt.txt` | Seed prompt: "Given the fields `question`, `passages`, produce the fields `answer`." |
 | `evaluator.py` | DSPy-based evaluator with BM25 retrieval and exact match scoring |
-| `config_adaevolve.yaml` | AdaEvolve config (multi-island, UCB selection, paradigm breakthrough) |
-| `config_evox.yaml` | EvoX config (co-evolutionary search, auto variation operators disabled) |
+| `config_adaevolve.yaml` | AdaEvolve config |
+| `config_evox.yaml` | EvoX config |
 | `requirements.txt` | Python dependencies |
 
 ## Notes
