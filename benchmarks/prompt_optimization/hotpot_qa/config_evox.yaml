@@ -1,16 +1,15 @@
-# HotPotQA Prompt Optimization
+# EvoX Configuration for HotPotQA Prompt Optimization
 # Evolves a natural-language instruction prompt (not code) for multi-hop QA
 #
 # Usage:
-#   uv run skydiscover-run initial_prompt.txt evaluator.py -c config.yaml -s adaevolve -i 100
-#   uv run skydiscover-run initial_prompt.txt evaluator.py -c config.yaml -s evox -i 100
+#   uv run skydiscover-run initial_prompt.txt evaluator.py -c config_evox.yaml --search evox
 
 max_iterations: 100
 checkpoint_interval: 1
 log_level: "INFO"
 diff_based_generation: false  # Full rewrite mode (essential for prompt optimization — can't diff free text)
 max_solution_length: 10000
-language: text  # Tells framework this is plain text, not code
+language: "text"  # Tells framework this is plain text, not code
 
 llm:
   models:
@@ -20,36 +19,16 @@ llm:
   temperature: 0.7
   max_tokens: 16000
   timeout: 300
+  guide_models:
+    - name: "gpt-5-mini"
+      api_base: "https://api.openai.com/v1"
+      max_tokens: 16000
+      timeout: 300
 
 search:
-  num_context_programs: 4
+  type: evox
   database:
-    population_size: 20
-    num_islands: 2
-    migration_interval: 10
-    migration_count: 5
-    decay: 0.9
-    intensity_min: 0.15
-    intensity_max: 0.5
-    use_unified_archive: true
-    fitness_weight: 1.0
-    novelty_weight: 0.0
-    diversity_strategy: text
-    use_adaptive_search: true
-    use_ucb_selection: true
-    use_migration: true
-    use_dynamic_islands: true
-    max_islands: 5
-    spawn_productivity_threshold: 0.015
-    spawn_cooldown_iterations: 30
-    use_paradigm_breakthrough: true
-    paradigm_window_size: 10
-    paradigm_improvement_threshold: 0.12
-    paradigm_max_uses: 2
-    paradigm_max_tried: 10
-    paradigm_num_to_generate: 3
-    enable_error_retry: true
-    max_error_retries: 2
+    auto_generate_variation_operators: false
 
 prompt:
   system_message: |

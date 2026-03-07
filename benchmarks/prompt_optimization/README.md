@@ -29,7 +29,7 @@ pip install dspy litellm bm25s pystemmer datasets diskcache ujson
 export OPENAI_API_KEY=...
 
 # Run (first run downloads ~1.3GB of data)
-uv run skydiscover-run initial_prompt.txt evaluator.py -c config.yaml -s adaevolve -i 100
+uv run skydiscover-run initial_prompt.txt evaluator.py -c config_adaevolve.yaml -i 100
 ```
 
 See `hotpot_qa/README.md` for full details.

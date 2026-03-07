@@ -1,0 +1,73 @@
+# AdaEvolve Configuration for HotPotQA Prompt Optimization
+# Evolves a natural-language instruction prompt (not code) for multi-hop QA
+#
+# Usage:
+#   uv run skydiscover-run initial_prompt.txt evaluator.py -c config_adaevolve.yaml --search adaevolve
+
+max_iterations: 100
+checkpoint_interval: 1
+log_level: "INFO"
+diff_based_generation: false  # Full rewrite mode (essential for prompt optimization — can't diff free text)
+max_solution_length: 10000
+language: "text"  # Tells framework this is plain text, not code
+
+llm:
+  models:
+    - name: "gpt-5-mini"
+      weight: 1.0
+  api_base: "https://api.openai.com/v1"
+  temperature: 0.7
+  max_tokens: 16000
+  timeout: 300
+
+search:
+  type: adaevolve
+  num_context_programs: 4
+  database:
+    population_size: 20
+    num_islands: 2
+    migration_interval: 10
+    migration_count: 5
+    decay: 0.9
+    intensity_min: 0.15
+    intensity_max: 0.5
+    use_unified_archive: true
+    fitness_weight: 1.0
+    novelty_weight: 0.0
+    diversity_strategy: text
+    use_adaptive_search: true
+    use_ucb_selection: true
+    use_migration: true
+    use_dynamic_islands: true
+    max_islands: 5
+    spawn_productivity_threshold: 0.015
+    spawn_cooldown_iterations: 30
+    use_paradigm_breakthrough: true
+    paradigm_window_size: 10
+    paradigm_improvement_threshold: 0.12
+    paradigm_max_uses: 2
+    paradigm_max_tried: 10
+    paradigm_num_to_generate: 3
+    enable_error_retry: true
+    max_error_retries: 2
+
+prompt:
+  system_message: |
+    You are an expert prompt engineer. Your task is to revise an group of existing prompts designed for large language models (LLMs), without being explicitly told what the task is.
+
+    Your improvements should:
+
+    * Infer the intended task and expected output format based on the structure and language of the original prompts.
+    * Clarify vague instructions, eliminate ambiguity, and improve overall interpretability for the LLM.
+    * Strengthen alignment between the prompt and the desired task outcome, ensuring more consistent and accurate responses.
+    * Improve robustness against edge cases or unclear input phrasing.
+    * If helpful, include formatting instructions, boundary conditions, or illustrative examples that reinforce the LLM's expected behavior.
+    * Avoid adding unnecessary verbosity or assumptions not grounded in the original prompt.
+    * Use feedback to help reduce known errors
+
+    The revised prompt should maintain the same input interface but be more effective, reliable, and production-ready for LLM use.
+
+evaluator:
+  timeout: 1800  # 30 min — each eval runs ~300 LLM calls with BM25 retrieval
+  max_retries: 3
+  cascade_evaluation: false

@@ -36,13 +36,13 @@ These are cached in the `hotpot_qa/` directory and reused on subsequent runs.
 uv run skydiscover-run \
   benchmarks/prompt_optimization/hotpot_qa/initial_prompt.txt \
   benchmarks/prompt_optimization/hotpot_qa/evaluator.py \
-  -c benchmarks/prompt_optimization/hotpot_qa/config.yaml -s adaevolve -i 100
+  -c benchmarks/prompt_optimization/hotpot_qa/config_adaevolve.yaml -i 100
 
 # EvoX (co-evolutionary search)
 uv run skydiscover-run \
   benchmarks/prompt_optimization/hotpot_qa/initial_prompt.txt \
   benchmarks/prompt_optimization/hotpot_qa/evaluator.py \
-  -c benchmarks/prompt_optimization/hotpot_qa/config.yaml -s evox -i 100
+  -c benchmarks/prompt_optimization/hotpot_qa/config_evox.yaml -i 100
 
 # Or use the reproduce script (runs AdaEvolve + EvoX in parallel):
 bash scripts/reproduce/prompt_opt.sh
@@ -60,7 +60,8 @@ bash scripts/reproduce/prompt_opt.sh
 |------|-------------|
 | `initial_prompt.txt` | Seed prompt: "Given the fields `question`, `passages`, produce the fields `answer`." |
 | `evaluator.py` | DSPy-based evaluator with BM25 retrieval and exact match scoring |
-| `config.yaml` | Config with prompt engineering system message, evaluator and search settings (use `-s` to select search algorithm) |
+| `config_adaevolve.yaml` | AdaEvolve config (multi-island, UCB selection, paradigm breakthrough) |
+| `config_evox.yaml` | EvoX config (co-evolutionary search, auto variation operators disabled) |
 | `requirements.txt` | Python dependencies |
 
 ## Notes

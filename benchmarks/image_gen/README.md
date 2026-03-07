@@ -6,7 +6,7 @@ This benchmark evaluates whether SkyDiscover can optimize images, not just code 
 
 **Directory:** `sky_festival/`
 
-The system must generate a floating sky-festival image where many details must match exact structural constraints: 9 clouds with specific shapes (rabbit, teacup, musical note, crescent moon, whale, etc.), 5 hot-air balloons with exact colors, passengers, and a banner reading "HAPPY 100TH SKY FESTIVAL", a floating island with 4 trees in a specific left-to-right order, and a party table with precisely counted items (6 cupcakes, 8 golden plates, 5 gift boxes in a pyramid). The scene also includes 6 characters with specific attributes (e.g., a robot with 3 colored buttons on its chest, a grandmother giving a thumbs-up with her left hand), flying creatures, and a correctly ordered 7-band rainbow. The full specification is about 2000 words.
+The system must generate a floating sky-festival image where many details must match exact structural constraints: 9 clouds with specific shapes (rabbit, teacup, musical note, crescent moon, whale, etc.), 5 hot-air balloons with exact colors, passengers, and a banner reading "HAPPY 100TH SKY FESTIVAL", a floating island with 4 trees in a specific left-to-right order, and a party table with precisely counted items (6 cupcakes, 8 golden plates, 5 gift boxes in a pyramid). The scene also includes 6 characters with specific attributes (e.g., a robot with 3 colored buttons on its chest, a grandmother giving a thumbs-up with her left hand), flying creatures, and a correctly ordered 7-band rainbow. The full specification is about 2000 words and lives in `config.yaml`'s `prompt.system_message`.
 
 **Evaluator.** Each generated image is graded by a GPT-5 vision judge using a strict rubric. The judge receives the image and a detailed scoring sheet, then returns per-category scores across 7 dimensions — cloud shapes (15 pts), balloons (20 pts), floating island (10 pts), table items (20 pts), characters (15 pts), decorations/creatures (10 pts), and rainbow/lighting (10 pts) — for a total of 100 points. The judge is instructed to be extremely harsh: points are awarded only when requirements are clearly and unambiguously met in the image.
 
@@ -26,7 +26,6 @@ From the repo root:
 
 ```bash
 uv run skydiscover-run \
-  benchmarks/image_gen/sky_festival/image_instruction.txt \
   benchmarks/image_gen/sky_festival/evaluator.py \
   -c benchmarks/image_gen/sky_festival/config.yaml \
   -o sky_festival_output
@@ -36,14 +35,12 @@ Or from this directory:
 
 ```bash
 cd benchmarks/image_gen/sky_festival
-uv run skydiscover-run image_instruction.txt evaluator.py \
-  -c config.yaml -o sky_festival_output
+uv run skydiscover-run evaluator.py -c config.yaml -o sky_festival_output
 ```
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `sky_festival/image_instruction.txt` | Seed description of the target image (the detailed spec lives in the config's system message) |
 | `sky_festival/evaluator.py` | GPT-5 vision judge that scores images against the 100-point rubric |
-| `sky_festival/config.yaml` | Run configuration (AdaEvolve, 3 islands, paradigm breakthrough enabled) |
+| `sky_festival/config.yaml` | Run configuration — includes the 2000-word target scene specification in `prompt.system_message` (AdaEvolve, 3 islands, paradigm breakthrough enabled) |
