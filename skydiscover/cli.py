@@ -268,24 +268,30 @@ def _configure_logging(level_name: Optional[str]) -> None:
 
 
 def _find_latest_checkpoint(checkpoint_dir: str) -> Optional[str]:
-    """Return the path of the most recent checkpoint, or None."""
+    """Return the path of the latest checkpoint directory named like ``checkpoint_<n>``."""
     if not os.path.isdir(checkpoint_dir):
         return None
 
-    def get_iteration_from_path(path: str) -> int:
+    def parse_iteration(path: str) -> Optional[int]:
         try:
             return int(path.rsplit("_", 1)[-1])
         except (ValueError, IndexError):
-            return 0
+            return None
 
-    dirs = [
-        os.path.join(checkpoint_dir, d)
-        for d in os.listdir(checkpoint_dir)
-        if os.path.isdir(os.path.join(checkpoint_dir, d))
-    ]
-    if not dirs:
+    candidates = []
+    for name in os.listdir(checkpoint_dir):
+        full_path = os.path.join(checkpoint_dir, name)
+        if not os.path.isdir(full_path):
+            continue
+        iteration = parse_iteration(name)
+        if iteration is None:
+            continue
+        candidates.append((iteration, full_path))
+
+    if not candidates:
         return None
-    return sorted(dirs, key=get_iteration_from_path)[-1]
+
+    return max(candidates, key=lambda item: item[0])[1]
 
 
 if __name__ == "__main__":
