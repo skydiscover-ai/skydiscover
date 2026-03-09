@@ -597,7 +597,12 @@ class DiscoveryController:
                         child_metrics.get("validity"),
                         error_msg,
                     )
-                    logger.debug("Failed solution (attempt %s/%s):\n%s", retry + 1, retry_times, child_solution)
+                    logger.debug(
+                        "Failed solution (attempt %s/%s):\n%s",
+                        retry + 1,
+                        retry_times,
+                        child_solution,
+                    )
 
                     failed_attempts.append(
                         {
