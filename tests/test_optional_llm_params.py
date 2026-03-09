@@ -4,7 +4,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from dataclasses import fields
+
 from skydiscover.config import LLMConfig, LLMModelConfig
+
+_OPENAI_DEFAULT_API_BASE: str = next(
+    f.default for f in fields(LLMConfig) if f.name == "api_base"
+)
 
 
 class TestLLMConfigOptionalParams:
@@ -27,6 +33,28 @@ class TestLLMConfigOptionalParams:
         cfg = LLMConfig(name="test-model", temperature=None, top_p=None)
         assert cfg.temperature is None
         assert cfg.top_p is None
+
+
+class TestLocalApiBaseConfig:
+    """Tests that a user-provided api_base is preserved for unknown model names."""
+
+    def test_unknown_model_with_local_api_base(self):
+        """api_base must not be overridden with OpenAI's default for unknown models."""
+        local_endpoint = "http://localhost:11434/v1"
+        cfg = LLMConfig(
+            name="my-custom-local-model",
+            api_base=local_endpoint,
+            models=[LLMModelConfig(name="my-custom-local-model")],
+        )
+        assert cfg.models[0].api_base == local_endpoint
+
+    def test_unknown_model_without_explicit_api_base_gets_openai_default(self):
+        """Without an explicit api_base, unknown model names fall back to the OpenAI default."""
+        cfg = LLMConfig(
+            name="my-custom-local-model",
+            models=[LLMModelConfig(name="my-custom-local-model")],
+        )
+        assert cfg.models[0].api_base == _OPENAI_DEFAULT_API_BASE
 
 
 class TestOpenAILLMParams:
