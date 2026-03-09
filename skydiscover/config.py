@@ -189,10 +189,15 @@ class LLMConfig(LLMModelConfig):
             self.guide_models = self.models.copy()
 
         # Resolve per-model api_base, api_key, and bare name from provider prefix
+        # Check if user explicitly set api_base at the LLMConfig level
+        # (i.e. it differs from the hardcoded default).  When a custom api_base
+        # is provided, we should NOT override it with the provider default so
+        # that update_model_params() below can propagate the user's value.
+        user_set_api_base = self.api_base != "https://api.openai.com/v1"
         for model in self.models + self.evaluator_models + self.guide_models:
             if model.name and model.api_base is None:
                 provider, bare_name, provider_base, env_vars = _parse_model_spec(model.name)
-                if provider_base:
+                if provider_base and not user_set_api_base:
                     model.api_base = provider_base
                 if model.api_key is None:
                     model.api_key = _resolve_api_key_from_env(env_vars)
