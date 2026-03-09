@@ -152,7 +152,7 @@ class LLMConfig(LLMModelConfig):
     """Configuration for LLM models"""
 
     # API configuration
-    api_base: str = "https://api.openai.com/v1"
+    api_base: str = _PROVIDERS["openai"][0]
 
     # Generation parameters
     system_message: Optional[str] = "system_message"
@@ -193,7 +193,7 @@ class LLMConfig(LLMModelConfig):
         # (i.e. it differs from the hardcoded default).  When a custom api_base
         # is provided, we should NOT override it with the provider default so
         # that update_model_params() below can propagate the user's value.
-        user_set_api_base = self.api_base != "https://api.openai.com/v1"
+        user_set_api_base = self.api_base.rstrip("/") != _PROVIDERS["openai"][0].rstrip("/")
         for model in self.models + self.evaluator_models + self.guide_models:
             if model.name and model.api_base is None:
                 provider, bare_name, provider_base, env_vars = _parse_model_spec(model.name)
@@ -514,7 +514,7 @@ class MonitorConfig:
     # AI summary settings
     summary_model: str = "gpt-5-mini"
     summary_api_key: Optional[str] = None  # Falls back to OPENAI_API_KEY
-    summary_api_base: str = "https://api.openai.com/v1"
+    summary_api_base: str = _PROVIDERS["openai"][0]
     summary_top_k: int = 3
     summary_interval: int = 0  # Auto-generate every N programs (0 = manual)
 
