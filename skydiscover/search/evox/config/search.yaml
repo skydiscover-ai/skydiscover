@@ -12,7 +12,7 @@ llm:
   api_base: "https://api.openai.com/v1"
   api_key: ${OPENAI_API_KEY}
   temperature: 0.7
-  top_p: 0.95
+  # top_p: 0.95  # omitted by default; some providers (e.g. Anthropic) reject both temperature and top_p
   max_tokens: 32000
   timeout: 600
   guide_models:

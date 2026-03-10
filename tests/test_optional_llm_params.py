@@ -11,7 +11,7 @@ class TestLLMConfigOptionalParams:
     def test_default_values(self):
         cfg = LLMConfig(name="test-model")
         assert cfg.temperature == 0.7
-        assert cfg.top_p == 0.95
+        assert cfg.top_p is None
 
     def test_top_p_none(self):
         cfg = LLMConfig(name="test-model", top_p=None)
@@ -21,7 +21,7 @@ class TestLLMConfigOptionalParams:
     def test_temperature_none(self):
         cfg = LLMConfig(name="test-model", temperature=None)
         assert cfg.temperature is None
-        assert cfg.top_p == 0.95
+        assert cfg.top_p is None
 
     def test_both_none(self):
         cfg = LLMConfig(name="test-model", temperature=None, top_p=None)

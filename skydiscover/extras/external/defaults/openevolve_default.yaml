@@ -6,7 +6,7 @@ checkpoint_interval: 10
 
 llm:
   temperature: 0.7
-  top_p: 0.95
+  # top_p: 0.95  # omitted by default; some providers (e.g. Anthropic) reject both temperature and top_p
   # gpt-4o/gpt-4o-mini cap at 16384 output tokens; gpt-5 models support more.
   # 16384 is the safe ceiling that works across all current OpenAI models.
   max_tokens: 16384

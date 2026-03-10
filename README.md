@@ -78,18 +78,25 @@ uv sync --extra math
 uv run skydiscover-run benchmarks/math/circle_packing/initial_program.py \
   benchmarks/math/circle_packing/evaluator.py \
   --config benchmarks/math/circle_packing/config.yaml \
+  --search evox \
+  --iterations 100
+
+uv run skydiscover-run benchmarks/math/circle_packing/initial_program.py \
+  benchmarks/math/circle_packing/evaluator.py \
+  --config benchmarks/math/circle_packing/config.yaml \
   --search adaevolve \
   --iterations 100
 
 # Or run on your own problem
+# algo can be "evox", "adaevolve", "openevolve", "gepa", "shinkaevolve"
 uv run skydiscover-run initial_program.py evaluator.py \
-  --search evox \
+  --search <algo> \
   --model gpt-5 \
   --iterations 100
 
 # initial_program is optional — omit it to let the LLM start from scratch
 uv run skydiscover-run evaluator.py \
-  --search evox \
+  --search <algo> \
   --model gpt-5 \
   --iterations 100
 ```

@@ -10,7 +10,7 @@ llm:
       weight: 1.0
   api_base: https://api.openai.com/v1
   temperature: 1.0
-  top_p: 0.95
+  # top_p: 0.95  # omitted by default; some providers (e.g. Anthropic) reject both temperature and top_p
   max_tokens: 32000
   timeout: 600
 
