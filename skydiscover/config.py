@@ -197,7 +197,14 @@ class LLMConfig(LLMModelConfig):
         for model in self.models + self.evaluator_models + self.guide_models:
             if model.name and model.api_base is None:
                 provider, bare_name, provider_base, env_vars = _parse_model_spec(model.name)
-                if provider_base and not user_set_api_base:
+                # Skip provider URL only for unrecognized bare names that fell
+                # through to the OpenAI default — never for an explicitly-prefixed
+                # provider (e.g. "anthropic/claude-3-sonnet") or a known bare prefix.
+                is_fallback = provider == "openai" and not (
+                    model.name.startswith("openai/")
+                    or any(model.name.startswith(p) for p in _BARE_PREFIX_MAP)
+                )
+                if provider_base and not (user_set_api_base and is_fallback):
                     model.api_base = provider_base
                 if model.api_key is None:
                     model.api_key = _resolve_api_key_from_env(env_vars)
