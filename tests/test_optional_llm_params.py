@@ -56,6 +56,18 @@ class TestLocalApiBaseConfig:
         )
         assert cfg.models[0].api_base == _OPENAI_DEFAULT_API_BASE
 
+    def test_mixed_providers_with_local_api_base(self):
+        """Provider-prefixed models must get their own endpoint, not the local one."""
+        cfg = LLMConfig(
+            api_base="http://localhost:11434/v1",
+            models=[
+                LLMModelConfig(name="anthropic/claude-3-sonnet"),
+                LLMModelConfig(name="my-local-model"),
+            ],
+        )
+        assert cfg.models[0].api_base == "https://api.anthropic.com/v1/"
+        assert cfg.models[1].api_base == "http://localhost:11434/v1"
+
 
 class TestOpenAILLMParams:
     def _make_llm(self, temperature=0.7, top_p=0.95):
