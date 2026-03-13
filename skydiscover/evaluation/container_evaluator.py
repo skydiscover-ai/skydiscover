@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import subprocess
 import time
 import uuid
@@ -268,12 +269,29 @@ class ContainerizedEvaluator:
         name = os.path.basename(os.path.normpath(self.benchmark_dir))
         tag = f"skydiscover-{name}:latest"
 
-        logger.info(f"Building Docker image: {tag} (from {self.benchmark_dir})")
-        result = subprocess.run(
-            ["docker", "build", "-t", tag, self.benchmark_dir],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"Docker build failed for {self.benchmark_dir}:\n{result.stderr}")
+        # Inject the shared wrapper.py into the build context if the benchmark
+        # doesn't supply its own.  Cleaned up after the build so the source
+        # tree stays tidy.
+        wrapper_src = os.path.join(os.path.dirname(__file__), "wrapper.py")
+        wrapper_dst = os.path.join(self.benchmark_dir, "wrapper.py")
+        injected_wrapper = False
+        if os.path.exists(wrapper_src) and not os.path.exists(wrapper_dst):
+            shutil.copy2(wrapper_src, wrapper_dst)
+            injected_wrapper = True
+
+        try:
+            logger.info(f"Building Docker image: {tag} (from {self.benchmark_dir})")
+            result = subprocess.run(
+                ["docker", "build", "-t", tag, self.benchmark_dir],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"Docker build failed for {self.benchmark_dir}:\n{result.stderr}"
+                )
+        finally:
+            if injected_wrapper:
+                os.remove(wrapper_dst)
+
         return tag
