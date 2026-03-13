@@ -1,7 +1,6 @@
 """Containerized evaluator: runs evaluate.sh inside a persistent Docker container."""
 
 import asyncio
-import hashlib
 import json
 import logging
 import os
@@ -23,34 +22,50 @@ class ContainerizedEvaluator:
 
     The benchmark directory must contain:
       - Dockerfile
-      - evaluate.sh  (called as: evaluate.sh <mode> <program_path>)
+      - evaluate.sh  (called as: evaluate.sh <solution_path> <mode>)
 
-    Any data files or other resources needed by evaluate.sh are the
-    benchmark's own concern — the framework imposes no structure on them.
+    Any data files or other resources needed by evaluate.sh, such as a
+    requirements.txt or data files, are the benchmark's own concern — the
+    framework imposes no structure on them.
 
-    evaluate.sh writes a single JSON object to stdout:
-      {
-        "status": "success" | "error" | "timeout",
-        "combined_score": <float in [0,1]>,
-        "metrics": {<str>: <float>},
-        "artifacts": {<str>: <str>}   # optional
-      }
+    evaluate.sh receives two arguments:
+      1. ``<solution_path>`` — absolute path to the candidate program inside
+         the container (e.g. ``/tmp/candidate_abc123.py``).
+      2. ``<mode>`` — either ``"train"`` or ``"test"``.
+
+         - **train**: called during the optimization loop in the process
+           of iterating towards a single solution. This may be called multiple
+           times per program, thus should be relatively fast.
+         - **test**: called at publish time (e.g. end-of-run best program).
+           Should be the authoritative, full evaluation, which will be used
+           for reporting and leaderboard ranking.
+
+         Evaluators that don't need the distinction can ignore the mode.
+
+    evaluate.sh writes a single JSON object to stdout::
+
+        {
+          "status": "success" | "error" | "timeout",
+          "combined_score": <float>,
+          "metrics": {<str>: <float>},
+          "artifacts": {<str>: <str>}   // optional
+        }
 
     Exit codes:
       0 — evaluation completed (score may still reflect failure)
       1 — evaluator itself crashed (infrastructure problem)
 
-    The image is built once and cached by a hash of all files in the benchmark
-    directory; rebuilds happen automatically when anything changes.
+    The image is built once at init time (Docker's layer cache makes
+    subsequent builds near-instant when nothing changed).
 
     A single container is started at init time and reused across evaluations.
     Each evaluation injects its candidate file via stdin (no host filesystem
     dependency) and runs evaluate.sh with docker exec.  Concurrent evaluations
     are safe because each uses a unique path inside the container's /tmp.
 
-    Design note: _run_container is intentionally a plain method (not async)
-    so it can be overridden by adapters targeting other interfaces (e.g.
-    Harbor's /solution + /logs/verifier/reward.json convention).
+    Design note: ``_run_single_in_container`` is intentionally a plain method
+    (not async) so it can be overridden by adapters targeting other container
+    interfaces (e.g. Harbor's /solution + /logs/verifier/reward.json).
     """
 
     def __init__(
@@ -84,8 +99,16 @@ class ContainerizedEvaluator:
         self,
         program_solution: str,
         program_id: str = "",
+        mode: str = "train",
     ) -> EvaluationResult:
-        """Evaluate one candidate program (train mode) and return scores."""
+        """Evaluate one candidate program and return scores.
+
+        Args:
+            program_solution: Source code (or path, for image mode) of the candidate.
+            program_id: Optional identifier for logging.
+            mode: ``"train"`` for hot-loop evaluation, ``"test"`` for
+                  authoritative/publish evaluation.
+        """
         start_time = time.time()
         label = f" {program_id}" if program_id else ""
 
@@ -94,13 +117,13 @@ class ContainerizedEvaluator:
             try:
                 result = await asyncio.wait_for(
                     asyncio.get_running_loop().run_in_executor(
-                        None, self._run_container, program_solution, "train"
+                        None, self._run_container, program_solution, mode
                     ),
                     timeout=self.config.timeout,
                 )
                 elapsed = time.time() - start_time
                 logger.info(
-                    f"Evaluated program{label} in {elapsed:.2f}s:"
+                    f"Evaluated program{label} [{mode}] in {elapsed:.2f}s:"
                     f" {format_metrics(result.metrics)}"
                 )
                 return result
@@ -124,7 +147,7 @@ class ContainerizedEvaluator:
         self,
         programs: List[Tuple[str, str]],
     ) -> List[EvaluationResult]:
-        """Evaluate multiple programs concurrently (train mode).
+        """Evaluate multiple programs concurrently.
 
         Args:
             programs: List of (solution, program_id) tuples.
@@ -138,7 +161,7 @@ class ContainerizedEvaluator:
         )
 
     # ------------------------------------------------------------------
-    # Docker helpers — override _run_container for alternative interfaces
+    # Container interaction — override for alternative interfaces
     # ------------------------------------------------------------------
 
     def _run_container(self, program_solution: str, mode: str) -> EvaluationResult:
@@ -149,46 +172,63 @@ class ContainerizedEvaluator:
         Override this method to target a different container interface
         (e.g. Harbor: cp to /solution/, read reward from /logs/verifier/reward.json).
         """
-        candidate_path = f"/tmp/candidate_{uuid.uuid4().hex}{self.program_suffix}"
+        candidate_path = self._inject_file(program_solution, self.program_suffix)
+        try:
+            return self._run_single_in_container(candidate_path, mode)
+        finally:
+            self._remove_file(candidate_path)
 
-        # Inject solution into the container via stdin — no host temp file needed.
+    def _run_single_in_container(
+        self, candidate_path: str, mode: str
+    ) -> EvaluationResult:
+        """Execute evaluate.sh inside the container and parse its JSON output."""
+        proc = subprocess.run(
+            [
+                "docker", "exec", self.container_id,
+                "/benchmark/evaluate.sh", candidate_path, mode,
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode != 0:
+            logger.error(
+                f"Evaluator exited with code {proc.returncode}:\n{proc.stderr}"
+            )
+            return EvaluationResult(
+                metrics={"error": 0.0},
+                artifacts={"stderr": proc.stderr, "exit_code": str(proc.returncode)},
+            )
+
+        result = self._parse_output(proc.stdout)
+        # Always surface stderr (e.g. warnings, partial tracebacks) even on
+        # successful exit — the evaluator may have caught the error internally
+        # and returned valid JSON, but stderr still has useful context.
+        if proc.stderr.strip():
+            result.artifacts.setdefault("stderr", proc.stderr)
+        return result
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _inject_file(self, content: str, suffix: str) -> str:
+        """Write content to a unique temp file inside the container via stdin."""
+        path = f"/tmp/{uuid.uuid4().hex}{suffix}"
         inject = subprocess.run(
-            ["docker", "exec", "-i", self.container_id, "tee", candidate_path],
-            input=program_solution.encode(),
+            ["docker", "exec", "-i", self.container_id, "tee", path],
+            input=content.encode(),
             capture_output=True,
         )
         if inject.returncode != 0:
-            logger.error(f"Failed to inject candidate: {inject.stderr.decode()}")
-            return EvaluationResult(
-                metrics={"error": 0.0},
-                artifacts={"stderr": inject.stderr.decode()},
-            )
+            raise RuntimeError(f"Failed to inject file into container: {inject.stderr.decode()}")
+        return path
 
-        try:
-            proc = subprocess.run(
-                [
-                    "docker",
-                    "exec",
-                    self.container_id,
-                    "/benchmark/evaluate.sh",
-                    mode,
-                    candidate_path,
-                ],
-                capture_output=True,
-                text=True,
-            )
-            if proc.returncode == 1:
-                logger.error(f"Evaluator crashed (exit 1):\n{proc.stderr}")
-                return EvaluationResult(
-                    metrics={"error": 0.0},
-                    artifacts={"stderr": proc.stderr},
-                )
-            return self._parse_output(proc.stdout)
-        finally:
-            subprocess.run(
-                ["docker", "exec", self.container_id, "rm", "-f", candidate_path],
-                capture_output=True,
-            )
+    def _remove_file(self, path: str) -> None:
+        """Remove a file inside the container."""
+        subprocess.run(
+            ["docker", "exec", self.container_id, "rm", "-f", path],
+            capture_output=True,
+        )
 
     def _parse_output(self, stdout: str) -> EvaluationResult:
         try:
@@ -226,15 +266,7 @@ class ContainerizedEvaluator:
 
     def _build_image(self) -> str:
         name = os.path.basename(self.benchmark_dir)
-        tag = f"skydiscover-{name}:{self._content_hash()}"
-
-        check = subprocess.run(
-            ["docker", "image", "inspect", tag],
-            capture_output=True,
-        )
-        if check.returncode == 0:
-            logger.info(f"Reusing cached Docker image: {tag}")
-            return tag
+        tag = f"skydiscover-{name}:latest"
 
         logger.info(f"Building Docker image: {tag} (from {self.benchmark_dir})")
         result = subprocess.run(
@@ -245,16 +277,3 @@ class ContainerizedEvaluator:
         if result.returncode != 0:
             raise RuntimeError(f"Docker build failed for {self.benchmark_dir}:\n{result.stderr}")
         return tag
-
-    def _content_hash(self) -> str:
-        """12-char hash of all files in the benchmark directory for image cache invalidation."""
-        h = hashlib.sha256()
-        for root, dirs, files in os.walk(self.benchmark_dir):
-            dirs.sort()  # deterministic traversal order
-            for fname in sorted(files):
-                path = os.path.join(root, fname)
-                # Include the relative path so renames also invalidate the cache
-                h.update(os.path.relpath(path, self.benchmark_dir).encode())
-                with open(path, "rb") as f:
-                    h.update(f.read())
-        return h.hexdigest()[:12]
