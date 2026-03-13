@@ -19,6 +19,7 @@ class SerializableResult:
     other_context_ids: Optional[List[str]] = None
 
     iteration_time: float = 0.0
+    llm_time: float = 0.0
     prompt: Optional[Dict[str, str]] = None
     llm_response: Optional[str] = None
     iteration: int = 0

@@ -347,7 +347,9 @@ class DiscoveryController:
                 if feedback:
                     prompt = self.feedback_reader.apply_feedback(prompt)
 
+            llm_start = time.time()
             result = await self._call_llm(prompt["system"], prompt["user"])
+            llm_time = time.time() - llm_start
             llm_response = result.text
             if not llm_response:
                 return SerializableResult(error="Empty LLM response", iteration=iteration)
@@ -380,6 +382,7 @@ class DiscoveryController:
                 parent_id=None,
                 other_context_ids=[],
                 iteration_time=time.time() - iteration_start,
+                llm_time=llm_time,
                 prompt=prompt,
                 llm_response=llm_response,
                 iteration=iteration,
@@ -470,6 +473,7 @@ class DiscoveryController:
                         )
 
                 try:
+                    llm_start = time.time()
                     if self.config.language == "image":
                         child_id = str(uuid.uuid4())
                         user_content = build_image_content(
@@ -495,6 +499,7 @@ class DiscoveryController:
                     else:
                         result = await self._call_llm(prompt["system"], prompt["user"])
                         llm_response = result.text
+                    llm_time = time.time() - llm_start
                 except Exception as e:
                     logger.error(f"LLM generation failed: {e}")
                     return SerializableResult(
@@ -646,6 +651,7 @@ class DiscoveryController:
                         parent_id=parent.id,
                         other_context_ids=context_program_ids,
                         iteration_time=iteration_time,
+                        llm_time=llm_time,
                         prompt=prompt,
                         llm_response=llm_response,
                         attempts_used=retry_times,
@@ -675,6 +681,7 @@ class DiscoveryController:
                 parent_id=parent.id,
                 other_context_ids=context_program_ids,
                 iteration_time=iteration_time,
+                llm_time=llm_time,
                 prompt=prompt,
                 llm_response=llm_response,
                 iteration=iteration,
@@ -897,6 +904,7 @@ class DiscoveryController:
                 f"Program {child_program.id} "
                 f"(parent: {result.parent_id}) "
                 f"completed in {result.iteration_time:.2f}s"
+                f" (llm: {result.llm_time:.2f}s)"
             )
 
         if iteration > 0 and iteration % self.config.checkpoint_interval == 0:
