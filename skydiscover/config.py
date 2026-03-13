@@ -502,6 +502,7 @@ class SearchConfig:
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     num_context_programs: int = 4
     output_dir: Optional[str] = None
+    switch_interval: Optional[int] = None  # EvoX: stagnation iters before strategy switch. Auto-calculated if None.
 
 
 # ═══════════════════════════════════════════════════════════════════════
