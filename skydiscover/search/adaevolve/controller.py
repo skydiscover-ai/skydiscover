@@ -168,7 +168,8 @@ class AdaEvolveController(DiscoveryController):
         sampling_intensity: Optional[float] = None,
         child_program: Optional[Dict] = None,
         iteration_time: Optional[float] = None,
-        llm_time: Optional[float] = None,
+        llm_generation_time: Optional[float] = None,
+        eval_time: Optional[float] = None,
         error: Optional[str] = None,
     ) -> None:
         """
@@ -210,7 +211,8 @@ class AdaEvolveController(DiscoveryController):
                 "success": error is None,
                 "error": error,
                 "iteration_time_seconds": iteration_time,
-                "llm_time_seconds": llm_time,
+                "llm_generation_time_seconds": llm_generation_time,
+                "eval_time_seconds": eval_time,
             }
 
             # Add child program info if available
@@ -333,7 +335,8 @@ class AdaEvolveController(DiscoveryController):
                 sampling_intensity=self._last_sampling_intensity,
                 child_program=None,
                 iteration_time=iteration_time,
-                llm_time=result.llm_time,
+                llm_generation_time=result.llm_generation_time,
+                eval_time=result.eval_time,
                 error=result.error,
             )
         else:
@@ -345,7 +348,8 @@ class AdaEvolveController(DiscoveryController):
                 sampling_intensity=self._last_sampling_intensity,
                 child_program=result.child_program_dict,
                 iteration_time=result.iteration_time,
-                llm_time=result.llm_time,
+                llm_generation_time=result.llm_generation_time,
+                eval_time=result.eval_time,
                 error=None,
             )
 
@@ -442,7 +446,8 @@ class AdaEvolveController(DiscoveryController):
             f"Iteration {iteration}: Program {child.id[:8]} "
             f"(parent: {result.parent_id[:8] if result.parent_id else 'None'}) "
             f"completed in {result.iteration_time:.2f}s"
-            f" (llm: {result.llm_time:.2f}s)"
+            f" (llm: {result.llm_generation_time:.2f}s,"
+            f" eval: {result.eval_time:.2f}s)"
         )
 
         # Log metrics
@@ -608,7 +613,7 @@ class AdaEvolveController(DiscoveryController):
         child_id = str(uuid.uuid4())
 
         # Generate
-        llm_time = 0.0
+        llm_generation_time = 0.0
         try:
             llm_start = time.time()
             if self.config.language == "image":
@@ -633,7 +638,7 @@ class AdaEvolveController(DiscoveryController):
             else:
                 result = await self._call_llm(prompt["system"], prompt["user"])
                 response = result.text
-            llm_time = time.time() - llm_start
+            llm_generation_time = time.time() - llm_start
         except Exception as e:
             return SerializableResult(error=f"LLM error: {e}", iteration=iteration)
 
@@ -663,7 +668,9 @@ class AdaEvolveController(DiscoveryController):
         # Evaluate
         try:
             eval_input = image_path if self.config.language == "image" else child_solution
+            eval_start = time.time()
             eval_result = await self.evaluator.evaluate_program(eval_input, child_id)
+            eval_time = time.time() - eval_start
         except Exception as e:
             return SerializableResult(error=f"Evaluation error: {e}", iteration=iteration)
 
@@ -704,7 +711,8 @@ class AdaEvolveController(DiscoveryController):
             parent_id=parent.id,
             other_context_ids=context_program_ids,
             iteration_time=iteration_time,
-            llm_time=llm_time,
+            llm_generation_time=llm_generation_time,
+            eval_time=eval_time,
             prompt=prompt,
             llm_response=response,
             iteration=iteration,

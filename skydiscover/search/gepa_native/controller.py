@@ -327,8 +327,7 @@ class GEPANativeController(DiscoveryController):
                 system_message=merge_prompt["system"],
                 messages=[{"role": "user", "content": merge_prompt["user"]}],
             )
-            llm_time = time.time() - llm_start
-            logger.info(f"Iteration {iteration}: Merge LLM call completed in {llm_time:.2f}s")
+            llm_generation_time = time.time() - llm_start
         except Exception as e:
             logger.warning(f"Merge LLM call failed: {e}")
             return
@@ -347,12 +346,19 @@ class GEPANativeController(DiscoveryController):
         # Evaluate the merged solution
         child_id = str(uuid.uuid4())
         try:
+            eval_start = time.time()
             eval_result = await self.evaluator.evaluate_program(child_solution, child_id)
+            eval_time = time.time() - eval_start
         except Exception as e:
             logger.warning(f"Merge evaluation failed: {e}")
             return
 
         merged_score = get_score(eval_result.metrics)
+        logger.info(
+            f"Iteration {iteration}: Merge completed"
+            f" (llm: {llm_generation_time:.2f}s,"
+            f" eval: {eval_time:.2f}s)"
+        )
 
         # GEPA acceptance criterion for merges: must meet or exceed both parents
         if merged_score >= max(score_a, score_b):
