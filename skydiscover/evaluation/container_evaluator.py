@@ -265,7 +265,7 @@ class ContainerizedEvaluator:
         return result.stdout.strip()
 
     def _build_image(self) -> str:
-        name = os.path.basename(self.benchmark_dir)
+        name = os.path.basename(os.path.normpath(self.benchmark_dir))
         tag = f"skydiscover-{name}:latest"
 
         logger.info(f"Building Docker image: {tag} (from {self.benchmark_dir})")
