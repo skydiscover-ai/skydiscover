@@ -178,22 +178,22 @@ class ContainerizedEvaluator:
         finally:
             self._remove_file(candidate_path)
 
-    def _run_single_in_container(
-        self, candidate_path: str, mode: str
-    ) -> EvaluationResult:
+    def _run_single_in_container(self, candidate_path: str, mode: str) -> EvaluationResult:
         """Execute evaluate.sh inside the container and parse its JSON output."""
         proc = subprocess.run(
             [
-                "docker", "exec", self.container_id,
-                "/benchmark/evaluate.sh", candidate_path, mode,
+                "docker",
+                "exec",
+                self.container_id,
+                "/benchmark/evaluate.sh",
+                candidate_path,
+                mode,
             ],
             capture_output=True,
             text=True,
         )
         if proc.returncode != 0:
-            logger.error(
-                f"Evaluator exited with code {proc.returncode}:\n{proc.stderr}"
-            )
+            logger.error(f"Evaluator exited with code {proc.returncode}:\n{proc.stderr}")
             return EvaluationResult(
                 metrics={"error": 0.0},
                 artifacts={"stderr": proc.stderr, "exit_code": str(proc.returncode)},

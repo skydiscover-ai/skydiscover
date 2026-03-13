@@ -40,22 +40,32 @@ def main():
         result = _mod.evaluate(program_path)
     except Exception as e:
         sys.stdout = real_stdout
-        print(json.dumps({
-            "status": "error",
-            "combined_score": 0.0,
-            "metrics": {"combined_score": 0.0},
-            "artifacts": {"error": str(e), "traceback": traceback.format_exc()},
-        }))
+        print(
+            json.dumps(
+                {
+                    "status": "error",
+                    "combined_score": 0.0,
+                    "metrics": {"combined_score": 0.0},
+                    "artifacts": {"error": str(e), "traceback": traceback.format_exc()},
+                }
+            )
+        )
         return
     sys.stdout = real_stdout
 
     if not isinstance(result, dict):
-        print(json.dumps({
-            "status": "error",
-            "combined_score": 0.0,
-            "metrics": {"combined_score": 0.0},
-            "artifacts": {"error": f"evaluate() returned {type(result).__name__}, expected dict"},
-        }))
+        print(
+            json.dumps(
+                {
+                    "status": "error",
+                    "combined_score": 0.0,
+                    "metrics": {"combined_score": 0.0},
+                    "artifacts": {
+                        "error": f"evaluate() returned {type(result).__name__}, expected dict"
+                    },
+                }
+            )
+        )
         return
 
     # Separate numeric metrics from non-numeric artifacts.
