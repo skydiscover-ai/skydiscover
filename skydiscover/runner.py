@@ -189,6 +189,8 @@ class Runner:
                     logger.info(
                         f"Test evaluation for best program: {format_metrics(test_result.metrics)}"
                     )
+                    # Persist test metrics to disk so they survive the run.
+                    self._save_best_program(best)
                 except Exception as e:
                     logger.warning(f"Test-mode re-evaluation failed: {e}")
 

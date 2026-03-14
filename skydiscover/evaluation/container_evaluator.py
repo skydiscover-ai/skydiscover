@@ -180,18 +180,26 @@ class ContainerizedEvaluator:
 
     def _run_single_in_container(self, candidate_path: str, mode: str) -> EvaluationResult:
         """Execute evaluate.sh inside the container and parse its JSON output."""
-        proc = subprocess.run(
-            [
-                "docker",
-                "exec",
-                self.container_id,
-                "/benchmark/evaluate.sh",
-                candidate_path,
-                mode,
-            ],
-            capture_output=True,
-            text=True,
-        )
+        try:
+            proc = subprocess.run(
+                [
+                    "docker",
+                    "exec",
+                    self.container_id,
+                    "/benchmark/evaluate.sh",
+                    candidate_path,
+                    mode,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=self.config.timeout,
+            )
+        except subprocess.TimeoutExpired:
+            logger.error(f"docker exec timed out after {self.config.timeout}s")
+            return EvaluationResult(
+                metrics={"error": 0.0, "timeout": True},
+                artifacts={"error": f"docker exec timed out after {self.config.timeout}s"},
+            )
         if proc.returncode != 0:
             logger.error(f"Evaluator exited with code {proc.returncode}:\n{proc.stderr}")
             return EvaluationResult(
@@ -265,7 +273,13 @@ class ContainerizedEvaluator:
         return result.stdout.strip()
 
     def _build_image(self) -> str:
-        name = os.path.basename(os.path.normpath(self.benchmark_dir))
+        norm = os.path.normpath(self.benchmark_dir)
+        name = os.path.basename(norm)
+        # Include parent dir to avoid tag collisions when multiple benchmarks
+        # share the same leaf directory name (e.g. "evaluator").
+        parent = os.path.basename(os.path.dirname(norm))
+        if parent and name == "evaluator":
+            name = f"{parent}-{name}"
         tag = f"skydiscover-{name}:latest"
 
         logger.info(f"Building Docker image: {tag} (from {self.benchmark_dir})")

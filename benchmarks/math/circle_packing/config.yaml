@@ -8,7 +8,7 @@ max_solution_length: 60000
 llm:
   api_base: https://api.openai.com/v1
   models:
-    - name: "gpt-4o-mini"
+    - name: "gpt-5"
       weight: 1.0
   max_tokens: 16384
   timeout: 600
