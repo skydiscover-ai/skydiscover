@@ -59,7 +59,7 @@ Each benchmark directory has its own README with setup and run instructions.
 
 ## Structure
 
-There are two ways to set up a benchmark: a **containerized evaluator** (recommended) or a **plain Python evaluator**.
+There are three ways to set up a benchmark: a **containerized evaluator** (recommended for new benchmarks), a **Harbor task** (for external benchmark suites), or a **plain Python evaluator** (simplest).
 
 ### Containerized evaluator (recommended)
 
@@ -182,7 +182,67 @@ SkyDiscover will automatically build the Docker image, start a persistent contai
 
 Simple containerized benchmark: [`math/heilbronn_triangle/`](math/heilbronn_triangle/)
 
-### Option 2: Plain Python evaluator
+### Option 2: Harbor tasks (external benchmarks)
+
+SkyDiscover natively supports [Harbor](https://harborframework.com/)-format tasks. This lets you run external benchmark suites like [AlgoTune](https://github.com/oripress/AlgoTune) (154 algorithm optimization tasks) without any conversion.
+
+A Harbor task directory looks like this:
+
+```
+task_dir/
+├── task.toml              # Metadata, timeouts
+├── instruction.md         # Problem description (shown to the LLM as context)
+├── environment/
+│   └── Dockerfile         # Container image definition
+├── tests/
+│   ├── test.sh            # Verification entrypoint
+│   └── ...                # Supporting test files (evaluator.py, test data, etc.)
+└── solution/              # Reference solution (optional, not shown to LLM)
+    └── solve.sh
+```
+
+SkyDiscover auto-detects Harbor tasks when the directory contains `instruction.md`, `tests/`, and `environment/Dockerfile`. The `instruction.md` is used as LLM context, solutions are injected at the path specified in the instructions (e.g. `/app/solver.py`), and rewards are read from `/logs/verifier/reward.txt` or `reward.json`.
+
+#### Running a Harbor task: AlgoTune example
+
+1. **Install the Harbor CLI and download a dataset:**
+
+```bash
+pip install harbor
+harbor datasets download algotune@1.0 -o /tmp/algotune
+```
+
+This downloads all 154 AlgoTune tasks. Each task is in a subdirectory like `/tmp/algotune/<id>/algotune-<name>/`.
+
+2. **Create a seed program.** AlgoTune tasks expect a `Solver` class with a `solve` method at `/app/solver.py`. Write a minimal starting solution:
+
+```python
+# initial_solver.py
+class Solver:
+    def solve(self, problem, **kwargs):
+        return []  # Baseline — the LLM will optimize this
+```
+
+3. **Run SkyDiscover**, pointing at the task directory:
+
+```bash
+# Pick a task (e.g. set-cover)
+TASK=/tmp/algotune/2HHbpvzVPo2qakaoGyAVS2/algotune-set-cover
+
+skydiscover-run initial_solver.py "$TASK" \
+  --model anthropic/claude-sonnet-4-6 \
+  -s best_of_n -i 10
+```
+
+SkyDiscover will build the Docker image from `environment/Dockerfile`, upload `tests/` into the container, and start optimizing. The score is the speedup over the reference implementation (e.g. `1.5` means 1.5x faster).
+
+> **Note:** AlgoTune's standard Dockerfile installs heavy packages (torch, jax, scipy, etc.) and needs ~10GB disk and 16GB RAM. Make sure your machine has enough resources.
+
+#### Other Harbor datasets
+
+Any Harbor-compatible dataset works the same way. Run `harbor datasets list` to see all available datasets, then `harbor datasets download <name>` to fetch them.
+
+### Option 3: Plain Python evaluator
 
 For simple tasks with no system dependencies, you can use a plain Python evaluator that runs on the host.
 
