@@ -29,7 +29,7 @@ SkyDiscover introduces two new adaptive optimization algorithms:
 
 SkyDiscover also supports using OpenEvolve, ShinkaEvolve and GEPA to quickly benchmark these algorithms using their own source code. SkyDiscover also hosts native versions of OpenEvolve and GEPA under `openevolve_native` and `gepa_native` algorithms using the modular interface.
 
-SkyDiscover natively supports [Harbor](https://harborframework.com/)-format benchmarks, so you can run external benchmark suites out of the box — tested with [AlgoTune](https://github.com/oripress/AlgoTune) (154 tasks), [EvoEval](https://github.com/evo-eval/evoeval) (100), [HumanEvalFix](https://github.com/bigcode-project/octopack) (164), [BigCodeBench](https://github.com/bigcode-project/bigcodebench) (145), [LiveCodeBench](https://livecodebench.github.io/) (100), [USACO](https://usaco.org/) (304), [CRUSTBench](https://github.com/AInfinity/CRUSTBench) (100), and [CodePDE](https://github.com/) (5).
+SkyDiscover natively supports [Harbor](https://harborframework.com/)-format benchmarks, so you can run external benchmark suites out of the box, including [AlgoTune](https://github.com/oripress/AlgoTune), [EvoEval](https://github.com/evo-eval/evoeval), [HumanEvalFix](https://github.com/bigcode-project/octopack), [BigCodeBench](https://github.com/bigcode-project/bigcodebench), [LiveCodeBench](https://livecodebench.github.io/), [USACO](https://usaco.org/), [CRUSTBench](https://github.com/AInfinity/CRUSTBench), and [CodePDE](https://github.com/).
 > 🚧 This project is under active development.
 
 ---
