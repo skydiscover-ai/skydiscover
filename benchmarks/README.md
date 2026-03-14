@@ -214,21 +214,20 @@ harbor datasets download algotune@1.0 -o /tmp/algotune
 
 This downloads all 154 AlgoTune tasks. Each task is in a subdirectory like `/tmp/algotune/<id>/algotune-<name>/`.
 
-2. **Create a seed program.** AlgoTune tasks expect a `Solver` class with a `solve` method at `/app/solver.py`. Write a minimal starting solution:
-
-```python
-# initial_solver.py
-class Solver:
-    def solve(self, problem, **kwargs):
-        return []  # Baseline — the LLM will optimize this
-```
-
-3. **Run SkyDiscover**, pointing at the task directory:
+2. **Run SkyDiscover**, pointing at the task directory. No seed program is needed — the LLM uses `instruction.md` as context and generates a solution from scratch:
 
 ```bash
 # Pick a task (e.g. set-cover)
 TASK=/tmp/algotune/2HHbpvzVPo2qakaoGyAVS2/algotune-set-cover
 
+skydiscover-run "$TASK" \
+  --model anthropic/claude-sonnet-4-6 \
+  -s best_of_n -i 10
+```
+
+You can optionally provide a seed program if you want to start from a known baseline instead of from scratch:
+
+```bash
 skydiscover-run initial_solver.py "$TASK" \
   --model anthropic/claude-sonnet-4-6 \
   -s best_of_n -i 10

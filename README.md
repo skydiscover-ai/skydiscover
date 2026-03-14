@@ -102,10 +102,10 @@ uv run skydiscover-run evaluator.py \
   --model gpt-5 \
   --iterations 100
 
-# Run a Harbor benchmark (e.g. AlgoTune) — no conversion needed
+# Run a Harbor benchmark (e.g. AlgoTune) — no seed program needed
 pip install harbor
 harbor datasets download algotune@1.0 -o /tmp/algotune
-uv run skydiscover-run initial_solver.py /tmp/algotune/<id>/algotune-set-cover \
+uv run skydiscover-run /tmp/algotune/<id>/algotune-set-cover \
   --model anthropic/claude-sonnet-4-6 \
   --search best_of_n -i 10
 ```
