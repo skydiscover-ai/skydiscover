@@ -96,7 +96,7 @@ class HarborEvaluator(ContainerizedEvaluator):
                 self.container_id,
                 "/bin/sh",
                 "-c",
-                f"cat > '{self.solution_path}'", 
+                f"cat > '{self.solution_path}'",
             ],
             input=program_solution.encode(),
             capture_output=True,
@@ -138,7 +138,7 @@ class HarborEvaluator(ContainerizedEvaluator):
 
         finally:
             # Clean up solution so the container is fresh for next evaluation.
-            self._exec(f"rm -f '{self.solution_path}'") 
+            self._exec(f"rm -f '{self.solution_path}'")
 
     # ------------------------------------------------------------------
     # Harbor-specific helpers
