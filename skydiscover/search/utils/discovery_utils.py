@@ -25,6 +25,12 @@ def load_evaluator_code(evaluation_file: Optional[str]) -> str:
         if not p.exists():
             return ""
         if p.is_dir():
+            # Harbor task: prioritize instruction.md — it contains the full
+            # problem description, reference implementation, and constraints.
+            instruction = p / "instruction.md"
+            if instruction.exists():
+                return instruction.read_text()
+
             _SKIP = {"Dockerfile", "requirements.txt"}
             _MAX_FILES = 10
             _MAX_BYTES = 50_000
