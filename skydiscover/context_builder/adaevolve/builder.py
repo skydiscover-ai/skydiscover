@@ -80,10 +80,6 @@ class AdaEvolveContextBuilder(DefaultContextBuilder):
             **kwargs,
         )
 
-        # Collapse 3+ consecutive newlines to 2 (empty search_guidance leaves extra blank lines)
-        if "user" in result:
-            result["user"] = re.sub(r"\n{3,}", "\n\n", result["user"])
-
         return result
 
     # =========================================================================
