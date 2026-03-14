@@ -236,9 +236,7 @@ class HarborEvaluator(ContainerizedEvaluator):
             return path
 
         # Tier 3: default.
-        logger.warning(
-            f"Could not extract solution path, using default: {_DEFAULT_SOLUTION_PATH}"
-        )
+        logger.warning(f"Could not extract solution path, using default: {_DEFAULT_SOLUTION_PATH}")
         return _DEFAULT_SOLUTION_PATH
 
     def _extract_path_from_solve_sh(self) -> str:
@@ -284,9 +282,7 @@ class HarborEvaluator(ContainerizedEvaluator):
             candidates = re.findall(r'cd\s+"?(/[^"$\s]+)"?\s*$', text, re.MULTILINE)
             if not candidates:
                 # Variable assignments like RBENCH_DIR="/workspace/rbench_reference"
-                candidates = re.findall(
-                    r'[A-Z_]+=\s*"?(/[^"$\s]+)"?\s*$', text, re.MULTILINE
-                )
+                candidates = re.findall(r'[A-Z_]+=\s*"?(/[^"$\s]+)"?\s*$', text, re.MULTILINE)
 
             if candidates:
                 base = candidates[0].rstrip('"')
