@@ -201,9 +201,26 @@ task_dir/
     └── solve.sh
 ```
 
-SkyDiscover auto-detects Harbor tasks when the directory contains `instruction.md`, `tests/`, and `environment/Dockerfile`. The `instruction.md` is used as LLM context, solutions are injected at the path specified in the instructions (e.g. `/app/solver.py`), and rewards are read from `/logs/verifier/reward.txt` or `reward.json`.
+SkyDiscover auto-detects Harbor tasks when the directory contains `instruction.md`, `tests/`, and `environment/Dockerfile`. The `instruction.md` is used as LLM context, solutions are injected at the path extracted from `solution/solve.sh` (or `instruction.md` as fallback), and rewards are read from `/logs/verifier/reward.txt` or `reward.json`.
 
-#### Running a Harbor task: AlgoTune example
+#### Tested Harbor datasets
+
+SkyDiscover has been tested with the following Harbor registry benchmarks:
+
+| Dataset | Tasks | Domain | Language | Install |
+|---------|-------|--------|----------|---------|
+| [algotune](https://github.com/oripress/AlgoTune) | 154 | Algorithm optimization (speedup scoring) | Python | `harbor datasets download algotune@1.0` |
+| [evoeval](https://github.com/evo-eval/evoeval) | 100 | Code generation (evolved from HumanEval) | Python | `harbor datasets download evoeval@1.0` |
+| [humanevalfix](https://github.com/bigcode-project/octopack) | 164 | Code repair (fix buggy functions) | Python | `harbor datasets download humanevalfix@1.0` |
+| [bigcodebench-hard-complete](https://github.com/bigcode-project/bigcodebench) | 145 | Python programming (reward-based) | Python | `harbor datasets download bigcodebench-hard-complete@1.0.0` |
+| [livecodebench](https://livecodebench.github.io/) | 100 | Competitive programming (stdin/stdout) | Python | `harbor datasets download livecodebench@6.0` |
+| [codepde](https://github.com/TBD) | 5 | Scientific computing (PDE solvers) | Python | `harbor datasets download codepde@1.0` |
+| [crustbench](https://github.com/AInfinity/CRUSTBench) | 100 | C-to-safe-Rust transpilation | Rust | `harbor datasets download crustbench@1.0` |
+| [usaco](https://usaco.org/) | 304 | Competition programming (USACO) | Python | `harbor datasets download usaco@2.0` |
+
+Any Harbor-compatible dataset should work — the evaluator automatically extracts the solution path from the task's `solution/solve.sh` script.
+
+#### Running a Harbor task
 
 1. **Install the Harbor CLI and download a dataset:**
 
@@ -217,17 +234,24 @@ This downloads all 154 AlgoTune tasks. Each task is in a subdirectory like `/tmp
 2. **Run SkyDiscover**, pointing at the task directory. The LLM uses `instruction.md` as context and generates solutions from scratch:
 
 ```bash
-# Pick a task (e.g. set-cover)
+# AlgoTune (algorithm optimization)
 TASK=/tmp/algotune/2HHbpvzVPo2qakaoGyAVS2/algotune-set-cover
+skydiscover-run "$TASK" --model anthropic/claude-sonnet-4-6 -s best_of_n -i 10
 
-skydiscover-run "$TASK" \
-  --model anthropic/claude-sonnet-4-6 \
-  -s best_of_n -i 10
+# EvoEval (code generation)
+harbor datasets download evoeval@1.0 -o /tmp/evoeval
+TASK=/tmp/evoeval/<id>/<task-name>
+skydiscover-run "$TASK" --model anthropic/claude-sonnet-4-6 -s best_of_n -i 5
+
+# HumanEvalFix (code repair)
+harbor datasets download humanevalfix@1.0 -o /tmp/humanevalfix
+TASK=/tmp/humanevalfix/<id>/<task-name>
+skydiscover-run "$TASK" --model anthropic/claude-sonnet-4-6 -s best_of_n -i 5
 ```
 
-SkyDiscover will build the Docker image from `environment/Dockerfile`, upload `tests/` into the container, and start optimizing. The score is the speedup over the reference implementation (e.g. `1.5` means 1.5x faster).
+SkyDiscover will build the Docker image from `environment/Dockerfile`, upload `tests/` into the container, and start optimizing.
 
-> **Note:** AlgoTune's standard Dockerfile installs heavy packages (torch, jax, scipy, etc.) and needs ~10GB disk and 16GB RAM. Make sure your machine has enough resources.
+> **Note:** Some datasets have heavy Dockerfiles. AlgoTune needs ~10GB disk and 16GB RAM (torch, jax, scipy). BigCodeBench installs R, GDAL, and many system packages. First builds are slow; subsequent runs use Docker cache.
 
 #### Other Harbor datasets
 

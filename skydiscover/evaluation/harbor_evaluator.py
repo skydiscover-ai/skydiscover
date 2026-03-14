@@ -4,7 +4,7 @@ Harbor tasks use a different container protocol from the standard
 ContainerizedEvaluator:
 
   - Solution is injected at a task-specific path (e.g. ``/app/solver.py``)
-    extracted from ``instruction.md``.
+    extracted from ``solution/solve.sh`` or ``instruction.md``.
   - Evaluation runs ``tests/test.sh`` instead of ``evaluate.sh``.
   - The reward is read from ``/logs/verifier/reward.txt`` (float) or
     ``/logs/verifier/reward.json`` (dict) instead of JSON on stdout.
@@ -36,8 +36,8 @@ from skydiscover.evaluation.evaluation_result import EvaluationResult
 
 logger = logging.getLogger(__name__)
 
-# Common solution paths in Harbor tasks — used as fallback.
-_DEFAULT_SOLUTION_PATH = "/app/solver.py"
+# Most common solution path across Harbor benchmarks — used as fallback.
+_DEFAULT_SOLUTION_PATH = "/app/solution.py"
 
 
 class HarborEvaluator(ContainerizedEvaluator):
@@ -211,23 +211,114 @@ class HarborEvaluator(ContainerizedEvaluator):
         )
 
     def _extract_solution_path(self) -> str:
-        """Extract the expected solution file path from instruction.md.
+        """Extract the expected solution file path for this Harbor task.
 
-        Looks for patterns like ``in `/app/solver.py` `` or
-        ``at /app/solution.py``.  Falls back to /app/solver.py.
-        
-        TODO(akrentsel): Consider using a smarter heuristic, or ask an LLM to extract.
+        Uses a three-tier strategy (most reliable first):
+
+        1. **Parse ``solution/solve.sh``** — the authoritative reference solution
+           script almost always contains a ``cat > /path/to/file`` redirect that
+           reveals the exact injection path.
+        2. **Parse ``instruction.md``** — look for explicit absolute paths in
+           backticks or after prepositions like "in", "at", "to".
+        3. **Default to ``/app/solution.py``** — the most common path across
+           Harbor benchmarks (evoeval, livecodebench, usaco, etc.).
         """
+        # Tier 1: parse solution/solve.sh (most reliable).
+        path = self._extract_path_from_solve_sh()
+        if path:
+            logger.info(f"Extracted solution path from solve.sh: {path}")
+            return path
+
+        # Tier 2: parse instruction.md.
+        path = self._extract_path_from_instruction()
+        if path:
+            logger.info(f"Extracted solution path from instruction.md: {path}")
+            return path
+
+        # Tier 3: default.
+        logger.warning(
+            f"Could not extract solution path, using default: {_DEFAULT_SOLUTION_PATH}"
+        )
+        return _DEFAULT_SOLUTION_PATH
+
+    def _extract_path_from_solve_sh(self) -> str:
+        """Extract the solution target path from ``solution/solve.sh``.
+
+        Looks for shell redirect patterns like ``cat > /app/solver.py``
+        or ``> /workspace/solution.py``.  If the path is relative, resolves
+        it against the last ``cd`` target found before the redirect.
+        """
+        solve_sh = os.path.join(self.task_dir, "solution", "solve.sh")
+        if not os.path.exists(solve_sh):
+            return ""
+
+        try:
+            with open(solve_sh) as f:
+                text = f.read()
+        except Exception:
+            return ""
+
+        _CODE_EXTS = r"\.(?:py|sh|js|ts|cpp|c|rs|go|java|rb)"
+
+        # First try: absolute path redirects.
+        for pattern in [
+            rf"cat\s+>\s*(/\S+{_CODE_EXTS})",
+            rf">\s*(/\S+{_CODE_EXTS})",
+        ]:
+            match = re.search(pattern, text)
+            if match:
+                return match.group(1)
+
+        # Second try: relative path redirect (e.g. crustbench writes to
+        # src/interfaces/base122.rs after cd-ing into a project directory).
+        redirect_pattern = rf"cat\s+>\s*(\S+{_CODE_EXTS})"
+        redirect_match = re.search(redirect_pattern, text)
+        if redirect_match:
+            rel_path = redirect_match.group(1)
+
+            # Resolve the base directory.  Strategy:
+            # 1. Look for concrete absolute paths in cd commands.
+            # 2. Look for absolute paths assigned to shell variables (the
+            #    variable may be used with cd later — e.g. RBENCH_DIR).
+            # 3. Fall back to the Dockerfile WORKDIR.
+            candidates = re.findall(r'cd\s+"?(/[^"$\s]+)"?\s*$', text, re.MULTILINE)
+            if not candidates:
+                # Variable assignments like RBENCH_DIR="/workspace/rbench_reference"
+                candidates = re.findall(
+                    r'[A-Z_]+=\s*"?(/[^"$\s]+)"?\s*$', text, re.MULTILINE
+                )
+
+            if candidates:
+                base = candidates[0].rstrip('"')
+            else:
+                # Dockerfile WORKDIR fallback.
+                base = "/workspace"
+                dockerfile = os.path.join(self.task_dir, "environment", "Dockerfile")
+                if os.path.exists(dockerfile):
+                    try:
+                        with open(dockerfile) as f:
+                            for line in f:
+                                m = re.match(r"WORKDIR\s+(/\S+)", line)
+                                if m:
+                                    base = m.group(1)
+                    except Exception:
+                        pass
+
+            return os.path.join(base, rel_path)
+
+        return ""
+
+    def _extract_path_from_instruction(self) -> str:
+        """Extract the solution file path from ``instruction.md``."""
         instruction_path = os.path.join(self.task_dir, "instruction.md")
         if not os.path.exists(instruction_path):
-            logger.warning(
-                f"No instruction.md in {self.task_dir}, "
-                f"using default solution path: {_DEFAULT_SOLUTION_PATH}"
-            )
-            return _DEFAULT_SOLUTION_PATH
+            return ""
 
-        with open(instruction_path) as f:
-            text = f.read()
+        try:
+            with open(instruction_path) as f:
+                text = f.read()
+        except Exception:
+            return ""
 
         patterns = [
             r'[`"\'](/\S+\.(?:py|sh|js|ts|cpp|c|rs|go|java))[`"\']',
@@ -236,15 +327,9 @@ class HarborEvaluator(ContainerizedEvaluator):
         for pattern in patterns:
             match = re.search(pattern, text)
             if match:
-                path = match.group(1)
-                logger.info(f"Extracted solution path from instruction.md: {path}")
-                return path
+                return match.group(1)
 
-        logger.warning(
-            f"Could not extract solution path from instruction.md, "
-            f"using default: {_DEFAULT_SOLUTION_PATH}"
-        )
-        return _DEFAULT_SOLUTION_PATH
+        return ""
 
     def _exec(self, cmd: str) -> subprocess.CompletedProcess:
         """Run a shell command inside the container."""

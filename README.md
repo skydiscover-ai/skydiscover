@@ -29,7 +29,7 @@ SkyDiscover introduces two new adaptive optimization algorithms:
 
 SkyDiscover also supports using OpenEvolve, ShinkaEvolve and GEPA to quickly benchmark these algorithms using their own source code. SkyDiscover also hosts native versions of OpenEvolve and GEPA under `openevolve_native` and `gepa_native` algorithms using the modular interface.
 
-SkyDiscover natively supports [Harbor](https://harborframework.com/)-format benchmarks, so you can run external benchmark suites like [AlgoTune](https://github.com/oripress/AlgoTune) (154 algorithm optimization tasks) out of the box.
+SkyDiscover natively supports [Harbor](https://harborframework.com/)-format benchmarks, so you can run external benchmark suites out of the box — tested with [AlgoTune](https://github.com/oripress/AlgoTune) (154 tasks), [EvoEval](https://github.com/evo-eval/evoeval) (100), [HumanEvalFix](https://github.com/bigcode-project/octopack) (164), [BigCodeBench](https://github.com/bigcode-project/bigcodebench) (145), [LiveCodeBench](https://livecodebench.github.io/) (100), [USACO](https://usaco.org/) (304), [CRUSTBench](https://github.com/AInfinity/CRUSTBench) (100), and [CodePDE](https://github.com/) (5).
 > 🚧 This project is under active development.
 
 ---
@@ -137,7 +137,7 @@ SkyDiscover supports three evaluator formats — pick whichever fits your use ca
 |:---|:---|:---|
 | **Python function** | Simple tasks, no system deps | `evaluator.py` |
 | **Containerized** | Custom deps, data files, isolation | `evaluator/` directory (must contain `Dockerfile` + `evaluate.sh`) |
-| **Harbor task** | External benchmark suites (AlgoTune, etc.) | Task directory (must contain `instruction.md` + `tests/` + `environment/Dockerfile`) |
+| **Harbor task** | External benchmark suites (AlgoTune, EvoEval, HumanEvalFix, BigCodeBench, LiveCodeBench, USACO, CRUSTBench, CodePDE, and more) | Task directory (must contain `instruction.md` + `tests/` + `environment/Dockerfile`) |
 
 SkyDiscover auto-detects the format. See [`benchmarks/README.md`](benchmarks/README.md#adding-a-benchmark) for full setup instructions.
 
@@ -156,7 +156,7 @@ def evaluate(program_path):
 
 **Containerized evaluator** — a directory with a `Dockerfile` and `evaluate.sh` that writes JSON to stdout. Runs in Docker, so it can have arbitrary dependencies.
 
-**Harbor task** — a directory following the [Harbor](https://harborframework.com/) format (`instruction.md`, `environment/Dockerfile`, `tests/test.sh`). Works out of the box with benchmark suites like [AlgoTune](https://github.com/oripress/AlgoTune).
+**Harbor task** — a directory following the [Harbor](https://harborframework.com/) format (`instruction.md`, `environment/Dockerfile`, `tests/test.sh`). Works out of the box with 8+ tested benchmark suites (see [benchmarks/README.md](benchmarks/README.md#tested-harbor-datasets) for the full list).
 
 - **combined_score** drives evolution. If omitted, SkyDiscover averages all numeric values in the dict.
 - **artifacts** is optional — entries are injected into the next LLM prompt as context.
