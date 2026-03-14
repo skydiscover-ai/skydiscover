@@ -214,7 +214,7 @@ SkyDiscover has been tested with the following Harbor registry benchmarks:
 | [humanevalfix](https://github.com/bigcode-project/octopack) | 164 | Code repair (fix buggy functions) | Python | `harbor datasets download humanevalfix@1.0` |
 | [bigcodebench-hard-complete](https://github.com/bigcode-project/bigcodebench) | 145 | Python programming (reward-based) | Python | `harbor datasets download bigcodebench-hard-complete@1.0.0` |
 | [livecodebench](https://livecodebench.github.io/) | 100 | Competitive programming (stdin/stdout) | Python | `harbor datasets download livecodebench@6.0` |
-| [codepde](https://github.com/TBD) | 5 | Scientific computing (PDE solvers) | Python | `harbor datasets download codepde@1.0` |
+| [codepde](https://github.com/LithiumDA/CodePDE) | 5 | Scientific computing (PDE solvers) | Python | `harbor datasets download codepde@1.0` |
 | [crustbench](https://github.com/AInfinity/CRUSTBench) | 100 | C-to-safe-Rust transpilation | Rust | `harbor datasets download crustbench@1.0` |
 | [usaco](https://usaco.org/) | 304 | Competition programming (USACO) | Python | `harbor datasets download usaco@2.0` |
 

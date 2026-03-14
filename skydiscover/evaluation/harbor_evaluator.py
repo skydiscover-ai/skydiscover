@@ -87,7 +87,7 @@ class HarborEvaluator(ContainerizedEvaluator):
         # Ensure parent directory exists and inject solution.
         parent_dir = os.path.dirname(self.solution_path)
         if parent_dir:
-            self._exec(f"mkdir -p {parent_dir}")
+            self._exec(f"mkdir -p '{parent_dir}'")
         inject = subprocess.run(
             [
                 "docker",
@@ -96,7 +96,7 @@ class HarborEvaluator(ContainerizedEvaluator):
                 self.container_id,
                 "/bin/sh",
                 "-c",
-                f"cat > {self.solution_path}",
+                f"cat > '{self.solution_path}'", 
             ],
             input=program_solution.encode(),
             capture_output=True,
@@ -138,7 +138,7 @@ class HarborEvaluator(ContainerizedEvaluator):
 
         finally:
             # Clean up solution so the container is fresh for next evaluation.
-            self._exec(f"rm -f {self.solution_path}")
+            self._exec(f"rm -f '{self.solution_path}'") 
 
     # ------------------------------------------------------------------
     # Harbor-specific helpers
@@ -179,12 +179,14 @@ class HarborEvaluator(ContainerizedEvaluator):
             try:
                 if is_json:
                     data = json.loads(proc.stdout.strip())
-                    reward = float(
-                        data.get(
-                            "reward",
-                            data.get("score", next(iter(data.values()))),
+                    raw = data.get("reward", data.get("score"))
+                    if raw is None:
+                        logger.warning(
+                            "No 'reward' or 'score' key in %s; defaulting to 0",
+                            path,
                         )
-                    )
+                        raw = 0
+                    reward = float(raw)
                     metrics = {"combined_score": reward}
                     for k, v in data.items():
                         if isinstance(v, (int, float)) and k not in (
