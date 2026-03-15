@@ -361,7 +361,10 @@ class Runner:
             def force_exit(signum, frame):
                 sys.exit(128 + signum)
 
+            # After the first termination signal, ensure subsequent SIGINT/SIGTERM
+            # cause an immediate exit instead of re-running the soft handler.
             signal.signal(signal.SIGINT, force_exit)
+            signal.signal(signal.SIGTERM, force_exit)
 
         signal.signal(signal.SIGINT, on_signal)
         signal.signal(signal.SIGTERM, on_signal)
