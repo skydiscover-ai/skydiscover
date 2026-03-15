@@ -44,16 +44,12 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "initial_program",
-        nargs="?",
-        default=None,
-        help="Path to the initial program file (can be optional)",
-    )
-    parser.add_argument(
-        "evaluation_file",
+        "paths",
+        nargs="+",
+        metavar="path",
         help=(
-            "Evaluator: path to a Python file (must define evaluate()) "
-            "or a benchmark directory containing Dockerfile + evaluate.sh"
+            "Positional paths: either '<evaluation_file>' or "
+            "'<initial_program> <evaluation_file>'"
         ),
     )
     parser.add_argument("--config", "-c", help="Path to configuration file (YAML)", default=None)
@@ -94,7 +90,18 @@ def parse_args() -> argparse.Namespace:
         help="Search algorithm to use",
     )
 
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    if len(args.paths) == 1:
+        args.initial_program = None
+        args.evaluation_file = args.paths[0]
+    elif len(args.paths) == 2:
+        args.initial_program, args.evaluation_file = args.paths
+    else:
+        parser.error("Expected either '<evaluation_file>' or '<initial_program> <evaluation_file>'")
+
+    delattr(args, "paths")
+    return args
 
 
 def main() -> int:
@@ -275,9 +282,9 @@ def _find_latest_checkpoint(checkpoint_dir: str) -> Optional[str]:
     if not os.path.isdir(checkpoint_dir):
         return None
 
-    def parse_iteration(path: str) -> Optional[int]:
+    def parse_iteration(name: str) -> Optional[int]:
         try:
-            return int(path.rsplit("_", 1)[-1])
+            return int(name.rsplit("_", 1)[-1])
         except (ValueError, IndexError):
             return None
 
