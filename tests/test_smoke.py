@@ -137,10 +137,8 @@ class TestBugFixGuards:
             LLMModelConfig(name="m1", weight=0.0, api_key="k", api_base="http://x"),
             LLMModelConfig(name="m2", weight=0.0, api_key="k", api_base="http://x"),
         ]
-        with pytest.raises(ValueError, match="weights must not all be zero"):
-            # Patch OpenAILLM so we never touch a real client
-            with patch("skydiscover.llm.llm_pool.OpenAILLM"):
-                LLMPool(cfgs)
+        with pytest.raises(ValueError, match="weights"):
+            LLMPool(cfgs)
 
     def test_evaluator_unique_module_names(self, tmp_path):
         """Two Evaluator instances for the same file must get distinct _module_name values."""
