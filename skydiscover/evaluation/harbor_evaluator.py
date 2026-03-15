@@ -52,6 +52,7 @@ class HarborEvaluator(ContainerizedEvaluator):
         self.task_dir = os.path.abspath(benchmark_dir)
         self.solution_path = self._extract_solution_path()
         self._tests_uploaded = False
+        self._apply_task_toml_timeout(config)
         super().__init__(benchmark_dir, config, max_concurrent)
         self._init_container()
 
@@ -143,6 +144,21 @@ class HarborEvaluator(ContainerizedEvaluator):
     # ------------------------------------------------------------------
     # Harbor-specific helpers
     # ------------------------------------------------------------------
+
+    def _apply_task_toml_timeout(self, config) -> None:
+        """Read verifier.timeout_sec from task.toml and apply it to config."""
+        toml_path = os.path.join(self.task_dir, "task.toml")
+        if not os.path.exists(toml_path):
+            return
+        try:
+            with open(toml_path) as f:
+                text = f.read()
+            match = re.search(r"timeout_sec\s*=\s*(\d+)", text)
+            if match:
+                config.timeout = int(match.group(1))
+                logger.info(f"Harbor task.toml: set evaluator timeout to {config.timeout}s")
+        except Exception as e:
+            logger.warning(f"Failed to read task.toml: {e}")
 
     def _init_container(self):
         """Create log directories and upload test files into the container."""

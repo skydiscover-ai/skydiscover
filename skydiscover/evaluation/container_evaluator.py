@@ -78,6 +78,7 @@ class ContainerizedEvaluator:
         self.config = config
         self.program_suffix = config.file_suffix
         self.task_pool = TaskPool(max_concurrency=max_concurrent)
+        self.llm_judge = None
         self.image_tag = self._build_image()
         self.container_id = self._start_container()
         logger.info(f"ContainerizedEvaluator ready: container={self.container_id[:12]}")

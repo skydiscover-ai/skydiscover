@@ -1,3 +1,22 @@
+"""Program evaluation framework.
+
+Evaluator hierarchy (pick one per benchmark)::
+
+    Evaluator                  Python function: evaluate(program_path) -> dict
+    ContainerizedEvaluator     Docker: Dockerfile + evaluate.sh  ->  JSON on stdout
+    └── HarborEvaluator        Harbor protocol: instruction.md + tests/test.sh + environment/
+
+``create_evaluator()`` auto-detects which one to use based on the benchmark
+directory contents.  Detection order: Harbor > Containerized > Python.
+
+Supporting modules:
+
+- ``evaluation_result``  — ``EvaluationResult`` dataclass (metrics + artifacts)
+- ``llm_judge``          — optional LLM-as-a-judge scorer (adds ``llm_*`` metrics)
+- ``wrapper``            — CLI bridge so old ``evaluate(path)->dict`` functions
+                           can emit container-protocol JSON on stdout
+"""
+
 import os
 from typing import Optional, Union
 
