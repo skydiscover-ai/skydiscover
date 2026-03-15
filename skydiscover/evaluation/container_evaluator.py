@@ -84,12 +84,32 @@ class ContainerizedEvaluator:
 
     def close(self):
         """Stop and remove the persistent container."""
-        if getattr(self, "container_id", None):
-            subprocess.run(
-                ["docker", "stop", self.container_id],
-                capture_output=True,
-            )
-            self.container_id = None
+        cid = getattr(self, "container_id", None)
+        if cid:
+            try:
+                logger.info(f"Stopping container {cid[:12]}...")
+                subprocess.run(
+                    ["docker", "stop", cid],
+                    capture_output=True,
+                    timeout=30,
+                )
+            except subprocess.TimeoutExpired:
+                logger.warning(f"Timed out stopping container {cid[:12]}, killing...")
+                try:
+                    subprocess.run(["docker", "kill", cid], capture_output=True, timeout=10)
+                except Exception:
+                    logger.warning(f"Failed to kill container {cid[:12]}", exc_info=True)
+            except Exception:
+                logger.warning(f"Failed to stop container {cid[:12]}", exc_info=True)
+            finally:
+                self.container_id = None
+
+    def __del__(self):
+        """Safety net: stop the container if close() was never called."""
+        try:
+            self.close()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Public API — mirrors Evaluator's interface

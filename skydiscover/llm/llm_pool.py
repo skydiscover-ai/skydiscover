@@ -20,15 +20,20 @@ class LLMPool:
             raise ValueError("LLMPool requires at least one model config")
 
         self.models_cfg = models_cfg
+
+        # Validate weights before creating clients to fail fast on bad config.
+        self.weights = [m.weight for m in models_cfg]
+        if any(w < 0 for w in self.weights):
+            raise ValueError("LLMPool model weights must be non-negative")
+        total = sum(self.weights)
+        if total <= 0:
+            raise ValueError("LLMPool model weights must sum to a positive value")
+        self.weights = [w / total for w in self.weights]
+
         self.models = [
             model_cfg.init_client(model_cfg) if model_cfg.init_client else OpenAILLM(model_cfg)
             for model_cfg in models_cfg
         ]
-
-        # Weights of each model in the pool: normalized to sum to 1
-        self.weights = [m.weight for m in models_cfg]
-        total = sum(self.weights)
-        self.weights = [w / total for w in self.weights]
         self.random_state = random.Random()
 
         # Logging
