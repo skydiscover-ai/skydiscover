@@ -12,22 +12,40 @@ concurrency:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
         with:
           python-version: "3.10"
+          enable-cache: true
       - run: uv sync --frozen --extra dev
       - run: uv run black --check skydiscover/
       - run: uv run isort --check skydiscover/
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
         with:
           python-version: "3.10"
+          enable-cache: true
       - run: uv sync --frozen --extra dev
       - name: Smoke test — package imports cleanly
         run: uv run python -c "from skydiscover import Runner, run_discovery, discover_solution, __version__; print(f'skydiscover {__version__} OK')"
+      - name: Run tests
+        run: uv run pytest tests/ -v
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          python-version: "3.10"
+          enable-cache: true
+      - run: uv build
