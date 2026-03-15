@@ -27,9 +27,11 @@ class LLMPool:
 
         # Weights of each model in the pool: normalized to sum to 1
         self.weights = [m.weight for m in models_cfg]
+        if any(w < 0 for w in self.weights):
+            raise ValueError("LLMPool model weights must be non-negative")
         total = sum(self.weights)
-        if total == 0:
-            raise ValueError("LLMPool model weights must not all be zero")
+        if total <= 0:
+            raise ValueError("LLMPool model weights must sum to a positive value")
         self.weights = [w / total for w in self.weights]
         self.random_state = random.Random()
 
