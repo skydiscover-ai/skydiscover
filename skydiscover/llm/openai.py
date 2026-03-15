@@ -155,8 +155,14 @@ class OpenAILLM(LLMInterface):
                 params["reasoning_effort"] = reasoning_effort
 
         retries = kwargs.get("retries", self.retries)
+        if retries is None:
+            retries = 0
         retry_delay = kwargs.get("retry_delay", self.retry_delay)
+        if retry_delay is None:
+            retry_delay = 2
         timeout = kwargs.get("timeout", self.timeout)
+        if timeout is None:
+            timeout = 300
 
         for attempt in range(retries + 1):
             try:
@@ -216,9 +222,15 @@ class OpenAILLM(LLMInterface):
         if self.max_tokens is not None:
             params["max_output_tokens"] = kwargs.get("max_tokens", self.max_tokens)
 
-        retries = kwargs.get("retries", self.retries) or 0
-        retry_delay = kwargs.get("retry_delay", self.retry_delay) or 2
-        timeout = kwargs.get("timeout", self.timeout) or 300
+        retries = kwargs.get("retries", self.retries)
+        if retries is None:
+            retries = 0
+        retry_delay = kwargs.get("retry_delay", self.retry_delay)
+        if retry_delay is None:
+            retry_delay = 2
+        timeout = kwargs.get("timeout", self.timeout)
+        if timeout is None:
+            timeout = 300
 
         for attempt in range(retries + 1):
             try:
