@@ -59,6 +59,8 @@ class Runner:
         )
         if self.initial_program_solution and not self.config.language:
             self.config.language = extract_solution_language(self.initial_program_solution)
+        if not self.config.language:
+            self.config.language = "python"
 
         # Set the file extension
         ext = os.path.splitext(initial_program_path)[1] if initial_program_path else ".py"

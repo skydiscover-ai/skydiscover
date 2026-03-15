@@ -28,6 +28,8 @@ SkyDiscover introduces two new adaptive optimization algorithms:
 - **[EvoX](https://arxiv.org/abs/2602.23413)**, which dynamically evolves the optimization (evolution) strategy itself using LLMs on the fly.
 
 SkyDiscover also supports using OpenEvolve, ShinkaEvolve and GEPA to quickly benchmark these algorithms using their own source code. SkyDiscover also hosts native versions of OpenEvolve and GEPA under `openevolve_native` and `gepa_native` algorithms using the modular interface.
+
+SkyDiscover natively supports [Harbor](https://harborframework.com/)-format benchmarks, so you can run external benchmark suites out of the box, including [AlgoTune](https://github.com/oripress/AlgoTune), [EvoEval](https://github.com/evo-eval/evoeval), [HumanEvalFix](https://github.com/bigcode-project/octopack), [BigCodeBench](https://github.com/bigcode-project/bigcodebench), [LiveCodeBench](https://livecodebench.github.io/), [USACO](https://usaco.org/), [CRUSTBench](https://github.com/AInfinity/CRUSTBench), and [CodePDE](https://github.com/).
 > 🚧 This project is under active development.
 
 ---
@@ -99,6 +101,13 @@ uv run skydiscover-run evaluator.py \
   --search <algo> \
   --model gpt-5 \
   --iterations 100
+
+# Run a Harbor benchmark (e.g. AlgoTune) — no seed program needed
+pip install harbor
+harbor datasets download algotune@1.0 -o /tmp/algotune
+uv run skydiscover-run /tmp/algotune/<id>/algotune-set-cover \
+  --model anthropic/claude-sonnet-4-6 \
+  --search best_of_n -i 10
 ```
 
 Or use the Python API:
@@ -122,7 +131,17 @@ print(result.best_score, result.best_solution)
 
 ### Scoring Function (required)
 
-Your evaluator is a Python file with an **evaluate(program_path)** function. It returns a dict with metrics and optional artifacts:
+SkyDiscover supports three evaluator formats — pick whichever fits your use case:
+
+| Format | When to use | What you point `evaluation_file` at |
+|:---|:---|:---|
+| **Python function** | Simple tasks, no system deps | `evaluator.py` |
+| **Containerized** | Custom deps, data files, isolation | `evaluator/` directory (must contain `Dockerfile` + `evaluate.sh`) |
+| **Harbor task** | External benchmark suites (AlgoTune, EvoEval, HumanEvalFix, BigCodeBench, LiveCodeBench, USACO, CRUSTBench, CodePDE, and more) | Task directory (must contain `instruction.md` + `tests/` + `environment/Dockerfile`) |
+
+SkyDiscover auto-detects the format. See [`benchmarks/README.md`](benchmarks/README.md#adding-a-benchmark) for full setup instructions.
+
+**Python evaluator** — a file with an `evaluate(program_path)` function:
 
 ```python
 def evaluate(program_path):
@@ -134,6 +153,10 @@ def evaluate(program_path):
         },
     }
 ```
+
+**Containerized evaluator** — a directory with a `Dockerfile` and `evaluate.sh` that writes JSON to stdout. Runs in Docker, so it can have arbitrary dependencies.
+
+**Harbor task** — a directory following the [Harbor](https://harborframework.com/) format (`instruction.md`, `environment/Dockerfile`, `tests/test.sh`). Works out of the box with 8+ tested benchmark suites (see [benchmarks/README.md](benchmarks/README.md#tested-harbor-datasets) for the full list).
 
 - **combined_score** drives evolution. If omitted, SkyDiscover averages all numeric values in the dict.
 - **artifacts** is optional — entries are injected into the next LLM prompt as context.

@@ -59,7 +59,7 @@ Each benchmark directory has its own README with setup and run instructions.
 
 ## Structure
 
-There are two ways to set up a benchmark: a **containerized evaluator** (recommended) or a **plain Python evaluator**.
+There are three ways to set up a benchmark: a **containerized evaluator** (recommended for new benchmarks), a **Harbor task** (for external benchmark suites), or a **plain Python evaluator** (simplest).
 
 ### Containerized evaluator (recommended)
 
@@ -182,7 +182,82 @@ SkyDiscover will automatically build the Docker image, start a persistent contai
 
 Simple containerized benchmark: [`math/heilbronn_triangle/`](math/heilbronn_triangle/)
 
-### Option 2: Plain Python evaluator
+### Option 2: Harbor tasks (external benchmarks)
+
+SkyDiscover natively supports [Harbor](https://harborframework.com/)-format tasks. This lets you run external benchmark suites like [AlgoTune](https://github.com/oripress/AlgoTune) (154 algorithm optimization tasks) without any conversion.
+
+A Harbor task directory looks like this:
+
+```
+task_dir/
+├── task.toml              # Metadata, timeouts
+├── instruction.md         # Problem description (shown to the LLM as context)
+├── environment/
+│   └── Dockerfile         # Container image definition
+├── tests/
+│   ├── test.sh            # Verification entrypoint
+│   └── ...                # Supporting test files (evaluator.py, test data, etc.)
+└── solution/              # Reference solution (optional, not shown to LLM)
+    └── solve.sh
+```
+
+SkyDiscover auto-detects Harbor tasks when the directory contains `instruction.md`, `tests/`, and `environment/Dockerfile`. The `instruction.md` is used as LLM context, solutions are injected at the path extracted from `solution/solve.sh` (or `instruction.md` as fallback), and rewards are read from `/logs/verifier/reward.txt` or `reward.json`.
+
+#### Tested Harbor datasets
+
+SkyDiscover has been tested with the following Harbor registry benchmarks:
+
+| Dataset | Tasks | Domain | Language | Install |
+|---------|-------|--------|----------|---------|
+| [algotune](https://github.com/oripress/AlgoTune) | 154 | Algorithm optimization (speedup scoring) | Python | `harbor datasets download algotune@1.0` |
+| [evoeval](https://github.com/evo-eval/evoeval) | 100 | Code generation (evolved from HumanEval) | Python | `harbor datasets download evoeval@1.0` |
+| [humanevalfix](https://github.com/bigcode-project/octopack) | 164 | Code repair (fix buggy functions) | Python | `harbor datasets download humanevalfix@1.0` |
+| [bigcodebench-hard-complete](https://github.com/bigcode-project/bigcodebench) | 145 | Python programming (reward-based) | Python | `harbor datasets download bigcodebench-hard-complete@1.0.0` |
+| [livecodebench](https://livecodebench.github.io/) | 100 | Competitive programming (stdin/stdout) | Python | `harbor datasets download livecodebench@6.0` |
+| [codepde](https://github.com/LithiumDA/CodePDE) | 5 | Scientific computing (PDE solvers) | Python | `harbor datasets download codepde@1.0` |
+| [crustbench](https://github.com/AInfinity/CRUSTBench) | 100 | C-to-safe-Rust transpilation | Rust | `harbor datasets download crustbench@1.0` |
+| [usaco](https://usaco.org/) | 304 | Competition programming (USACO) | Python | `harbor datasets download usaco@2.0` |
+
+Any Harbor-compatible dataset should work — the evaluator automatically extracts the solution path from the task's `solution/solve.sh` script.
+
+#### Running a Harbor task
+
+1. **Install the Harbor CLI and download a dataset:**
+
+```bash
+pip install harbor
+harbor datasets download algotune@1.0 -o /tmp/algotune
+```
+
+This downloads all 154 AlgoTune tasks. Each task is in a subdirectory like `/tmp/algotune/<id>/algotune-<name>/`.
+
+2. **Run SkyDiscover**, pointing at the task directory. The LLM uses `instruction.md` as context and generates solutions from scratch:
+
+```bash
+# AlgoTune (algorithm optimization)
+TASK=/tmp/algotune/2HHbpvzVPo2qakaoGyAVS2/algotune-set-cover
+skydiscover-run "$TASK" --model anthropic/claude-sonnet-4-6 -s best_of_n -i 10
+
+# EvoEval (code generation)
+harbor datasets download evoeval@1.0 -o /tmp/evoeval
+TASK=/tmp/evoeval/<id>/<task-name>
+skydiscover-run "$TASK" --model anthropic/claude-sonnet-4-6 -s best_of_n -i 5
+
+# HumanEvalFix (code repair)
+harbor datasets download humanevalfix@1.0 -o /tmp/humanevalfix
+TASK=/tmp/humanevalfix/<id>/<task-name>
+skydiscover-run "$TASK" --model anthropic/claude-sonnet-4-6 -s best_of_n -i 5
+```
+
+SkyDiscover will build the Docker image from `environment/Dockerfile`, upload `tests/` into the container, and start optimizing.
+
+> **Note:** Some datasets have heavy Dockerfiles. AlgoTune needs ~10GB disk and 16GB RAM (torch, jax, scipy). BigCodeBench installs R, GDAL, and many system packages. First builds are slow; subsequent runs use Docker cache.
+
+#### Other Harbor datasets
+
+Any Harbor-compatible dataset works the same way. Run `harbor datasets list` to see all available datasets, then `harbor datasets download <name>` to fetch them.
+
+### Option 3: Plain Python evaluator
 
 For simple tasks with no system dependencies, you can use a plain Python evaluator that runs on the host.
 

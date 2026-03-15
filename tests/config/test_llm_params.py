@@ -1,10 +1,9 @@
-"""Tests for Optional temperature/top_p in LLM config and API params."""
-
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
+"""Tests for LLM config: optional temperature/top_p and api_base routing."""
 
 from dataclasses import fields
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from skydiscover.config import LLMConfig, LLMModelConfig
 
@@ -13,20 +12,21 @@ _OPENAI_DEFAULT_API_BASE: str = next(
 )
 
 
-class TestLLMConfigOptionalParams:
-    def test_default_values(self):
+class TestLLMConfigDefaults:
+    def test_default_temperature(self):
         cfg = LLMConfig(name="test-model")
         assert cfg.temperature == 0.7
+
+    def test_default_top_p_is_none(self):
+        cfg = LLMConfig(name="test-model")
         assert cfg.top_p is None
 
-    def test_top_p_none(self):
-        cfg = LLMConfig(name="test-model", top_p=None)
-        assert cfg.top_p is None
-        assert cfg.temperature == 0.7
-
-    def test_temperature_none(self):
+    def test_explicit_none_temperature(self):
         cfg = LLMConfig(name="test-model", temperature=None)
         assert cfg.temperature is None
+
+    def test_explicit_none_top_p(self):
+        cfg = LLMConfig(name="test-model", top_p=None)
         assert cfg.top_p is None
 
     def test_both_none(self):
@@ -35,21 +35,17 @@ class TestLLMConfigOptionalParams:
         assert cfg.top_p is None
 
 
-class TestLocalApiBaseConfig:
-    """Tests that a user-provided api_base is preserved for unknown model names."""
-
-    def test_unknown_model_with_local_api_base(self):
-        """api_base must not be overridden with OpenAI's default for unknown models."""
-        local_endpoint = "http://localhost:11434/v1"
+class TestApiBaseRouting:
+    def test_unknown_model_preserves_local_api_base(self):
+        local = "http://localhost:11434/v1"
         cfg = LLMConfig(
             name="my-custom-local-model",
-            api_base=local_endpoint,
+            api_base=local,
             models=[LLMModelConfig(name="my-custom-local-model")],
         )
-        assert cfg.models[0].api_base == local_endpoint
+        assert cfg.models[0].api_base == local
 
-    def test_unknown_model_without_explicit_api_base_gets_openai_default(self):
-        """Without an explicit api_base, unknown model names fall back to the OpenAI default."""
+    def test_unknown_model_gets_openai_default(self):
         cfg = LLMConfig(
             name="my-custom-local-model",
             models=[LLMModelConfig(name="my-custom-local-model")],
@@ -57,7 +53,6 @@ class TestLocalApiBaseConfig:
         assert cfg.models[0].api_base == _OPENAI_DEFAULT_API_BASE
 
     def test_mixed_providers_with_local_api_base(self):
-        """Provider-prefixed models must get their own endpoint, not the local one."""
         cfg = LLMConfig(
             api_base="http://localhost:11434/v1",
             models=[
@@ -72,6 +67,7 @@ class TestLocalApiBaseConfig:
 class TestOpenAILLMParams:
     def _make_llm(self, temperature=0.7, top_p=0.95):
         from skydiscover.llm.openai import OpenAILLM
+
         cfg = LLMModelConfig(
             name="test-model",
             temperature=temperature,
@@ -90,13 +86,12 @@ class TestOpenAILLMParams:
     async def test_params_include_temperature_and_top_p(self):
         llm = self._make_llm(temperature=0.5, top_p=0.9)
         llm._call_api = AsyncMock(return_value="response")
-
         await llm.generate(
             system_message="sys",
             messages=[{"role": "user", "content": "user"}],
-            temperature=0.5, top_p=0.9,
+            temperature=0.5,
+            top_p=0.9,
         )
-
         params = llm._call_api.call_args[0][0]
         assert params["temperature"] == 0.5
         assert params["top_p"] == 0.9
@@ -105,9 +100,7 @@ class TestOpenAILLMParams:
     async def test_params_exclude_none_top_p(self):
         llm = self._make_llm(top_p=None)
         llm._call_api = AsyncMock(return_value="response")
-
         await llm.generate(system_message="sys", messages=[{"role": "user", "content": "user"}])
-
         params = llm._call_api.call_args[0][0]
         assert "top_p" not in params
         assert "temperature" in params
@@ -116,9 +109,7 @@ class TestOpenAILLMParams:
     async def test_params_exclude_none_temperature(self):
         llm = self._make_llm(temperature=None)
         llm._call_api = AsyncMock(return_value="response")
-
         await llm.generate(system_message="sys", messages=[{"role": "user", "content": "user"}])
-
         params = llm._call_api.call_args[0][0]
         assert "temperature" not in params
         assert "top_p" in params
@@ -127,9 +118,7 @@ class TestOpenAILLMParams:
     async def test_params_exclude_both_none(self):
         llm = self._make_llm(temperature=None, top_p=None)
         llm._call_api = AsyncMock(return_value="response")
-
         await llm.generate(system_message="sys", messages=[{"role": "user", "content": "user"}])
-
         params = llm._call_api.call_args[0][0]
         assert "temperature" not in params
         assert "top_p" not in params
