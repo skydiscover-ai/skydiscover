@@ -45,7 +45,7 @@ if [ "${DIND:-}" = "1" ]; then
 
     # Drop to non-root user. The controller writes the command to a
     # script file (.run.sh) to avoid quoting issues with su -c.
-    exec su -s /bin/bash claude -c "export HOME=/workspace; $1"
+    exec su -s /bin/bash claude -c "export HOME=/workspace; export ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY; $1"
 else
     # Simple mode: just run the command (caller used --user).
     exec "$@"

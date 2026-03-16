@@ -68,15 +68,6 @@ class ClaudeCodeController(DiscoveryController):
                 check=True,
             )
 
-    def _save_evaluator_image(self, workspace: Path, image_tag: str) -> None:
-        """Export the evaluator Docker image so the DinD daemon can load it."""
-        tar_path = workspace / ".evaluator-image.tar"
-        logger.info(f"Saving evaluator image '{image_tag}' for DinD...")
-        subprocess.run(
-            ["docker", "save", "-o", str(tar_path), image_tag],
-            check=True,
-        )
-
     def _write_eval_script(
         self, workspace: Path, eval_type: str, evaluator_image: str = "", timeout: int = 360
     ) -> None:
@@ -173,14 +164,13 @@ class ClaudeCodeController(DiscoveryController):
             is_docker_eval = eval_path.is_dir()
 
             if is_docker_eval:
-                evaluator_image = self.evaluator.image_tag
+                # Write the evaluator container ID so run_eval.sh can
+                # docker exec into the already-running evaluator container.
+                eval_cid = self.evaluator.container_id
+                (workspace / ".evaluator-container-id").write_text(eval_cid)
                 eval_timeout = self.config.evaluator.timeout
                 self._write_eval_script(
-                    workspace, "docker", evaluator_image=evaluator_image, timeout=eval_timeout
-                )
-                # Export the evaluator image for the DinD daemon to load.
-                await loop.run_in_executor(
-                    None, self._save_evaluator_image, workspace, evaluator_image
+                    workspace, "docker", timeout=eval_timeout
                 )
             else:
                 shutil.copy(eval_path, workspace / "evaluator.py")
@@ -194,11 +184,16 @@ class ClaudeCodeController(DiscoveryController):
             task_content = (workspace / "TASK.md").read_text()
 
             api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-            log_path = workspace / "claude.log"
+            # Put the log in output_dir so it survives workspace cleanup.
+            if self.output_dir:
+                os.makedirs(self.output_dir, exist_ok=True)
+                log_path = Path(self.output_dir) / "claude.log"
+            else:
+                log_path = workspace / "claude.log"
 
             pip_step = (
-                "pip install -q --no-warn-script-location -r /workspace/requirements.txt"
-                " >/dev/null 2>&1 && "
+                "pip install -q --no-warn-script-location"
+                " -r /workspace/requirements.txt && "
                 if (workspace / "requirements.txt").exists() else ""
             )
             model_flag = f" --model {shlex.quote(model)}" if model else ""
@@ -212,42 +207,63 @@ class ClaudeCodeController(DiscoveryController):
                 f"{model_flag}"
             )
 
+            # Run as the built-in 'claude' user (Claude Code refuses
+            # --dangerously-skip-permissions as root). pip install runs
+            # first as root, then we drop to the claude user.
+            #
+            # We write two scripts to avoid nested quoting issues:
+            # .run.sh     — runs as root: installs deps, fixes perms, drops to claude
+            # .claude.sh  — runs as claude: the actual claude CLI invocation
+            claude_script = workspace / ".claude.sh"
+            claude_script.write_text(
+                f"#!/bin/bash\nset -euo pipefail\n"
+                f"export HOME=/workspace\n"
+                f"claude -p {shlex.quote(task_content)}"
+                f" --max-turns {max_turns}"
+                f" --dangerously-skip-permissions"
+                f" --output-format stream-json"
+                f" --verbose"
+                f"{model_flag}\n"
+            )
+            claude_script.chmod(0o755)
+
+            docker_sock_step = ""
             if is_docker_eval:
-                # DinD mode: --privileged gives the container its own Docker
-                # daemon. The entrypoint starts dockerd, loads the evaluator
-                # image, then drops to a non-root user before running claude.
-                # Write bash_cmd to a script file so it doesn't get mangled
-                # by su -c argument expansion in the entrypoint.
-                run_script = workspace / ".run.sh"
-                run_script.write_text(f"#!/bin/bash\n{bash_cmd}\n")
-                run_script.chmod(0o755)
-                cmd = [
-                    "docker", "run", "--rm",
-                    "--privileged",
-                    "-e", "DIND=1",
-                    "-e", f"ANTHROPIC_API_KEY={api_key}",
-                    "-v", f"{workspace}:/workspace",
-                    "-w", "/workspace",
-                    image_name,
-                    "/workspace/.run.sh",
-                ]
-            else:
-                # Simple mode: no Docker needed inside the container.
-                cmd = [
-                    "docker", "run", "--rm",
-                    "--user", f"{os.getuid()}:{os.getgid()}",
-                    "-e", "HOME=/workspace",
-                    "-e", f"ANTHROPIC_API_KEY={api_key}",
-                    "-v", f"{workspace}:/workspace",
-                    "-w", "/workspace",
-                    "--entrypoint", "bash",
-                    image_name,
-                    "-c", bash_cmd,
+                # Make the host Docker socket accessible to the non-root claude user.
+                docker_sock_step = "chmod 666 /var/run/docker.sock 2>/dev/null || true\n"
+
+            run_script = workspace / ".run.sh"
+            run_script.write_text(
+                f"#!/bin/bash\nset -euo pipefail\n"
+                f"{pip_step}"
+                f"{docker_sock_step}"
+                f"chown -R claude:claude /workspace 2>/dev/null || chmod -R 777 /workspace 2>/dev/null || true\n"
+                f"exec su --preserve-environment -s /bin/bash claude -c /workspace/.claude.sh\n"
+            )
+            run_script.chmod(0o755)
+            cmd = [
+                "docker", "run", "--rm",
+                "-e", f"ANTHROPIC_API_KEY={api_key}",
+                "-v", f"{workspace}:/workspace",
+                "-w", "/workspace",
+                "--entrypoint", "bash",
+                image_name,
+                "/workspace/.run.sh",
+            ]
+            if is_docker_eval:
+                # Mount host Docker socket so Claude can docker exec
+                # into the evaluator container. Add the socket's group
+                # so the non-root claude user has permission.
+                import stat as stat_mod
+                sock_gid = os.stat("/var/run/docker.sock").st_gid
+                cmd[3:3] = [
+                    "-v", "/var/run/docker.sock:/var/run/docker.sock",
+                    "--group-add", str(sock_gid),
                 ]
 
             logger.info(
                 f"Starting Claude Code container (--max-turns {max_turns})\n"
-                f"  Monitor progress: tail -f {log_path} | cclean -t"
+                f"  Monitor progress: tail -f {log_path} | cclean -t\n"
                 f"  (https://github.com/ariel-frischer/claude-clean)"
             )
 
