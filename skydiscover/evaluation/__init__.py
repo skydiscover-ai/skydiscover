@@ -41,7 +41,7 @@ def _is_harbor_task(path: str) -> bool:
     return (
         os.path.isdir(path)
         and os.path.exists(os.path.join(path, "instruction.md"))
-        and os.path.isdir(os.path.join(path, "tests"))
+        and os.path.exists(os.path.join(path, "tests", "test.sh"))
         and os.path.isdir(os.path.join(path, "environment"))
         and os.path.exists(os.path.join(path, "environment", "Dockerfile"))
     )

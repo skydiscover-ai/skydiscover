@@ -75,7 +75,7 @@ class CoEvolutionController(DiscoveryController):
         self._best_search_score: Optional[float] = None
         self._num_search_evolutions = 0
 
-        self._switch_interval = None
+        self._switch_interval = getattr(self.config.search, "switch_interval", None)
         self._stagnant_count = 0
         self._last_tracked_best_score: Optional[float] = None
 

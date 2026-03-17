@@ -122,6 +122,7 @@ class HarborEvaluator(ContainerizedEvaluator):
                 ],
                 capture_output=True,
                 text=True,
+                timeout=self.config.timeout,
             )
 
             # Read reward regardless of exit code — test.sh may exit non-zero
@@ -136,6 +137,12 @@ class HarborEvaluator(ContainerizedEvaluator):
                 result.artifacts.setdefault("stdout", proc.stdout)
 
             return result
+        except subprocess.TimeoutExpired:
+            logger.error(f"docker exec timed out after {self.config.timeout}s")
+            return EvaluationResult(
+                metrics={"combined_score": 0.0},
+                artifacts={"error": f"docker exec timed out after {self.config.timeout}s"},
+            )
 
         finally:
             # Clean up solution so the container is fresh for next evaluation.
