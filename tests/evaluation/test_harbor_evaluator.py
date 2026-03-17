@@ -294,6 +294,7 @@ def _make_harbor_dir(tmp_path):
     """Create a minimal valid Harbor task directory."""
     (tmp_path / "instruction.md").write_text("problem")
     (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test.sh").write_text("#!/bin/bash\n")
     (tmp_path / "environment").mkdir()
     (tmp_path / "environment" / "Dockerfile").write_text("FROM python:3.11\n")
     return str(tmp_path)
@@ -315,9 +316,17 @@ class TestHarborTaskDetection:
         (tmp_path / "environment" / "Dockerfile").write_text("FROM python:3.11\n")
         assert _is_harbor_task(str(tmp_path)) is False
 
+    def test_missing_test_sh(self, tmp_path):
+        (tmp_path / "instruction.md").write_text("problem")
+        (tmp_path / "tests").mkdir()
+        (tmp_path / "environment").mkdir()
+        (tmp_path / "environment" / "Dockerfile").write_text("FROM python:3.11\n")
+        assert _is_harbor_task(str(tmp_path)) is False
+
     def test_missing_dockerfile(self, tmp_path):
         (tmp_path / "instruction.md").write_text("problem")
         (tmp_path / "tests").mkdir()
+        (tmp_path / "tests" / "test.sh").write_text("#!/bin/bash\n")
         (tmp_path / "environment").mkdir()
         assert _is_harbor_task(str(tmp_path)) is False
 
