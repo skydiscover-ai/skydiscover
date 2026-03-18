@@ -2,7 +2,7 @@
 #
 # Usage:
 #   cd benchmarks/image_gen/sky_festival
-#   skydiscover-run evaluator.py -c config.yaml -s adaevolve -o sky_festival_output
+#   skydiscover-run eval -c config.yaml -s adaevolve -o sky_festival_output
 
 language: "image"
 diff_based_generation: false

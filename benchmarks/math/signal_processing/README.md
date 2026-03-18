@@ -25,7 +25,7 @@ The evaluator tests on 5 synthetic signals: sinusoidal, multi-frequency, non-sta
 # From repo root
 uv run skydiscover-run \
   benchmarks/math/signal_processing/initial_program.py \
-  benchmarks/math/signal_processing/evaluator.py \
+  benchmarks/math/signal_processing/eval \
   -c benchmarks/math/signal_processing/config.yaml \
   -s [your_algorithm] \
   -i 100
@@ -41,6 +41,6 @@ uv run skydiscover-run \
 | File | Description |
 |------|-------------|
 | `initial_program.py` | Seed: basic moving average / weighted exponential filters |
-| `evaluator.py` | Multi-objective evaluation across 5 synthetic test signals |
+| `eval/` | Containerized evaluator — multi-objective evaluation across 5 synthetic test signals |
 | `config.yaml` | LLM and evaluator settings |
 | `requirements.txt` | Python dependencies |

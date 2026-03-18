@@ -31,7 +31,7 @@ From the repo root:
 ```bash
 uv run skydiscover-run \
   benchmarks/ADRS/cloudcast/initial_program.py \
-  benchmarks/ADRS/cloudcast/evaluator.py \
+  benchmarks/ADRS/cloudcast/eval \
   -c benchmarks/ADRS/cloudcast/config.yaml \
   -s [your_algorithm] \
   -i 100
@@ -42,7 +42,7 @@ uv run skydiscover-run \
 | File | Description |
 |------|-------------|
 | `initial_program.py` | Baseline `search_algorithm` function to evolve |
-| `evaluator.py` | Scores programs on total transfer cost across 5 network configs |
+| `eval/` | Containerized evaluator — scores programs on total transfer cost across 5 network configs |
 | `config.yaml` | Task-specific config (LLM, evaluator timeout, system prompt) |
 | `simulator.py` | Broadcast cost simulator |
 | `broadcast.py` | `BroadCastTopology` data structure |

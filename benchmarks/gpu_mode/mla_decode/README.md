@@ -11,7 +11,7 @@ From the repo root:
 ```bash
 uv run skydiscover-run \
   benchmarks/gpu_mode/mla_decode/initial_program.py \
-  benchmarks/gpu_mode/mla_decode/evaluator.py \
+  benchmarks/gpu_mode/mla_decode/eval \
   -c benchmarks/gpu_mode/mla_decode/config.yaml \
   -s [your_algorithm] -i 50
 ```
@@ -30,7 +30,7 @@ uv run skydiscover-run \
 GPUMODE_USE_MODAL=true GPUMODE_MODAL_GPU=H200 \
   uv run skydiscover-run \
   benchmarks/gpu_mode/mla_decode/initial_program.py \
-  benchmarks/gpu_mode/mla_decode/evaluator.py \
+  benchmarks/gpu_mode/mla_decode/eval \
   -c benchmarks/gpu_mode/mla_decode/config.yaml \
   -s [your_algorithm] -i 50
 ```

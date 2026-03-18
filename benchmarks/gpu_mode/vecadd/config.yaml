@@ -1,5 +1,5 @@
 # GPU Mode: Float16 Vector Addition
-# Usage: uv run skydiscover-run initial_program.py evaluator.py -c config.yaml -s <strategy> -i 50
+# Usage: uv run skydiscover-run initial_program.py eval -c config.yaml -s <strategy> -i 50
 
 max_iterations: 100
 checkpoint_interval: 10

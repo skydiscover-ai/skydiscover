@@ -30,7 +30,7 @@ From the repo root:
 ```bash
 uv run skydiscover-run \
   benchmarks/ADRS/eplb/initial_program.py \
-  benchmarks/ADRS/eplb/evaluator.py \
+  benchmarks/ADRS/eplb/eval \
   -c benchmarks/ADRS/eplb/config.yaml \
   -s [your_algorithm] \
   -i 100 \
@@ -40,7 +40,7 @@ uv run skydiscover-run \
 Or from this directory:
 
 ```bash
-uv run skydiscover-run initial_program.py evaluator.py \
+uv run skydiscover-run initial_program.py eval \
   -c config.yaml \
   -s [your_algorithm] \
   -i 100
@@ -57,7 +57,7 @@ python evaluate_best_program.py
 | File | Description |
 |------|-------------|
 | `initial_program.py` | Baseline `rebalance_experts` function to evolve |
-| `evaluator.py` | Scores programs on load-balance quality and execution speed |
+| `eval/` | Containerized evaluator — scores programs on load-balance quality and execution speed |
 | `config.yaml` | Task-specific config (LLM, evaluator timeout, system prompt) |
 | `evaluate_best_program.py` | Standalone script to evaluate a saved best program |
 | `expert-load.json` | Workload data (must be downloaded — see Setup) |

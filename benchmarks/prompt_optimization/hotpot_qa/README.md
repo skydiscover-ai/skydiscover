@@ -35,13 +35,13 @@ These are cached in the `hotpot_qa/` directory and reused on subsequent runs.
 # AdaEvolve (multi-island adaptive search)
 uv run skydiscover-run \
   benchmarks/prompt_optimization/hotpot_qa/initial_prompt.txt \
-  benchmarks/prompt_optimization/hotpot_qa/evaluator.py \
+  benchmarks/prompt_optimization/hotpot_qa/eval \
   -c benchmarks/prompt_optimization/hotpot_qa/config_adaevolve.yaml -i 100
 
 # EvoX (co-evolutionary search)
 uv run skydiscover-run \
   benchmarks/prompt_optimization/hotpot_qa/initial_prompt.txt \
-  benchmarks/prompt_optimization/hotpot_qa/evaluator.py \
+  benchmarks/prompt_optimization/hotpot_qa/eval \
   -c benchmarks/prompt_optimization/hotpot_qa/config_evox.yaml -i 100
 
 # Or use the reproduce script (runs AdaEvolve + EvoX in parallel):
@@ -59,7 +59,7 @@ bash scripts/reproduce/prompt_opt.sh
 | File | Description |
 |------|-------------|
 | `initial_prompt.txt` | Seed prompt: "Given the fields `question`, `passages`, produce the fields `answer`." |
-| `evaluator.py` | DSPy-based evaluator with BM25 retrieval and exact match scoring |
+| `eval/` | Containerized evaluator — DSPy-based with BM25 retrieval and exact match scoring |
 | `config_adaevolve.yaml` | AdaEvolve config |
 | `config_evox.yaml` | EvoX config |
 | `requirements.txt` | Python dependencies |

@@ -31,13 +31,13 @@ export OPENAI_API_KEY="..."
 
 # Containerized benchmark (recommended — evaluator runs in Docker)
 uv run skydiscover-run benchmarks/math/circle_packing_rect/initial_program.py \
-  benchmarks/math/circle_packing_rect/evaluator \
+  benchmarks/math/circle_packing_rect/eval \
   -c benchmarks/math/circle_packing_rect/config.yaml \
   -s best_of_n -i 50
 
 # Plain Python evaluator (runs on host)
 uv run skydiscover-run benchmarks/math/circle_packing/initial_program.py \
-  benchmarks/math/circle_packing/evaluator.py \
+  benchmarks/math/circle_packing/eval \
   -c benchmarks/math/circle_packing/config.yaml \
   -s best_of_n -i 100
 ```
@@ -67,7 +67,7 @@ There are two ways to set up a benchmark: a **containerized evaluator** (recomme
 <task>/
 ├── initial_program.py       # Starting solution
 ├── config.yaml              # System prompt + search/evaluator settings
-└── evaluator/               # Self-contained Docker benchmark
+└── eval/                    # Self-contained Docker benchmark
     ├── Dockerfile
     ├── evaluate.sh          # Entrypoint (receives solution path + mode)
     ├── evaluator.py         # Scoring logic
@@ -75,7 +75,7 @@ There are two ways to set up a benchmark: a **containerized evaluator** (recomme
     └── ...                  # Any other data/files the evaluator needs
 ```
 
-The `evaluator/` directory is the Docker build context. Everything inside it gets copied into the image — data files, model weights, test fixtures, etc. SkyDiscover auto-detects this layout when `evaluation_file` points to a directory containing a `Dockerfile` and `evaluate.sh`.
+The `eval/` directory is the Docker build context. Everything inside it gets copied into the image — data files, model weights, test fixtures, etc. SkyDiscover auto-detects this layout when `evaluation_file` points to a directory containing a `Dockerfile` and `evaluate.sh`.
 
 ### Plain Python evaluator
 
@@ -154,7 +154,7 @@ ENTRYPOINT ["./evaluate.sh"]
 
 If you have an existing `evaluate(program_path) -> dict` function, you can wrap it with the backwards-compatibility wrapper:
 
-1. Copy `skydiscover/evaluation/wrapper.py` into your `evaluator/` directory.
+1. Copy `skydiscover/evaluation/wrapper.py` into your `eval/` directory.
 2. Add this to the bottom of your `evaluator.py`:
 
 ```python
@@ -167,11 +167,11 @@ The wrapper handles stdout redirection (so debug prints don't corrupt JSON), err
 
 #### Running a containerized benchmark
 
-Point `evaluation_file` at the `evaluator/` directory:
+Point `evaluation_file` at the `eval/` directory:
 
 ```bash
 skydiscover-run benchmarks/math/circle_packing_rect/initial_program.py \
-  benchmarks/math/circle_packing_rect/evaluator \
+  benchmarks/math/circle_packing_rect/eval \
   -c benchmarks/math/circle_packing_rect/config.yaml \
   -s best_of_n -i 50
 ```

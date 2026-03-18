@@ -276,9 +276,9 @@ class ContainerizedEvaluator:
         norm = os.path.normpath(self.benchmark_dir)
         name = os.path.basename(norm)
         # Include parent dir to avoid tag collisions when multiple benchmarks
-        # share the same leaf directory name (e.g. "evaluator").
+        # share the same leaf directory name (e.g. "eval").
         parent = os.path.basename(os.path.dirname(norm))
-        if parent and name == "evaluator":
+        if parent and name in ("eval", "evaluator"):
             name = f"{parent}-{name}"
         tag = f"skydiscover-{name}:latest"
 

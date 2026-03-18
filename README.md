@@ -76,13 +76,13 @@ export OPENAI_API_KEY="<your-key>"
 # Try the circle packing benchmark
 uv sync --extra math
 uv run skydiscover-run benchmarks/math/circle_packing/initial_program.py \
-  benchmarks/math/circle_packing/evaluator.py \
+  benchmarks/math/circle_packing/eval \
   --config benchmarks/math/circle_packing/config.yaml \
   --search evox \
   --iterations 100
 
 uv run skydiscover-run benchmarks/math/circle_packing/initial_program.py \
-  benchmarks/math/circle_packing/evaluator.py \
+  benchmarks/math/circle_packing/eval \
   --config benchmarks/math/circle_packing/config.yaml \
   --search adaevolve \
   --iterations 100

@@ -29,7 +29,7 @@ Supported algorithms: `adaevolve`, `evox`, `openevolve`, `gepa`, `shinkaevolve`
 Single problem:
 ```bash
 cd benchmarks/frontier-cs-eval
-FRONTIER_CS_PROBLEM=0 uv run skydiscover-run initial_program.cpp evaluator.py \
+FRONTIER_CS_PROBLEM=0 uv run skydiscover-run initial_program.cpp eval \
   -c config.yaml -s [search_algorithm] -i 50
 ```
 
@@ -56,7 +56,7 @@ uv run python analyze_results.py   # generate plots and statistics
 | File | Description |
 |------|-------------|
 | `initial_program.cpp` | Seed C++ program |
-| `evaluator.py` | Evaluates C++ solutions via Frontier-CS docker judge |
+| `eval/` | Containerized evaluator — evaluates C++ solutions via Frontier-CS docker judge |
 | `config.yaml` | Config with system prompt template |
 | `run_all_frontiercs.py` | Parallelizes evolution across all problems |
 | `run_best_programs_frontiercs.py` | Re-evaluates best programs after evolution |

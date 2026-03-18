@@ -2,7 +2,7 @@
 # Evolves a natural-language instruction prompt (not code) for multi-hop QA
 #
 # Usage:
-#   uv run skydiscover-run initial_prompt.txt evaluator.py -c config_adaevolve.yaml --search adaevolve
+#   uv run skydiscover-run initial_prompt.txt eval -c config_adaevolve.yaml --search adaevolve
 
 max_iterations: 100
 checkpoint_interval: 1

@@ -24,7 +24,7 @@ Run evolution on a single problem:
 ```bash
 uv run skydiscover-run \
   benchmarks/ale_bench/ale-bench-lite-problems/ahc025/initial_program.cpp \
-  benchmarks/ale_bench/ale-bench-lite-problems/ahc025/evaluator.py \
+  benchmarks/ale_bench/ale-bench-lite-problems/ahc025/eval \
   -c benchmarks/ale_bench/ale-bench-lite-problems/ahc025/config.yaml \
   --search evox \
   -i 100
@@ -59,7 +59,7 @@ ale_bench/
 ├── ale-bench-lite-problems/
 │   └── ahcXXX/
 │       ├── initial_program.cpp   # Starting C++ solution
-│       ├── evaluator.py          # Runs 50 public cases via ale_bench
+│       ├── eval/             # Containerized evaluator (runs 50 public cases via ale_bench)
 │       └── config.yaml           # Search config (cpp, diff-based, 100 iterations)
 ├── ale_agent_best/
 │   └── ahcXXX.cpp               # Best known solutions (reference)
