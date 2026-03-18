@@ -484,8 +484,10 @@ class ClaudeCodeController(DiscoveryController):
                 except OSError:
                     pass
 
-            # Final evaluation: always re-evaluate the best solution on disk so the
-            # reported score is reproducible (re-running best_program.py gives same #).
+            # Final evaluation: re-evaluate the solution on disk.
+            # If it times out or errors (e.g. solution too slow), fall back to the
+            # best program already in the database from mid-run checkpoints —
+            # that score is already verified and reliable.
             try:
                 final_code = solution_path.read_text()
             except OSError:
@@ -493,25 +495,42 @@ class ClaudeCodeController(DiscoveryController):
             if not final_code.strip():
                 final_code = initial_code
 
-            program_id = str(uuid.uuid4())
-            eval_result = await self.evaluator.evaluate_program(final_code, program_id)
             final_iter = max(actual_turns, 1)
+            final_score_source = "final_eval"
+            program_id = str(uuid.uuid4())
+            try:
+                eval_result = await self.evaluator.evaluate_program(final_code, program_id)
+                if eval_result.metrics.get("timeout") or eval_result.metrics.get("combined_score") is None:
+                    raise ValueError("Final eval timed out or returned no score")
+            except Exception as e:
+                # Fall back to best checkpoint score already in the database.
+                logger.warning(f"Final eval failed ({e}), falling back to best checkpoint score")
+                best = self.database.get_best_program()
+                if best and best.metrics and best.metrics.get("combined_score") is not None:
+                    eval_result = type("R", (), {"metrics": best.metrics, "artifacts": best.artifacts or {}})()
+                    final_code = best.solution
+                    program_id = best.id
+                    final_score_source = "best_checkpoint"
+                else:
+                    eval_result = type("R", (), {"metrics": {}, "artifacts": {}})()
+                    final_score_source = "none"
 
-            program = Program(
-                id=program_id,
-                solution=final_code,
-                language=self.config.language or "python",
-                metrics=eval_result.metrics,
-                iteration_found=final_iter,
-                parent_id=initial.id if initial else None,
-                other_context_ids=[],
-                metadata={
-                    "claude_code_max_turns": max_turns,
-                    "actual_turns": actual_turns,
-                },
-                artifacts=eval_result.artifacts,
-            )
-            self.database.add(program, iteration=final_iter)
+            if final_score_source == "final_eval":
+                program = Program(
+                    id=program_id,
+                    solution=final_code,
+                    language=self.config.language or "python",
+                    metrics=eval_result.metrics,
+                    iteration_found=final_iter,
+                    parent_id=initial.id if initial else None,
+                    other_context_ids=[],
+                    metadata={
+                        "claude_code_max_turns": max_turns,
+                        "actual_turns": actual_turns,
+                    },
+                    artifacts=eval_result.artifacts,
+                )
+                self.database.add(program, iteration=final_iter)
 
             if checkpoint_callback:
                 checkpoint_callback(final_iter)
@@ -531,6 +550,7 @@ class ClaudeCodeController(DiscoveryController):
                     "wall_seconds": round(run_elapsed, 1),
                     "baseline_score": initial.metrics.get("combined_score") if initial and initial.metrics else None,
                     "final_score": eval_result.metrics.get("combined_score"),
+                    "final_score_source": final_score_source,
                     "final_metrics": eval_result.metrics,
                 }
                 (out / "run_summary.json").write_text(
@@ -541,6 +561,7 @@ class ClaudeCodeController(DiscoveryController):
                     f"cost=${total_cost_usd:.4f}, "
                     f"time={run_elapsed:.0f}s, "
                     f"score={eval_result.metrics.get('combined_score', '?')}"
+                    f" (source={final_score_source})"
                 )
 
         finally:
