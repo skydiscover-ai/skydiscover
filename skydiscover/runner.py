@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import signal
+import sys
 import time
 import uuid
 from typing import Optional
@@ -59,6 +60,8 @@ class Runner:
         )
         if self.initial_program_solution and not self.config.language:
             self.config.language = extract_solution_language(self.initial_program_solution)
+        if not self.config.language:
+            self.config.language = "python"
 
         # Set the file extension
         ext = os.path.splitext(initial_program_path)[1] if initial_program_path else ".py"
@@ -354,8 +357,16 @@ class Runner:
     def _install_signal_handlers(self) -> None:
         def on_signal(signum, frame):
             logger.info(f"Signal {signum} received, shutting down...")
-            self.discovery_controller.request_shutdown()
-            signal.signal(signal.SIGINT, lambda s, f: __import__("sys").exit(0))
+            if self.discovery_controller is not None:
+                self.discovery_controller.request_shutdown()
+
+            def force_exit(signum, frame):
+                sys.exit(128 + signum)
+
+            # After the first termination signal, ensure subsequent SIGINT/SIGTERM
+            # cause an immediate exit instead of re-running the soft handler.
+            signal.signal(signal.SIGINT, force_exit)
+            signal.signal(signal.SIGTERM, force_exit)
 
         signal.signal(signal.SIGINT, on_signal)
         signal.signal(signal.SIGTERM, on_signal)

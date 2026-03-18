@@ -107,13 +107,7 @@ class CoEvolutionController(DiscoveryController):
 
         if self._switch_interval is None:
             self._switch_interval = max(1, int(max_iterations * self.DEFAULT_SWITCH_RATIO))
-            logger.info(
-                f"Switch if {self._switch_interval} iterations of stagnation detected (auto: {max_iterations} * {self.DEFAULT_SWITCH_RATIO})"
-            )
-        else:
-            logger.info(
-                f"Switch if {self._switch_interval} iterations of stagnation detected (explicit config)"
-            )
+            logger.info(f"Switch if {self._switch_interval} iterations of stagnation detected")
 
         self.start_db_stats = self.database.get_statistics(
             improvement_threshold=self.DEFAULT_IMPROVEMENT_THRESHOLD

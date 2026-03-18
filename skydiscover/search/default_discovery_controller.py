@@ -102,6 +102,10 @@ class DiscoveryController:
         self.feedback_reader: Optional[Any] = None
         self._prompt_context: Dict[str, Any] = {}
 
+        # Load evaluator/task description and inject into system message so
+        # the LLM knows what problem to solve (especially for from-scratch).
+        self._inject_evaluator_context()
+
         logger.info(
             f"DiscoveryController initialized: num_context_programs={self.num_context_programs}"
         )
@@ -114,6 +118,28 @@ class DiscoveryController:
     # ------------------------------------------------------------------
     # Initialisation helpers
     # ------------------------------------------------------------------
+
+    def _inject_evaluator_context(self):
+        """Load evaluator/task description and prepend to the system message.
+
+        For Harbor tasks this loads instruction.md; for containerized benchmarks
+        it loads the evaluator source files. The content gives the LLM essential
+        context about the problem it needs to solve.
+        """
+        from skydiscover.search.utils.discovery_utils import load_evaluator_code
+
+        task_description = load_evaluator_code(self.evaluation_file)
+        if not task_description:
+            return
+
+        ctx = self.config.context_builder
+        existing = ctx.system_message or ""
+        # Prepend the task description so the LLM always sees it.
+        ctx.system_message = (
+            f"# Task Description\n\n{task_description}\n\n{existing}"
+            if existing
+            else f"# Task Description\n\n{task_description}"
+        )
 
     def _init_context_builder(self):
         """Initialize the appropriate context builder based on config."""

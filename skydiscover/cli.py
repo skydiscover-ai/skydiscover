@@ -221,9 +221,7 @@ async def main_async() -> int:
             if not os.path.exists(args.checkpoint):
                 print(f"Error: Checkpoint directory '{args.checkpoint}' not found", file=sys.stderr)
                 return 1
-            print(f"Loading checkpoint from {args.checkpoint}")
-            runner.database.load(args.checkpoint)
-            print(f"Checkpoint loaded (iteration {runner.database.last_iteration})")
+            print(f"Will resume from checkpoint: {args.checkpoint}")
 
         # Run the discovery
         best_program = await runner.run(

@@ -262,7 +262,7 @@ def get_available_packages(problem_dir=None) -> list:
     """Get list of available packages from requirements.txt or pyproject.toml (direct dependencies only)."""
     from pathlib import Path
 
-    repo_root = Path(__file__).resolve().parents[3]
+    repo_root = Path(__file__).resolve().parents[4]
 
     # Priority 1: requirements.txt in problem directory
     if problem_dir is not None:
