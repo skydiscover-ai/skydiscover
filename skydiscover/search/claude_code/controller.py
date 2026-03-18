@@ -497,40 +497,49 @@ class ClaudeCodeController(DiscoveryController):
 
             final_iter = max(actual_turns, 1)
             final_score_source = "final_eval"
+
+            # Try evaluating the last solution Claude wrote.  If it times out or
+            # errors (solution too slow), fall back to re-evaluating the best
+            # program's CODE from the database — a fresh evaluation, not a stored
+            # number, so the result cannot be gamed by checkpoint selection.
             program_id = str(uuid.uuid4())
             try:
                 eval_result = await self.evaluator.evaluate_program(final_code, program_id)
                 if eval_result.metrics.get("timeout") or eval_result.metrics.get("combined_score") is None:
                     raise ValueError("Final eval timed out or returned no score")
             except Exception as e:
-                # Fall back to best checkpoint score already in the database.
-                logger.warning(f"Final eval failed ({e}), falling back to best checkpoint score")
+                logger.warning(f"Final eval failed ({e}), re-evaluating best checkpoint code")
                 best = self.database.get_best_program()
-                if best and best.metrics and best.metrics.get("combined_score") is not None:
-                    eval_result = type("R", (), {"metrics": best.metrics, "artifacts": best.artifacts or {}})()
+                if best and best.solution and best.solution.strip():
                     final_code = best.solution
-                    program_id = best.id
-                    final_score_source = "best_checkpoint"
+                    program_id = str(uuid.uuid4())
+                    try:
+                        eval_result = await self.evaluator.evaluate_program(final_code, program_id)
+                        final_score_source = "best_program_reeval"
+                    except Exception as e2:
+                        logger.warning(f"Best program re-eval also failed ({e2})")
+                        eval_result = type("R", (), {"metrics": {}, "artifacts": {}})()
+                        final_score_source = "none"
                 else:
                     eval_result = type("R", (), {"metrics": {}, "artifacts": {}})()
                     final_score_source = "none"
 
-            if final_score_source == "final_eval":
-                program = Program(
-                    id=program_id,
-                    solution=final_code,
-                    language=self.config.language or "python",
-                    metrics=eval_result.metrics,
-                    iteration_found=final_iter,
-                    parent_id=initial.id if initial else None,
-                    other_context_ids=[],
-                    metadata={
-                        "claude_code_max_turns": max_turns,
-                        "actual_turns": actual_turns,
-                    },
-                    artifacts=eval_result.artifacts,
-                )
-                self.database.add(program, iteration=final_iter)
+            program = Program(
+                id=program_id,
+                solution=final_code,
+                language=self.config.language or "python",
+                metrics=eval_result.metrics,
+                iteration_found=final_iter,
+                parent_id=initial.id if initial else None,
+                other_context_ids=[],
+                metadata={
+                    "claude_code_max_turns": max_turns,
+                    "actual_turns": actual_turns,
+                    "final_score_source": final_score_source,
+                },
+                artifacts=eval_result.artifacts,
+            )
+            self.database.add(program, iteration=final_iter)
 
             if checkpoint_callback:
                 checkpoint_callback(final_iter)
