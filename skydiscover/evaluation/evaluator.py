@@ -7,6 +7,7 @@ import sys
 import tempfile
 import time
 import traceback
+import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 from skydiscover.config import EvaluatorConfig
@@ -58,12 +59,13 @@ class Evaluator:
         if eval_dir not in sys.path:
             sys.path.insert(0, eval_dir)
 
-        spec = importlib.util.spec_from_file_location("evaluation_module", self.evaluation_file)
+        self._module_name = f"_skydiscover_eval_{uuid.uuid4().hex}"
+        spec = importlib.util.spec_from_file_location(self._module_name, self.evaluation_file)
         if spec is None or spec.loader is None:
             raise ImportError(f"Cannot load module from {self.evaluation_file}")
 
         module = importlib.util.module_from_spec(spec)
-        sys.modules["evaluation_module"] = module
+        sys.modules[self._module_name] = module
         spec.loader.exec_module(module)
 
         if not hasattr(module, "evaluate"):
@@ -188,6 +190,10 @@ class Evaluator:
             coros=[self.evaluate_program] * len(programs),
             args_list=list(programs),
         )
+
+    def close(self) -> None:
+        """Remove the dynamically loaded evaluation module from sys.modules."""
+        sys.modules.pop(getattr(self, "_module_name", None), None)
 
     # ------------------------------------------------------------------
     # Internals

@@ -154,9 +154,7 @@ class OpenAILLM(LLMInterface):
             if reasoning_effort is not None:
                 params["reasoning_effort"] = reasoning_effort
 
-        retries = kwargs.get("retries", self.retries)
-        retry_delay = kwargs.get("retry_delay", self.retry_delay)
-        timeout = kwargs.get("timeout", self.timeout)
+        retries, retry_delay, timeout = self._resolve_retry_options(**kwargs)
 
         for attempt in range(retries + 1):
             try:
@@ -180,6 +178,19 @@ class OpenAILLM(LLMInterface):
             None, lambda: self.client.chat.completions.create(**params)
         )
         return response.choices[0].message.content
+
+    def _resolve_retry_options(self, **kwargs) -> Tuple[int, int, int]:
+        """Resolve retry/timeout options from kwargs, falling back to instance defaults."""
+        retries = kwargs.get("retries", self.retries)
+        if retries is None:
+            retries = 0
+        retry_delay = kwargs.get("retry_delay", self.retry_delay)
+        if retry_delay is None:
+            retry_delay = 2
+        timeout = kwargs.get("timeout", self.timeout)
+        if timeout is None:
+            timeout = 300
+        return retries, retry_delay, timeout
 
     # ------------------------------------------------------------------
     # Image generation (OpenAI Responses API)
@@ -216,9 +227,7 @@ class OpenAILLM(LLMInterface):
         if self.max_tokens is not None:
             params["max_output_tokens"] = kwargs.get("max_tokens", self.max_tokens)
 
-        retries = kwargs.get("retries", self.retries) or 0
-        retry_delay = kwargs.get("retry_delay", self.retry_delay) or 2
-        timeout = kwargs.get("timeout", self.timeout) or 300
+        retries, retry_delay, timeout = self._resolve_retry_options(**kwargs)
 
         for attempt in range(retries + 1):
             try:

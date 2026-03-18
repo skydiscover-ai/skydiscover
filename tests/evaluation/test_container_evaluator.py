@@ -1,18 +1,16 @@
-"""Tests for ContainerizedEvaluator — focused on pure logic that doesn't need Docker."""
+"""Tests for ContainerizedEvaluator — pure logic that doesn't need Docker."""
 
 import json
+from unittest.mock import patch
 
 import pytest
 
-from skydiscover.config import EvaluatorConfig
 from skydiscover.evaluation.container_evaluator import ContainerizedEvaluator
 
 
 @pytest.fixture
 def parse_output():
     """Return a bound _parse_output method without starting a real container."""
-    # _parse_output is a pure function of stdout — we can call it on the class
-    # by giving it a throwaway self (it only uses self for nothing).
     inst = object.__new__(ContainerizedEvaluator)
     return inst._parse_output
 
@@ -35,10 +33,9 @@ class TestParseOutputSuccess:
         assert result.metrics["accuracy"] == 0.9
         assert result.metrics["speed"] == 0.8
         assert result.artifacts["feedback"] == "good job"
-        assert "status" not in result.artifacts  # success → no status artifact
+        assert "status" not in result.artifacts
 
     def test_combined_score_promoted_to_metrics(self, parse_output):
-        """combined_score at top level should appear in metrics even if metrics dict omits it."""
         stdout = json.dumps({
             "status": "success",
             "combined_score": 0.5,
@@ -54,8 +51,7 @@ class TestParseOutputSuccess:
             "combined_score": 1.0,
             "metrics": {"combined_score": 1.0},
         })
-        result = parse_output(stdout)
-        assert result.artifacts == {}
+        assert parse_output(stdout).artifacts == {}
 
     def test_integer_metrics_converted_to_float(self, parse_output):
         stdout = json.dumps({
@@ -68,7 +64,6 @@ class TestParseOutputSuccess:
         assert isinstance(result.metrics["n_correct"], float)
 
     def test_non_numeric_metrics_filtered(self, parse_output):
-        """String values in metrics should be silently dropped."""
         stdout = json.dumps({
             "status": "success",
             "combined_score": 0.5,
@@ -80,8 +75,7 @@ class TestParseOutputSuccess:
 
     def test_trailing_whitespace_stripped(self, parse_output):
         stdout = json.dumps({"status": "success", "combined_score": 0.7, "metrics": {}}) + "\n\n"
-        result = parse_output(stdout)
-        assert result.metrics["combined_score"] == 0.7
+        assert parse_output(stdout).metrics["combined_score"] == 0.7
 
 
 # ------------------------------------------------------------------
@@ -113,30 +107,39 @@ class TestParseOutputErrors:
         assert result.artifacts["error"] == "segfault"
 
     def test_timeout_status(self, parse_output):
-        stdout = json.dumps({
-            "status": "timeout",
-            "combined_score": 0.0,
-            "metrics": {},
-        })
-        result = parse_output(stdout)
-        assert result.artifacts["status"] == "timeout"
+        stdout = json.dumps({"status": "timeout", "combined_score": 0.0, "metrics": {}})
+        assert parse_output(stdout).artifacts["status"] == "timeout"
 
     def test_missing_status_defaults_to_error(self, parse_output):
         stdout = json.dumps({"combined_score": 0.5, "metrics": {"combined_score": 0.5}})
-        result = parse_output(stdout)
-        assert result.artifacts["status"] == "error"
+        assert parse_output(stdout).artifacts["status"] == "error"
 
     def test_missing_combined_score_defaults_to_zero(self, parse_output):
         stdout = json.dumps({"status": "success", "metrics": {}})
-        result = parse_output(stdout)
-        assert result.metrics["combined_score"] == 0.0
+        assert parse_output(stdout).metrics["combined_score"] == 0.0
 
     def test_missing_metrics_dict(self, parse_output):
         stdout = json.dumps({"status": "success", "combined_score": 0.3})
-        result = parse_output(stdout)
-        assert result.metrics["combined_score"] == 0.3
+        assert parse_output(stdout).metrics["combined_score"] == 0.3
 
     def test_partial_json_truncated(self, parse_output):
         result = parse_output('{"status": "suc')
         assert result.metrics["error"] == 0.0
         assert "raw_output" in result.artifacts
+
+
+# ------------------------------------------------------------------
+# llm_judge attribute
+# ------------------------------------------------------------------
+
+
+class TestLlmJudgeAttribute:
+    def test_init_sets_llm_judge_to_none(self):
+        """ContainerizedEvaluator.__init__ must set self.llm_judge before Docker calls."""
+        with patch.object(ContainerizedEvaluator, "_build_image", return_value="fake:latest"), \
+             patch.object(ContainerizedEvaluator, "_start_container", return_value="abc123"):
+            from skydiscover.config import EvaluatorConfig
+
+            inst = ContainerizedEvaluator.__new__(ContainerizedEvaluator)
+            ContainerizedEvaluator.__init__(inst, "/tmp/fake", EvaluatorConfig())
+            assert inst.llm_judge is None

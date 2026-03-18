@@ -210,7 +210,8 @@ class ProgramDatabase(ABC):
     def _is_better(self, program1: Program, program2: Program) -> bool:
         """Determine if program1 has better fitness than program2."""
         if not program1.metrics and not program2.metrics:
-            return program1.timestamp > program2.timestamp
+            # No evidence either way — keep the current best.
+            return False
         if program1.metrics and not program2.metrics:
             return True
         if not program1.metrics and program2.metrics:
