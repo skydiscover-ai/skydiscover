@@ -2,7 +2,7 @@
 Utilities for metric scoring and formatting.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 def get_score(metrics: Dict[str, Any]) -> float:
@@ -34,6 +34,31 @@ def format_metrics(metrics: Dict[str, Any]) -> str:
             parts.append(f"{name}={value}")
 
     return ", ".join(parts)
+
+
+def normalize_metric_value(
+    key: str,
+    value: Any,
+    higher_is_better: Dict[str, bool],
+) -> Optional[float]:
+    """Convert a metric to an internal score where larger is always better.
+
+    Args:
+        key: Metric name used to look up direction in *higher_is_better*.
+        value: Raw metric value (must be numeric, else returns ``None``).
+        higher_is_better: Mapping of metric names to direction.  Missing keys
+            default to ``True`` (i.e. higher is better).
+
+    Returns:
+        Normalised float (negated when the metric should be minimised), or
+        ``None`` when *value* is not numeric.
+    """
+    if not isinstance(value, (int, float)):
+        return None
+    normalized = float(value)
+    if not higher_is_better.get(key, True):
+        normalized = -normalized
+    return normalized
 
 
 def format_improvement(parent_metrics: Dict[str, Any], child_metrics: Dict[str, Any]) -> str:

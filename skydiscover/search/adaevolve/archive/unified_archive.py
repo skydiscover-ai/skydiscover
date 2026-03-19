@@ -525,6 +525,12 @@ class UnifiedArchive:
     # Fitness
     # =========================================================================
 
+    def _normalize_metric_value(self, key: str, value: Any) -> Optional[float]:
+        """Convert a metric to an internal score where larger is always better."""
+        from skydiscover.utils.metrics import normalize_metric_value
+
+        return normalize_metric_value(key, value, self.config.higher_is_better)
+
     def _get_fitness(self, program: Program) -> float:
         """Get primary fitness value from metrics."""
         metrics = program.metrics
@@ -532,23 +538,31 @@ class UnifiedArchive:
         # Use configured fitness key if specified
         if self.config.fitness_key is not None:
             key = self.config.fitness_key
-            if key in metrics and isinstance(metrics[key], (int, float)):
-                return float(metrics[key])
+            normalized = self._normalize_metric_value(key, metrics.get(key))
+            if normalized is not None:
+                return normalized
             # Configured key not found - log warning and fallback
             logger.debug(
                 f"Configured fitness_key '{key}' not found in metrics, "
                 f"falling back to auto-detection"
             )
 
+        # Prefer combined_score as the canonical scalar fallback.
+        normalized = self._normalize_metric_value("combined_score", metrics.get("combined_score"))
+        if normalized is not None:
+            return normalized
+
         # Try common metric names as fallback
         for key in ["score", "fitness", "accuracy", "reward"]:
-            if key in metrics and isinstance(metrics[key], (int, float)):
-                return float(metrics[key])
+            normalized = self._normalize_metric_value(key, metrics.get(key))
+            if normalized is not None:
+                return normalized
 
         # Use first numeric metric
         for key, val in metrics.items():
-            if isinstance(val, (int, float)):
-                return float(val)
+            normalized = self._normalize_metric_value(key, val)
+            if normalized is not None:
+                return normalized
 
         return 0.0
 

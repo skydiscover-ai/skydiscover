@@ -94,3 +94,26 @@ search:
 ```
 
 Ablation flags: `use_adaptive_search`, `use_ucb_selection`, `use_migration`, `use_unified_archive`, `use_paradigm_breakthrough`, `use_dynamic_islands` — set any to `false` to disable.
+
+### Multiobjective Mode
+
+AdaEvolve can run in scalar mode or explicit Pareto mode:
+
+```yaml
+search:
+  type: "adaevolve"
+  database:
+    pareto_objectives: ["accuracy", "latency"]
+    higher_is_better:
+      accuracy: true
+      latency: false
+    fitness_key: "accuracy"          # optional scalar proxy for adaptive state
+    pareto_objectives_weight: 0.4    # archive weight for Pareto percentile
+```
+
+When `pareto_objectives` is configured:
+- parent selection can exploit the Pareto front directly
+- global `best_program_id` becomes a deterministic representative of the current Pareto front
+- logs and prompt guidance refer to the configured objectives instead of assuming `combined_score`
+
+When `pareto_objectives` is omitted, AdaEvolve keeps the existing scalar `combined_score` behavior.

@@ -51,6 +51,9 @@ class ParadigmGenerator:
         num_paradigms: int = 3,
         eval_timeout: int = 300,
         language: str = "python",
+        objective_names: Optional[List[str]] = None,
+        higher_is_better: Optional[Dict[str, bool]] = None,
+        fitness_key: Optional[str] = None,
     ):
         """
         Initialize the paradigm generator.
@@ -71,6 +74,35 @@ class ParadigmGenerator:
         self.language = language
         self._is_image_mode = language.lower() == "image"
         self._is_prompt_optimization = language.lower() in ("text", "prompt", "image")
+        self.objective_names = list(objective_names or [])
+        self.higher_is_better = dict(higher_is_better or {})
+        self.fitness_key = fitness_key
+
+    def _is_multiobjective(self) -> bool:
+        """Return True when explicit Pareto objectives are configured."""
+        return bool(self.objective_names)
+
+    def _score_label(self) -> str:
+        """Label for the numeric score shown in prompts."""
+        return "proxy score" if self._is_multiobjective() else "score"
+
+    def _optimization_targets_text(self) -> str:
+        """Describe what the paradigms should optimize."""
+        if not self._is_multiobjective():
+            return "Optimize the primary scalar score defined by the evaluator."
+
+        parts = []
+        for objective in self.objective_names:
+            direction = "maximize" if self.higher_is_better.get(objective, True) else "minimize"
+            parts.append(f"{objective} ({direction})")
+
+        text = "Optimize the Pareto trade-offs across: " + ", ".join(parts) + "."
+        if self.fitness_key:
+            text += (
+                f" Use `{self.fitness_key}` only as a scalar proxy when one score is needed for"
+                " ranking, stagnation detection, or tie-breaking."
+            )
+        return text
 
     async def generate(
         self,
@@ -222,8 +254,8 @@ class ParadigmGenerator:
         """Build the current program analysis directive."""
         return f"""**CRITICAL: ANALYZE THE CURRENT PROGRAM FIRST**
 Before suggesting new ideas, carefully analyze the Current Program above:
-- What algorithm/approach does it use? (This is what's WORKING - score {best_score:.6f})
-- What are its strengths? (Why does it achieve this score?)
+- What algorithm/approach does it use? (This is what's WORKING - {self._score_label()} {best_score:.6f})
+- What are its strengths? (Why does it achieve this {self._score_label()}?)
 - What are its weaknesses? (What limits further improvement?)
 - How can you improve it? (How to beat it?)
 
@@ -236,13 +268,17 @@ Before suggesting new ideas, carefully analyze the Current Program above:
 
 {self.system_message}
 
+## Optimization Targets
+
+{self._optimization_targets_text()}
+
 ## Evaluator Code (shows how images are scored)
 
 ```python
 {self.evaluator_code if self.evaluator_code else "N/A - evaluator code not provided"}
 ```
 
-## Current Best Image Prompt (score: {best_score:.6f})
+## Current Best Image Prompt ({self._score_label()}: {best_score:.6f})
 
 {program_solution if program_solution else "N/A"}
 
@@ -254,13 +290,17 @@ How can the prompt be restructured to produce a better image?"""
 
 {self.system_message}
 
+## Optimization Targets
+
+{self._optimization_targets_text()}
+
 ## Evaluator Code (shows how solutions are scored)
 
 ```python
 {self.evaluator_code if self.evaluator_code else "N/A - evaluator code not provided"}
 ```
 
-## Current Best Program (score: {best_score:.6f})
+## Current Best Program ({self._score_label()}: {best_score:.6f})
 
 ```python
 {program_solution if program_solution else "N/A"}
@@ -288,7 +328,7 @@ What are its strengths and weaknesses? How can you improve upon it?"""
 - What causes failures or penalties?
 
 **STEP 2: Identify Metrics**
-- What is the primary metric?
+- What is the primary metric or Pareto objective set?
 - How is it calculated?
 - What secondary metrics exist?
 - If variance/std is penalized, the program needs consistency across scenarios
@@ -315,7 +355,7 @@ What are its strengths and weaknesses? How can you improve upon it?"""
 - What would satisfy constraints better?
 - What fundamentally different approaches could work?
 
-Current best score is {best_score:.6f}. Your ideas must be capable of improving this."""
+Current best {self._score_label()} is {best_score:.6f}. Your ideas must improve the configured optimization targets and, in multiobjective mode, explicitly reason about objective trade-offs."""
 
     def _build_image_analysis_framework(self, best_score: float) -> str:
         """Build image-specific analysis framework."""
@@ -537,7 +577,7 @@ Example:
   {{
     "idea": "Use scipy.optimize.minimize with SLSQP",
     "description": "Apply scipy.optimize.minimize directly to optimize all variables together...",
-    "what_to_optimize": "combined_score",
+    "what_to_optimize": "{', '.join(self.objective_names) if self.objective_names else 'primary evaluator score'}",
     "cautions": "Ensure constraints are properly formulated, use multiple starting points",
     "approach_type": "scipy.optimize.minimize"
   }}
@@ -585,13 +625,17 @@ Example:
 
 {self.system_message}
 
+## Optimization Targets
+
+{self._optimization_targets_text()}
+
 ## Evaluator Code (shows how prompts are scored)
 
 ```python
 {self.evaluator_code if self.evaluator_code else "N/A - evaluator code not provided"}
 ```
 
-## Current Best Prompt (score: {best_score:.6f})
+## Current Best Prompt ({self._score_label()}: {best_score:.6f})
 
 ```text
 {prompt_text if prompt_text else "N/A"}
@@ -604,7 +648,7 @@ What are its strengths and weaknesses? How can you improve upon it?"""
         """Build analysis directive for prompt optimization."""
         return f"""**CRITICAL: ANALYZE THE CURRENT PROMPT FIRST**
 Before suggesting new strategies, carefully analyze the current prompt above:
-- What instruction approach does it use? (This is what's WORKING - score {best_score:.6f})
+- What instruction approach does it use? (This is what's WORKING - {self._score_label()} {best_score:.6f})
 - What are its strengths? (Clarity? Structure? Examples? Reasoning guidance?)
 - What are its weaknesses? (Vague? Missing constraints? No examples? Poor format spec?)
 - What would make the LLM perform better on this task?
@@ -644,7 +688,7 @@ Understand what works, then suggest fundamentally different prompt strategies.""
 - What prompt engineering techniques haven't been tried?
 - How can we better exploit the retrieval context?
 
-Current best score is {best_score:.6f}. Your ideas must be capable of improving this."""
+Current best {self._score_label()} is {best_score:.6f}. Your ideas must improve the configured optimization targets and, in multiobjective mode, explicitly address evaluator trade-offs."""
 
     def _build_prompt_opt_techniques_section(self) -> str:
         """Build techniques guidance for prompt optimization."""
