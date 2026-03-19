@@ -1615,7 +1615,9 @@ class AdaEvolveDatabase(ProgramDatabase):
                 return archive._elite_scores.get(program.id, 0.0)
         return 0.0
 
-    def _get_pareto_representative_sort_key(self, program: Program) -> Tuple[float, float, float, int, str]:
+    def _get_pareto_representative_sort_key(
+        self, program: Program
+    ) -> Tuple[float, float, float, int, str]:
         """Sort key for choosing one stable representative from a Pareto front.
 
         Higher values win (used with ``max``).  Ties are broken by:
@@ -1697,9 +1699,11 @@ class AdaEvolveDatabase(ProgramDatabase):
             # Read the STALE cache (snapshot of the front before this program
             # was added).  The cache was invalidated by add() but the old list
             # is intentionally preserved for exactly this comparison.
-            previous_front_ids: Set[str] = {
-                p.id for p in (self._global_pareto_cache or [])
-            } if not self._global_pareto_cache_valid else set()
+            previous_front_ids: Set[str] = (
+                {p.id for p in (self._global_pareto_cache or [])}
+                if not self._global_pareto_cache_valid
+                else set()
+            )
 
             # Now recompute (cache is invalid, so this triggers O(n²) rebuild).
             front = self.get_global_pareto_front()
@@ -1711,9 +1715,7 @@ class AdaEvolveDatabase(ProgramDatabase):
             self._global_best_score = self._get_fitness(representative)
 
             front_ids = {p.id for p in front}
-            entered_front = (
-                program.id in front_ids and program.id not in previous_front_ids
-            )
+            entered_front = program.id in front_ids and program.id not in previous_front_ids
             representative_changed = representative.id != previous_best_id
             score_improved = self._global_best_score > previous_best_score
             return entered_front or representative_changed or score_improved
@@ -1924,7 +1926,9 @@ class AdaEvolveDatabase(ProgramDatabase):
                 for challenger in population:
                     if challenger.id == candidate.id:
                         continue
-                    if self._dominates(objective_vectors[challenger.id], objective_vectors[candidate.id]):
+                    if self._dominates(
+                        objective_vectors[challenger.id], objective_vectors[candidate.id]
+                    ):
                         dominated = True
                         break
                 if not dominated:

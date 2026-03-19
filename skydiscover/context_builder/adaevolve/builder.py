@@ -106,7 +106,9 @@ class AdaEvolveContextBuilder(DefaultContextBuilder):
         return get_score(metrics)
 
     def _task_objective_text(self) -> str:
-        subject = "prompt" if (self.config.language or "").lower() in ("text", "prompt") else "program"
+        subject = (
+            "prompt" if (self.config.language or "").lower() in ("text", "prompt") else "program"
+        )
         if not self._is_multiobjective_enabled():
             return f"Suggest improvements to the {subject} that will improve its COMBINED_SCORE."
         return (
@@ -123,9 +125,7 @@ class AdaEvolveContextBuilder(DefaultContextBuilder):
     def _diversity_note_text(self) -> str:
         if not self._is_multiobjective_enabled():
             return "Different solutions with similar combined_score but different features are valuable."
-        return (
-            "Different solutions with similar overall trade-offs but different objective balances are valuable."
-        )
+        return "Different solutions with similar overall trade-offs but different objective balances are valuable."
 
     def build_prompt(
         self,
@@ -376,7 +376,9 @@ class AdaEvolveContextBuilder(DefaultContextBuilder):
 
         return f"{header}\n\n{intro}\n\n{fields}\n\n**CRITICAL:**\n{critical_bullets}"
 
-    def _format_sibling_context(self, siblings: List[Program], parent_program: Program) -> Optional[str]:
+    def _format_sibling_context(
+        self, siblings: List[Program], parent_program: Program
+    ) -> Optional[str]:
         """
         Format sibling context showing previous mutations of the parent.
 
@@ -437,9 +439,7 @@ class AdaEvolveContextBuilder(DefaultContextBuilder):
         try:
             previous_attempt_template = self.template_manager.get_template("previous_attempt")
         except (ValueError, KeyError):
-            previous_attempt_template = (
-                "### Attempt {attempt_number}\n- Changes: {changes}\n- Metrics: {performance}\n- Outcome: {outcome}"
-            )
+            previous_attempt_template = "### Attempt {attempt_number}\n- Changes: {changes}\n- Metrics: {performance}\n- Outcome: {outcome}"
 
         previous_programs = sorted(
             previous_programs,
@@ -481,7 +481,9 @@ class AdaEvolveContextBuilder(DefaultContextBuilder):
 
         return "".join(lines)
 
-    def _determine_outcome(self, program_metrics: Dict[str, Any], parent_metrics: Dict[str, Any]) -> str:
+    def _determine_outcome(
+        self, program_metrics: Dict[str, Any], parent_metrics: Dict[str, Any]
+    ) -> str:
         """Describe attempt outcome using the configured scalar proxy in Pareto mode."""
         if not self._is_multiobjective_enabled():
             return super()._determine_outcome(program_metrics, parent_metrics)

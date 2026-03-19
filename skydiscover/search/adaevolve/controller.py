@@ -39,6 +39,7 @@ from skydiscover.utils.code_utils import (
     format_diff_summary,
     parse_full_rewrite,
 )
+
 logger = logging.getLogger(__name__)
 
 
