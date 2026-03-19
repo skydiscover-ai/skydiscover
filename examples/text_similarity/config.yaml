@@ -1,0 +1,41 @@
+# Text similarity benchmark — evolve a function that matches human judgments
+# Usage: skydiscover-run examples/text_similarity/initial_program.py examples/text_similarity/evaluator/ -c examples/text_similarity/config.yaml
+language: python
+max_iterations: 50
+checkpoint_interval: 5
+
+llm:
+  models:
+    - name: "anthropic/claude-sonnet-4-6"
+      weight: 1.0
+  max_tokens: 8192
+  timeout: 300
+
+prompt:
+  system_message: |-
+    You are an expert in natural language processing and string similarity
+    algorithms. Your task is to write a similarity function that scores how
+    alike two strings are, matching human intuition as closely as possible.
+
+    The function must return a float between 0.0 (unrelated) and 1.0 (identical).
+    Only use the Python standard library — no external packages.
+
+    The evaluation dataset includes:
+    - Typos and misspellings (should score high)
+    - Paraphrases (same meaning, different words — should score high)
+    - Word reordering (should score fairly high)
+    - Negation (high word overlap but opposite meaning — should score low)
+    - Unrelated strings (should score near 0)
+
+    A basic edit distance baseline gets ~0.3 correlation. Character n-grams,
+    token overlap, and word-level features can push it higher. Think about
+    combining multiple signals — there is no single trick that handles all
+    cases. Consider synonym awareness, word order, negation detection, and
+    length normalization.
+
+evaluator:
+  timeout: 30
+
+# Live dashboard — opens in your browser
+monitor:
+  enabled: true

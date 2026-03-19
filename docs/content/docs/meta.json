@@ -2,13 +2,6 @@
   "title": "Documentation",
   "pages": [
     "index",
-    "getting-started",
-    "tutorials",
-    "examples",
-    "harbor",
-    "algorithms",
-    "configuration",
-    "troubleshooting",
-    "api-reference"
+    "getting-started"
   ]
 }
