@@ -1560,7 +1560,13 @@ class AdaEvolveDatabase(ProgramDatabase):
         return list(self.programs.values())
 
     def _get_objective_vector(self, program: Program) -> Optional[List[float]]:
-        """Return the configured objective vector for a program."""
+        """Return the configured objective vector for a program.
+
+        Missing or non-numeric objectives are filled with ``-inf`` so that
+        programs with incomplete metrics cannot accidentally dominate
+        fully-evaluated programs (all objectives are in "higher is better"
+        space after normalisation).
+        """
         if not self.is_multiobjective_enabled():
             return None
 
@@ -1568,7 +1574,7 @@ class AdaEvolveDatabase(ProgramDatabase):
         vector: List[float] = []
         for objective in self.pareto_objectives:
             normalized = self._metric_to_maximization_value(objective, metrics.get(objective))
-            vector.append(normalized if normalized is not None else 0.0)
+            vector.append(normalized if normalized is not None else float("-inf"))
         return vector
 
     @staticmethod
@@ -1610,12 +1616,16 @@ class AdaEvolveDatabase(ProgramDatabase):
         return 0.0
 
     def _get_pareto_representative_sort_key(self, program: Program) -> Tuple[float, float, float, int, str]:
-        """Sort key for choosing one stable representative from a Pareto front."""
+        """Sort key for choosing one stable representative from a Pareto front.
+
+        Higher values win (used with ``max``).  Ties are broken by:
+        proxy score → crowding distance → elite score → newer iteration → ID.
+        """
         return (
             self._get_multiobjective_proxy_score(program),
             self._get_archive_crowding_distance(program),
             self._get_archive_elite_score(program),
-            -getattr(program, "iteration_found", 0),
+            getattr(program, "iteration_found", 0),  # newer wins ties
             program.id,
         )
 
@@ -1839,9 +1849,26 @@ class AdaEvolveDatabase(ProgramDatabase):
         return best
 
     def get_top_programs(self, n: int = 10, metric: Optional[str] = None) -> List[Program]:
-        """Get top n programs across all islands."""
+        """Get top n programs across all islands.
+
+        When *metric* is provided, programs are sorted by that specific metric
+        (respecting ``higher_is_better`` if configured).  Otherwise, multiobjective
+        mode returns the non-dominated front padded with proxy-score-ranked
+        programs, and scalar mode sorts by the default proxy fitness.
+        """
         all_programs = self._all_population_programs()
-        if metric or not self.is_multiobjective_enabled():
+
+        if metric:
+            # Sort by the requested metric, applying direction normalisation.
+            def _metric_key(p: Program) -> float:
+                val = (getattr(p, "metrics", None) or {}).get(metric)
+                normalized = self._metric_to_maximization_value(metric, val)
+                return normalized if normalized is not None else float("-inf")
+
+            sorted_programs = sorted(all_programs, key=_metric_key, reverse=True)
+            return sorted_programs[:n]
+
+        if not self.is_multiobjective_enabled():
             sorted_programs = sorted(all_programs, key=self._get_fitness, reverse=True)
             return sorted_programs[:n]
 

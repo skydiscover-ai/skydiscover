@@ -53,7 +53,7 @@ def normalize_metric_value(
         Normalised float (negated when the metric should be minimised), or
         ``None`` when *value* is not numeric.
     """
-    if not isinstance(value, (int, float)):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     normalized = float(value)
     if not higher_is_better.get(key, True):

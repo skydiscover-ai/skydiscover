@@ -310,6 +310,44 @@ class TestProxyScoreFallbacks:
         p = _make_program("p1", combined_score=0.42, accuracy=0.99)
         assert db.get_program_proxy_score(p) == 0.42
 
+    def test_get_top_programs_with_specific_metric(self):
+        """get_top_programs(metric=...) should sort by that metric, not proxy."""
+        db = _pareto_db(fitness_key="accuracy")
+
+        # p1 has highest accuracy (proxy), p2 has lowest latency (best if minimised)
+        db.add(_make_program("p1", accuracy=0.95, latency=100.0), target_island=0)
+        db.add(_make_program("p2", accuracy=0.80, latency=10.0), target_island=0)
+        db.add(_make_program("p3", accuracy=0.85, latency=50.0), target_island=1)
+
+        # Sort by latency — p2 (10) is best because higher_is_better=False → negated
+        top_by_latency = db.get_top_programs(n=3, metric="latency")
+        assert top_by_latency[0].id == "p2"  # lowest latency = best
+
+        # Sort by accuracy — p1 (0.95) is best
+        top_by_accuracy = db.get_top_programs(n=3, metric="accuracy")
+        assert top_by_accuracy[0].id == "p1"
+
+    def test_representative_prefers_newer_on_tie(self):
+        """When proxy score and other signals are equal, newer programs should win.
+
+        Programs are placed on separate islands so their archive-level elite
+        scores are symmetric and the iteration tie-breaker is decisive.
+        """
+        db = _pareto_db(fitness_key="accuracy")
+
+        old = _make_program("aaa_old", accuracy=0.90, latency=10.0)
+        new = _make_program("zzz_new", accuracy=0.90, latency=10.0)
+
+        # Separate islands → each is the only program in its archive,
+        # so crowding distance and elite score are symmetric.
+        db.add(old, iteration=1, target_island=0)
+        db.add(new, iteration=5, target_island=1)
+
+        # Both on global front (identical metrics), newer iteration should win
+        best = db.get_best_program()
+        assert best is not None
+        assert best.id == "zzz_new"
+
 
 # =========================================================================
 # 6. Shared normalize_metric_value utility
@@ -333,6 +371,11 @@ class TestNormalizeMetricValue:
     def test_integer_values(self):
         assert normalize_metric_value("count", 5, {"count": True}) == 5.0
         assert normalize_metric_value("errors", 3, {"errors": False}) == -3.0
+
+    def test_boolean_values_excluded(self):
+        """bool is a subclass of int in Python; must not be treated as numeric."""
+        assert normalize_metric_value("timeout", True, {}) is None
+        assert normalize_metric_value("success", False, {}) is None
 
 
 # =========================================================================
@@ -604,8 +647,10 @@ class TestFormatPreviousAttempts:
         ]
 
         result = builder._format_previous_attempts(programs, num_previous_attempts=2)
-        # Best 2 by proxy (accuracy) should be selected: high and mid
-        assert "high" not in result or "low" not in result  # can't have all 3 in top-2
+        # Best 2 by proxy (accuracy) should be selected: 0.99 and 0.75, not 0.50
+        assert "0.9900" in result  # high accuracy present
+        assert "0.7500" in result  # mid accuracy present
+        assert "0.5000" not in result  # low accuracy excluded
 
 
 # =========================================================================
@@ -691,8 +736,9 @@ class TestEndToEndMultiobjective:
         db.add(_make_program("p2", accuracy=0.90, latency=40.0), target_island=0)
         assert {p.id for p in db.get_global_pareto_front()} == {"p2"}
 
-    def test_missing_objective_metric_treated_as_zero(self):
-        """Programs with missing objective values get 0.0 for that dimension."""
+    def test_missing_objective_metric_treated_as_worst(self):
+        """Programs with missing objective values get -inf for that dimension,
+        preventing them from accidentally dominating fully-evaluated programs."""
         db = _pareto_db()
 
         complete = _make_program("complete", accuracy=0.5, latency=50.0)
@@ -705,12 +751,14 @@ class TestEndToEndMultiobjective:
         vec_partial = db._get_objective_vector(partial)
 
         assert vec_complete == [0.5, -50.0]  # latency negated
-        assert vec_partial == [0.6, 0.0]  # missing latency → 0.0
+        assert vec_partial[0] == 0.6
+        assert vec_partial[1] == float("-inf")  # missing latency → worst possible
 
-        # partial has better accuracy and latency=0 vs -50 (which after negation
-        # means 0 > -50), so partial dominates complete
+        # complete has latency=-50 > -inf, so partial does NOT dominate complete.
+        # partial has accuracy=0.6 > 0.5, so complete does NOT dominate partial.
+        # Both are on the front (trade-off: complete has real latency, partial has better accuracy).
         front = db.get_global_pareto_front()
-        assert {p.id for p in front} == {"partial"}
+        assert {p.id for p in front} == {"complete", "partial"}
 
     def test_sample_global_top_excludes_id(self):
         db = _pareto_db()

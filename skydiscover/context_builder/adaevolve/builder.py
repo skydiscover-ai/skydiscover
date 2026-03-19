@@ -55,13 +55,13 @@ class AdaEvolveContextBuilder(DefaultContextBuilder):
         return getattr(self.config.search, "database", None)
 
     def _is_multiobjective_enabled(self) -> bool:
-        return bool(getattr(self._db_config(), "pareto_objectives", []) or [])
+        return bool(getattr(self._db_config(), "pareto_objectives", []))
 
     def _objective_descriptions(self) -> List[str]:
         db_config = self._db_config()
-        higher_is_better = getattr(db_config, "higher_is_better", {}) or {}
+        higher_is_better = getattr(db_config, "higher_is_better", {})
         descriptions = []
-        for objective in getattr(db_config, "pareto_objectives", []) or []:
+        for objective in getattr(db_config, "pareto_objectives", []):
             direction = "maximize" if higher_is_better.get(objective, True) else "minimize"
             descriptions.append(f"{objective} ({direction})")
         return descriptions
@@ -69,7 +69,7 @@ class AdaEvolveContextBuilder(DefaultContextBuilder):
     def _metric_to_maximization_value(self, metric_name: str, value: Any) -> Optional[float]:
         from skydiscover.utils.metrics import normalize_metric_value
 
-        higher_is_better = getattr(self._db_config(), "higher_is_better", {}) or {}
+        higher_is_better = getattr(self._db_config(), "higher_is_better", {})
         return normalize_metric_value(metric_name, value, higher_is_better)
 
     _PROGRESS_SCORE_MISSING = float("-inf")
@@ -96,7 +96,7 @@ class AdaEvolveContextBuilder(DefaultContextBuilder):
 
         if self._is_multiobjective_enabled():
             objective_values = []
-            for objective in getattr(db_config, "pareto_objectives", []) or []:
+            for objective in getattr(db_config, "pareto_objectives", []):
                 normalized = self._metric_to_maximization_value(objective, metrics.get(objective))
                 if normalized is not None:
                     objective_values.append(normalized)
