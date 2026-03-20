@@ -26,7 +26,7 @@ from skydiscover.search.adaevolve.archive import (
 )
 from skydiscover.search.adaevolve.paradigm import ParadigmTracker
 from skydiscover.search.base_database import Program, ProgramDatabase
-from skydiscover.utils.metrics import get_score
+from skydiscover.utils.metrics import compute_proxy_score, get_score
 
 logger = logging.getLogger(__name__)
 
@@ -1514,30 +1514,12 @@ class AdaEvolveDatabase(ProgramDatabase):
     def _get_multiobjective_proxy_score(self, program: Program) -> float:
         """Return a scalar proxy for adaptive state and deterministic tie-breaking."""
         metrics = getattr(program, "metrics", None) or {}
-        if not metrics:
-            return float("-inf")
-
-        if self.fitness_key is not None:
-            normalized = self._metric_to_maximization_value(
-                self.fitness_key, metrics.get(self.fitness_key)
-            )
-            if normalized is not None:
-                return normalized
-
-        combined_score = metrics.get("combined_score")
-        if isinstance(combined_score, (int, float)):
-            return float(combined_score)
-
-        if self.is_multiobjective_enabled():
-            objective_values = []
-            for objective in self.pareto_objectives:
-                normalized = self._metric_to_maximization_value(objective, metrics.get(objective))
-                if normalized is not None:
-                    objective_values.append(normalized)
-            if objective_values:
-                return sum(objective_values) / len(objective_values)
-
-        return get_score(metrics)
+        return compute_proxy_score(
+            metrics,
+            fitness_key=self.fitness_key,
+            pareto_objectives=self.pareto_objectives if self.is_multiobjective_enabled() else None,
+            higher_is_better=self.higher_is_better,
+        )
 
     def get_program_proxy_score(self, program: Optional[Program]) -> float:
         """Public wrapper for the scalar proxy used by AdaEvolve internals."""
@@ -1600,8 +1582,7 @@ class AdaEvolveDatabase(ProgramDatabase):
         for archive in self.archives:
             if archive.contains(program.id):
                 archive._ensure_cache_valid()
-                crowding = archive._crowding_distances.get(program.id, 0.0)
-                return 1e9 if crowding == float("inf") else crowding
+                return archive._crowding_distances.get(program.id, 0.0)
         return 0.0
 
     def _get_archive_elite_score(self, program: Program) -> float:

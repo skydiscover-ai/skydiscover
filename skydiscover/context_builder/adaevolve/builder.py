@@ -20,7 +20,7 @@ from skydiscover.config import Config
 from skydiscover.context_builder.default import DefaultContextBuilder
 from skydiscover.context_builder.utils import TemplateManager, prog_attr
 from skydiscover.search.base_database import Program
-from skydiscover.utils.metrics import get_score
+from skydiscover.utils.metrics import compute_proxy_score, get_score
 
 logger = logging.getLogger(__name__)
 
@@ -55,13 +55,13 @@ class AdaEvolveContextBuilder(DefaultContextBuilder):
         return getattr(self.config.search, "database", None)
 
     def _is_multiobjective_enabled(self) -> bool:
-        return bool(getattr(self._db_config(), "pareto_objectives", []))
+        return bool(getattr(self._db_config(), "pareto_objectives", None) or [])
 
     def _objective_descriptions(self) -> List[str]:
         db_config = self._db_config()
-        higher_is_better = getattr(db_config, "higher_is_better", {})
+        higher_is_better = getattr(db_config, "higher_is_better", None) or {}
         descriptions = []
-        for objective in getattr(db_config, "pareto_objectives", []):
+        for objective in getattr(db_config, "pareto_objectives", None) or []:
             direction = "maximize" if higher_is_better.get(objective, True) else "minimize"
             descriptions.append(f"{objective} ({direction})")
         return descriptions
@@ -69,7 +69,7 @@ class AdaEvolveContextBuilder(DefaultContextBuilder):
     def _metric_to_maximization_value(self, metric_name: str, value: Any) -> Optional[float]:
         from skydiscover.utils.metrics import normalize_metric_value
 
-        higher_is_better = getattr(self._db_config(), "higher_is_better", {})
+        higher_is_better = getattr(self._db_config(), "higher_is_better", None) or {}
         return normalize_metric_value(metric_name, value, higher_is_better)
 
     _PROGRESS_SCORE_MISSING = float("-inf")
@@ -80,30 +80,14 @@ class AdaEvolveContextBuilder(DefaultContextBuilder):
         Returns ``_PROGRESS_SCORE_MISSING`` (``-inf``) for empty/missing metrics
         so that callers can distinguish "no data" from "score is zero".
         """
-        if not metrics:
-            return self._PROGRESS_SCORE_MISSING
-
         db_config = self._db_config()
-        fitness_key = getattr(db_config, "fitness_key", None)
-        if fitness_key:
-            normalized = self._metric_to_maximization_value(fitness_key, metrics.get(fitness_key))
-            if normalized is not None:
-                return normalized
-
-        combined_score = metrics.get("combined_score")
-        if isinstance(combined_score, (int, float)):
-            return float(combined_score)
-
-        if self._is_multiobjective_enabled():
-            objective_values = []
-            for objective in getattr(db_config, "pareto_objectives", []):
-                normalized = self._metric_to_maximization_value(objective, metrics.get(objective))
-                if normalized is not None:
-                    objective_values.append(normalized)
-            if objective_values:
-                return sum(objective_values) / len(objective_values)
-
-        return get_score(metrics)
+        pareto_objectives = getattr(db_config, "pareto_objectives", None) or None
+        return compute_proxy_score(
+            metrics,
+            fitness_key=getattr(db_config, "fitness_key", None),
+            pareto_objectives=pareto_objectives,
+            higher_is_better=getattr(db_config, "higher_is_better", None) or {},
+        )
 
     def _task_objective_text(self) -> str:
         subject = (
@@ -457,7 +441,7 @@ class AdaEvolveContextBuilder(DefaultContextBuilder):
             changes = metadata.get("changes", "Unknown changes")
             performance_parts = []
             for name, value in metrics.items():
-                if isinstance(value, (int, float)):
+                if not isinstance(value, bool) and isinstance(value, (int, float)):
                     try:
                         performance_parts.append(f"{name}: {value:.4f}")
                     except (ValueError, TypeError):

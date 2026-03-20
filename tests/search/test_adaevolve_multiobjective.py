@@ -377,6 +377,11 @@ class TestNormalizeMetricValue:
         assert normalize_metric_value("timeout", True, {}) is None
         assert normalize_metric_value("success", False, {}) is None
 
+    def test_nan_returns_none(self):
+        """NaN breaks comparison semantics and must not enter objective vectors."""
+        assert normalize_metric_value("acc", float("nan"), {"acc": True}) is None
+        assert normalize_metric_value("latency", float("nan"), {"latency": False}) is None
+
 
 # =========================================================================
 # 7. Unified archive fitness fallbacks
@@ -774,3 +779,17 @@ class TestEndToEndMultiobjective:
         db.add(_make_program("p1", combined_score=0.5), target_island=0)
         assert db.get_global_pareto_front() == []
         assert db.is_multiobjective_enabled() is False
+
+    def test_nan_metric_does_not_dominate_real_solutions(self):
+        """A program with NaN metrics must not enter the Pareto front over real solutions."""
+        db = _pareto_db()
+
+        good = _make_program("good", accuracy=0.9, latency=10.0)
+        nan_prog = _make_program("nan_prog", accuracy=float("nan"), latency=5.0)
+
+        db.add(good, target_island=0)
+        db.add(nan_prog, target_island=1)
+
+        # NaN accuracy → -inf in objective vector, so nan_prog cannot dominate good
+        front = db.get_global_pareto_front()
+        assert "good" in {p.id for p in front}
