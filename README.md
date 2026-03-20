@@ -161,6 +161,8 @@ def evaluate(program_path):
 - **combined_score** drives evolution. If omitted, SkyDiscover averages all numeric values in the dict.
 - **artifacts** is optional — entries are injected into the next LLM prompt as context.
 
+For `search.type: adaevolve`, you can also enable explicit Pareto optimization by configuring `search.database.pareto_objectives` and returning those objective metrics directly from the evaluator. In that mode, `combined_score` becomes optional and is only used as a scalar fallback/proxy when configured.
+
 ### Starting Solution (optional)
 
 The initial program is **optional**. When omitted, the LLM generates a solution from scratch. If provided, it marks the region to mutate with EVOLVE-BLOCK markers. Everything outside is left untouched.

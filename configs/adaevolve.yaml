@@ -71,6 +71,18 @@ search:
     novelty_weight: 0.0               # Weight for novelty rank in elite score
     diversity_strategy: "code"        # Diversity metric: "code", "metric", or "hybrid"
 
+    # --- Optional Pareto multiobjective mode ---
+    # Leave pareto_objectives empty to keep the current scalar combined_score behavior.
+    # When enabled, return the raw objective metrics from the evaluator and set:
+    # pareto_objectives:
+    #   - accuracy
+    #   - latency
+    # higher_is_better:
+    #   accuracy: true
+    #   latency: false
+    # fitness_key: accuracy              # Optional scalar proxy for adaptive state / tie-breaking
+    # pareto_objectives_weight: 0.4      # Weight of Pareto percentile in archive elite score
+
     # --- Dynamic island spawning ---
     use_dynamic_islands: true
     max_islands: 5                    # Maximum number of islands

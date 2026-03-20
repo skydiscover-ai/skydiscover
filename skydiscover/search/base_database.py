@@ -15,7 +15,7 @@ from dataclasses import asdict, dataclass, field, fields
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from skydiscover.config import DatabaseConfig
-from skydiscover.utils.metrics import get_score
+from skydiscover.utils.metrics import format_metrics, get_score
 
 logger = logging.getLogger(__name__)
 
@@ -331,11 +331,10 @@ class ProgramDatabase(ABC):
     def log_status(self) -> None:
         """Log the status of the database"""
         best_program = self.get_best_program()
-        best_score = None
         if best_program and best_program.metrics:
-            best_score = best_program.metrics.get("combined_score")
-
-        score_str = f"{best_score:.6f}" if best_score is not None else "N/A"
+            score_str = format_metrics(best_program.metrics)
+        else:
+            score_str = "N/A"
         logger.info(
             f"Database has {len(self.programs)} programs, best program score is {score_str}"
         )
