@@ -11,6 +11,9 @@
   <a href="https://arxiv.org/abs/2602.20133"><img src="https://img.shields.io/badge/paper-AdaEvolve-red?style=flat-square" alt="AdaEvolve Paper" /></a>
   <a href="https://arxiv.org/abs/2602.23413"><img src="https://img.shields.io/badge/paper-EvoX-lightblue?style=flat-square" alt="EvoX Paper" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-green?style=flat-square" /></a>
+  <a href="https://gitcgr.com/skydiscover-ai/skydiscover">
+    <img src="https://gitcgr.com/badge/skydiscover-ai/skydiscover.svg" alt="gitcgr" />
+  </a>
   </p>
 
 
