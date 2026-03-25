@@ -194,9 +194,7 @@ class OpenAILLM(LLMInterface):
         input_items = self._convert_to_responses_input(
             [m for m in messages if m.get("role") != "system"]
         )
-        system_msg = next(
-            (m["content"] for m in messages if m.get("role") == "system"), None
-        )
+        system_msg = next((m["content"] for m in messages if m.get("role") == "system"), None)
         resp_params: Dict[str, Any] = {
             "model": params.get("model", self.model),
             "input": input_items,
