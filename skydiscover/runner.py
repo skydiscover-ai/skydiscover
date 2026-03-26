@@ -404,6 +404,7 @@ class Runner:
                 f.write(best.solution)
             with open(os.path.join(checkpoint_path, "best_program_info.json"), "w") as f:
                 from skydiscover.search.utils.checkpoint_manager import SafeJSONEncoder
+
                 json.dump(
                     {
                         "id": best.id,
@@ -447,6 +448,7 @@ class Runner:
         info_path = os.path.join(best_dir, "best_program_info.json")
         with open(info_path, "w") as f:
             from skydiscover.search.utils.checkpoint_manager import SafeJSONEncoder
+
             json.dump(
                 {
                     "id": program.id,

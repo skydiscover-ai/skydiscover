@@ -27,6 +27,7 @@ class SafeJSONEncoder(json.JSONEncoder):
         # Convert numpy arrays/scalars to Python types
         try:
             import numpy as np
+
             if isinstance(obj, np.ndarray):
                 return obj.tolist()
             if isinstance(obj, (np.integer,)):
