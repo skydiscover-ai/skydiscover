@@ -505,7 +505,9 @@ class SearchConfig:
     switch_interval: Optional[int] = (
         None  # EvoX: stagnation iters before strategy switch. Auto-calculated if None.
     )
-    share_llm: bool = False  # EvoX: if True, meta-level search evolution uses the same LLM as the main discovery process.
+    share_llm: bool = (
+        False  # EvoX: if True, meta-level search evolution uses the same LLM as the main discovery process.
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════
