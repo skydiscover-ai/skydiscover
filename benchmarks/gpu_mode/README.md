@@ -17,7 +17,7 @@ Evolve high-performance GPU kernels using SkyDiscover. Each benchmark provides a
 # Run on local GPU
 uv run skydiscover-run \
   benchmarks/gpu_mode/trimul/initial_program.py \
-  benchmarks/gpu_mode/trimul/evaluator.py \
+  benchmarks/gpu_mode/trimul/eval \
   -c benchmarks/gpu_mode/trimul/config.yaml \
   -s [your_algorithm] \
   -i 50
@@ -26,7 +26,7 @@ uv run skydiscover-run \
 GPUMODE_USE_MODAL=true GPUMODE_MODAL_GPU=H100 \
   uv run skydiscover-run \
   benchmarks/gpu_mode/trimul/initial_program.py \
-  benchmarks/gpu_mode/trimul/evaluator.py \
+  benchmarks/gpu_mode/trimul/eval \
   -c benchmarks/gpu_mode/trimul/config.yaml \
   -s [your_algorithm] \
   -i 50
@@ -85,7 +85,7 @@ gpu_mode/
 
 # Each benchmark contains:
 #   initial_program.py   — starting kernel
-#   evaluator.py         — imports shared_eval, exposes evaluate()
+#   eval/            — containerized evaluator directory
 #   reference.py         — reference kernel, test/benchmark cases, SCORE_SCALE
 #   config.yaml          — search config
 #   requirements.txt     — dependencies

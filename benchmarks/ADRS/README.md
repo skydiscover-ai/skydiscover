@@ -46,7 +46,7 @@ Given a set of database transactions with read/write dependencies on shared keys
 
 Each benchmark directory contains:
 - `initial_program.py` — the seed solution for evolution
-- `evaluator.py` — the scoring function
+- `eval/` — containerized evaluator directory
 - `config.yaml` — run configuration
 
 Run any benchmark from the repo root:
@@ -54,7 +54,7 @@ Run any benchmark from the repo root:
 ```bash
 uv run skydiscover-run \
   benchmarks/ADRS/cloudcast/initial_program.py \
-  benchmarks/ADRS/cloudcast/evaluator.py \
+  benchmarks/ADRS/cloudcast/eval \
   -c benchmarks/ADRS/cloudcast/config.yaml \
   -s [your_algorithm] \
   -i 100

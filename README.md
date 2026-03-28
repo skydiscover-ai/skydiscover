@@ -78,13 +78,13 @@ export OPENAI_API_KEY="<your-key>"
 # Try the circle packing benchmark
 uv sync --extra math
 uv run skydiscover-run benchmarks/math/circle_packing/initial_program.py \
-  benchmarks/math/circle_packing/evaluator.py \
+  benchmarks/math/circle_packing/eval \
   --config benchmarks/math/circle_packing/config.yaml \
   --search evox \
   --iterations 100
 
 uv run skydiscover-run benchmarks/math/circle_packing/initial_program.py \
-  benchmarks/math/circle_packing/evaluator.py \
+  benchmarks/math/circle_packing/eval \
   --config benchmarks/math/circle_packing/config.yaml \
   --search adaevolve \
   --iterations 100
@@ -136,7 +136,7 @@ SkyDiscover supports three evaluator formats — pick whichever fits your use ca
 | Format | When to use | What you point `evaluation_file` at |
 |:---|:---|:---|
 | **Python function** | Simple tasks, no system deps | `evaluator.py` |
-| **Containerized** | Custom deps, data files, isolation | `evaluator/` directory (must contain `Dockerfile` + `evaluate.sh`) |
+| **Containerized** | Custom deps, data files, isolation | `eval/` directory (must contain `Dockerfile` + `evaluate.sh`) |
 | **Harbor task** | External benchmark suites (AlgoTune, EvoEval, HumanEvalFix, BigCodeBench, LiveCodeBench, USACO, CRUSTBench, CodePDE, and more) | Task directory (must contain `instruction.md` + `tests/` + `environment/Dockerfile`) |
 
 SkyDiscover auto-detects the format. See [`benchmarks/README.md`](benchmarks/README.md#adding-a-benchmark) for full setup instructions.

@@ -1,5 +1,5 @@
 # Math benchmark: sums_diffs_finite_sets
-# Usage: skydiscover-run initial_program.py evaluator.py -c config.yaml -s <strategy>
+# Usage: skydiscover-run initial_program.py eval -c config.yaml -s <strategy>
 language: python
 diff_based_generation: true
 max_iterations: 100

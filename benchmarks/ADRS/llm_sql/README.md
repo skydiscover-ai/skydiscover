@@ -31,7 +31,7 @@ From the repo root:
 ```bash
 uv run skydiscover-run \
   benchmarks/ADRS/llm_sql/initial_program.py \
-  benchmarks/ADRS/llm_sql/evaluator.py \
+  benchmarks/ADRS/llm_sql/eval \
   -c benchmarks/ADRS/llm_sql/config.yaml \
   -s [your_algorithm] \
   -i 100
@@ -49,7 +49,7 @@ Combined score: `0.95 * average_hit_rate + 0.05 * (12 - min(12, avg_runtime)) / 
 | File | Description |
 |------|-------------|
 | `initial_program.py` | Baseline `Evolved` class with `reorder()` method to evolve |
-| `evaluator.py` | Scores programs on prefix hit rate and runtime across 5 datasets |
+| `eval/` | Containerized evaluator — scores programs on prefix hit rate and runtime across 5 datasets |
 | `config.yaml` | Task-specific config (LLM, evaluator timeout, system prompt) |
 | `solver.py` | Base `Algorithm` class and greedy baseline |
 | `utils.py` | Prefix hit count evaluation utilities |

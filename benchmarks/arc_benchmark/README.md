@@ -39,11 +39,11 @@ TASK_NUM=0 ARC_TASK_FILE=training CONFIG_OUT=./config_task_0.yaml \
   uv run python generate_config.py
 
 # Run with any backend
-uv run skydiscover-run initial_program.py evaluator.py \
+uv run skydiscover-run initial_program.py eval \
   -c config_task_0.yaml -s [your_algorithm] -i 30
 
 # Or with evox, openevolve, gepa:
-uv run skydiscover-run initial_program.py evaluator.py \
+uv run skydiscover-run initial_program.py eval \
   -c config_task_0.yaml -s [your_algorithm] -i 30
 ```
 
@@ -57,7 +57,7 @@ NUM_TASKS=$(uv run python -c "import json; print(len(json.load(open('data/arc-ag
 
 for i in $(seq 0 $((NUM_TASKS - 1))); do
   TASK_NUM=$i CONFIG_OUT=./config_task_${i}.yaml uv run python generate_config.py
-  TASK_NUM=$i uv run skydiscover-run initial_program.py evaluator.py \
+  TASK_NUM=$i uv run skydiscover-run initial_program.py eval \
     -c config_task_${i}.yaml -s [your_algorithm] -i 30 \
     -o outputs/eval_task_${i}
 done
@@ -86,7 +86,7 @@ uv run skydiscover-run ... -m gemini/gemini-3-pro-preview
 | File | Description |
 |------|-------------|
 | `initial_program.py` | Seed program with two transform functions to evolve |
-| `evaluator.py` | Scores programs on pass@2 + cell accuracy |
+| `eval/` | Containerized evaluator — scores programs on pass@2 + cell accuracy |
 | `config.yaml` | Base config template (prompt injected by generate_config.py) |
 | `generate_config.py` | Injects task-specific training examples into config as system prompt |
 | `post_discovery_eval.py` | Evaluates best program on held-out test inputs |

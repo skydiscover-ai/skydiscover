@@ -11,7 +11,7 @@ From the repo root:
 ```bash
 uv run skydiscover-run \
   benchmarks/gpu_mode/trimul/initial_program.py \
-  benchmarks/gpu_mode/trimul/evaluator.py \
+  benchmarks/gpu_mode/trimul/eval \
   -c benchmarks/gpu_mode/trimul/config.yaml \
   -s [your_algorithm] -i 50
 ```
@@ -28,7 +28,7 @@ uv run skydiscover-run \
 GPUMODE_USE_MODAL=true GPUMODE_MODAL_GPU=H100 \
   uv run skydiscover-run \
   benchmarks/gpu_mode/trimul/initial_program.py \
-  benchmarks/gpu_mode/trimul/evaluator.py \
+  benchmarks/gpu_mode/trimul/eval \
   -c benchmarks/gpu_mode/trimul/config.yaml \
   -s [your_algorithm] -i 50
 ```

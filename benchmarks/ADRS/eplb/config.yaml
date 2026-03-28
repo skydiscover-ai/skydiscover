@@ -1,5 +1,5 @@
 # Expert Parallelism Load Balancer (EPLB) — MoE Expert Rearrangement
-# Usage: skydiscover-run initial_program.py evaluator.py -c config.yaml -s <strategy>
+# Usage: skydiscover-run initial_program.py eval -c config.yaml -s <strategy>
 # NOTE: Requires expert-load.json — see README.md for download instructions.
 language: python
 diff_based_generation: true

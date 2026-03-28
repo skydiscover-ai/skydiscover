@@ -34,10 +34,10 @@ Mathematical optimization and algorithm evolution problems.
 ```bash
 uv run skydiscover-run \
   benchmarks/math/signal_processing/initial_program.py \
-  benchmarks/math/signal_processing/evaluator.py \
+  benchmarks/math/signal_processing/eval \
   -c benchmarks/math/signal_processing/config.yaml \
   -s [your_algorithm] \
   -i 100
 ```
 
-Each problem directory contains `initial_program.py`, `evaluator.py`, and either `config.yaml` or per-search configs. Some multi-variant problems have numbered subdirectories (e.g., `heilbronn_convex/13/`, `hexagon_packing/11/`).
+Each problem directory contains `initial_program.py`, `eval/` (containerized evaluator), and either `config.yaml` or per-search configs. Some multi-variant problems have numbered subdirectories (e.g., `heilbronn_convex/13/`, `hexagon_packing/11/`).

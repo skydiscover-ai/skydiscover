@@ -15,7 +15,7 @@ Pack 26 non-overlapping circles in a unit square to maximize the sum of their ra
 # From repo root
 uv run skydiscover-run \
   benchmarks/math/circle_packing/initial_program.py \
-  benchmarks/math/circle_packing/evaluator.py \
+  benchmarks/math/circle_packing/eval \
   -c benchmarks/math/circle_packing/config.yaml \
   -s [your_algorithm] \
   -i 100
@@ -33,6 +33,6 @@ A `codebase/reference/` directory is provided with geometric insights (hex grids
 | File | Description |
 |------|-------------|
 | `initial_program.py` | Seed: simple ring-based circle arrangement |
-| `evaluator.py` | Validates constraints, computes sum-of-radii ratio to target |
+| `eval/` | Containerized evaluator — validates constraints, computes sum-of-radii ratio to target |
 | `config.yaml` | LLM and evaluator settings |
 | `codebase/reference/` | Geometric reference material for agentic mode |

@@ -1,5 +1,5 @@
 # ALE-Bench ahc011 — AtCoder Heuristic Contest
-# Usage: skydiscover-run initial_program.cpp evaluator.py -c config.yaml -s <strategy>
+# Usage: skydiscover-run initial_program.cpp eval -c config.yaml -s <strategy>
 language: cpp
 diff_based_generation: true
 max_iterations: 100
