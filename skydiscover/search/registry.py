@@ -7,6 +7,7 @@ import os
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type
 
 from skydiscover.config import Config, DatabaseConfig, build_output_dir, load_config
+from skydiscover.llm.cost import CostTracker
 from skydiscover.search.base_database import Program, ProgramDatabase
 from skydiscover.search.default_discovery_controller import (
     DiscoveryController,
@@ -119,6 +120,7 @@ def setup_search(
     config_path: str,
     output_dir: Optional[str] = None,
     parent_llm_config: Optional["LLMConfig"] = None,
+    cost_tracker: Optional[CostTracker] = None,
 ) -> Tuple[DiscoveryControllerInput, str]:
     """
     Load config, create database, and build a DiscoveryControllerInput from a config path.
@@ -175,5 +177,6 @@ def setup_search(
         database=database,
         file_suffix=config.file_suffix,
         output_dir=output_dir,
+        cost_tracker=cost_tracker,
     )
     return controller_input, initial_program_solution

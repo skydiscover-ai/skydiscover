@@ -71,6 +71,13 @@ class SerializableResult:
     iteration: int = 0
     error: Optional[str] = None
     attempts_used: int = 1
+    llm_model_name: Optional[str] = None
+    llm_input_tokens: int = 0
+    llm_output_tokens: int = 0
+    llm_total_tokens: int = 0
+    llm_input_cost_usd: float = 0.0
+    llm_output_cost_usd: float = 0.0
+    llm_total_cost_usd: float = 0.0
 
 
 def load_database_from_file(

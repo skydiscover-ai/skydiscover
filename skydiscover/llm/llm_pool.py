@@ -3,10 +3,11 @@
 import asyncio
 import logging
 import random
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from skydiscover.config import LLMModelConfig
 from skydiscover.llm.base import LLMResponse
+from skydiscover.llm.cost import CostTracker
 from skydiscover.llm.openai import OpenAILLM
 
 logger = logging.getLogger("skydiscover.llm")
@@ -15,11 +16,19 @@ logger = logging.getLogger("skydiscover.llm")
 class LLMPool:
     """Weighted pool of LLM backends. Samples one per generate() call."""
 
-    def __init__(self, models_cfg: List[LLMModelConfig]):
+    def __init__(
+        self,
+        models_cfg: List[LLMModelConfig],
+        *,
+        cost_tracker: Optional[CostTracker] = None,
+        usage_category: str = "generation",
+    ):
         if not models_cfg:
             raise ValueError("LLMPool requires at least one model config")
 
         self.models_cfg = models_cfg
+        self.cost_tracker = cost_tracker
+        self.usage_category = usage_category
 
         # Validate weights before creating clients to fail fast on bad config.
         self.weights = [m.weight for m in models_cfg]
@@ -58,12 +67,23 @@ class LLMPool:
     ) -> LLMResponse:
         """Sample a model and generate a response."""
         model = self._sample_model()
-        return await model.generate(system_message, messages, **kwargs)
+        response = await model.generate(system_message, messages, **kwargs)
+        self.record_response_usage(response)
+        return response
 
     async def generate_all(
         self, system_message: str, messages: List[Dict[str, Any]], **kwargs
     ) -> List[LLMResponse]:
         """Generate using all models concurrently."""
-        return await asyncio.gather(
+        responses = await asyncio.gather(
             *(model.generate(system_message, messages, **kwargs) for model in self.models)
         )
+        for response in responses:
+            self.record_response_usage(response)
+        return responses
+
+    def record_response_usage(self, response: Optional[LLMResponse]) -> None:
+        """Record one response in the shared run-level tracker."""
+        if self.cost_tracker is None or response is None:
+            return
+        self.cost_tracker.record(response, self.usage_category)

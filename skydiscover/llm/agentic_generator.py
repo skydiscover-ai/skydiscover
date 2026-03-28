@@ -11,6 +11,8 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from skydiscover.llm.base import LLMResponse
+from skydiscover.llm.cost import compute_token_costs, extract_usage_counts
 from skydiscover.llm.openai import is_openai_reasoning_model
 from skydiscover.utils.code_utils import build_repo_map
 
@@ -44,12 +46,20 @@ class AgenticGenerator:
         self.llm_pool = llm_pool
         self.config = config
 
-    async def generate(self, system_message: str, user_message: str) -> Optional[str]:
-        """Run the agent loop. Returns generated text, or None on failure."""
+    async def generate(self, system_message: str, user_message: str) -> Optional[LLMResponse]:
+        """Run the agent loop. Returns aggregated usage for the final text, or None on failure."""
         cfg = self.config
         files_read: set = set()
         conversation: List[Dict[str, Any]] = []
         t0 = time.time()
+        total_input_tokens = 0
+        total_output_tokens = 0
+        total_tokens = 0
+        total_input_cost_usd = 0.0
+        total_output_cost_usd = 0.0
+        total_cost_usd = 0.0
+        last_model_name: Optional[str] = None
+        last_usage_source: Optional[str] = None
 
         sys_prompt = f"{system_message}\n\n{_AGENTIC_SYSTEM_PROMPT}"
         repo_map = build_repo_map(
@@ -78,7 +88,7 @@ class AgenticGenerator:
                 )
 
             try:
-                assistant_msg = await asyncio.wait_for(
+                assistant_msg, llm_response = await asyncio.wait_for(
                     self._call_llm(sys_prompt, conversation),
                     timeout=cfg.per_step_timeout,
                 )
@@ -95,6 +105,15 @@ class AgenticGenerator:
                 logger.error("Step %d: LLM error: %s", step, e)
                 break
 
+            total_input_tokens += llm_response.input_tokens
+            total_output_tokens += llm_response.output_tokens
+            total_tokens += llm_response.total_tokens
+            total_input_cost_usd += llm_response.input_cost_usd
+            total_output_cost_usd += llm_response.output_cost_usd
+            total_cost_usd += llm_response.total_cost_usd
+            last_model_name = llm_response.model_name
+            last_usage_source = llm_response.usage_source
+
             tool_calls = assistant_msg.get("tool_calls", [])
             text_content = assistant_msg.get("content", "").strip()
             conversation.append(assistant_msg)
@@ -104,7 +123,17 @@ class AgenticGenerator:
                     logger.info(
                         "Agent produced text at step %d (%d files read)", step, len(files_read)
                     )
-                    return text_content
+                    return LLMResponse(
+                        text=text_content,
+                        model_name=last_model_name,
+                        usage_source=last_usage_source,
+                        input_tokens=total_input_tokens,
+                        output_tokens=total_output_tokens,
+                        total_tokens=total_tokens,
+                        input_cost_usd=total_input_cost_usd,
+                        output_cost_usd=total_output_cost_usd,
+                        total_cost_usd=total_cost_usd,
+                    )
                 conversation.append(
                     {
                         "role": "user",
@@ -145,7 +174,7 @@ class AgenticGenerator:
 
     async def _call_llm(
         self, system_message: str, conversation: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    ) -> tuple[Dict[str, Any], LLMResponse]:
         """Call a sampled LLM with tool schemas."""
         model = self.llm_pool.models[
             self.llm_pool.random_state.choices(
@@ -184,6 +213,27 @@ class AgenticGenerator:
         resp = await loop.run_in_executor(
             None, lambda: model.client.chat.completions.create(**params)
         )
+        input_tokens, output_tokens, total_tokens = extract_usage_counts(
+            getattr(resp, "usage", None)
+        )
+        input_cost_usd, output_cost_usd, total_cost_usd = compute_token_costs(
+            input_tokens,
+            output_tokens,
+            getattr(model, "input_price_per_million_tokens", None),
+            getattr(model, "output_price_per_million_tokens", None),
+        )
+        llm_response = LLMResponse(
+            text=resp.choices[0].message.content or "",
+            model_name=getattr(resp, "model", None) or getattr(model, "model", None),
+            usage_source="api" if getattr(resp, "usage", None) is not None else None,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+            input_cost_usd=input_cost_usd,
+            output_cost_usd=output_cost_usd,
+            total_cost_usd=total_cost_usd,
+        )
+        self.llm_pool.record_response_usage(llm_response)
 
         msg = resp.choices[0].message
         out: Dict[str, Any] = {"role": "assistant", "content": msg.content or ""}
@@ -196,7 +246,7 @@ class AgenticGenerator:
                 }
                 for tc in msg.tool_calls
             ]
-        return out
+        return out, llm_response
 
     # ------------------------------------------------------------------
     # Tools

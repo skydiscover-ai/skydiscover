@@ -143,6 +143,10 @@ class LLMModelConfig:
     retries: Optional[int] = None
     retry_delay: Optional[int] = None
 
+    # Pricing parameters (USD per 1M tokens)
+    input_price_per_million_tokens: Optional[float] = None
+    output_price_per_million_tokens: Optional[float] = None
+
     # Reasoning parameters
     reasoning_effort: Optional[str] = None
 
@@ -164,6 +168,10 @@ class LLMConfig(LLMModelConfig):
     timeout: int = 600
     retries: int = 3
     retry_delay: int = 5
+
+    # Pricing parameters (USD per 1M tokens)
+    input_price_per_million_tokens: Optional[float] = None
+    output_price_per_million_tokens: Optional[float] = None
 
     # model(s) for solution discovery
     models: List[LLMModelConfig] = field(default_factory=list)
@@ -222,6 +230,8 @@ class LLMConfig(LLMModelConfig):
             "timeout": self.timeout,
             "retries": self.retries,
             "retry_delay": self.retry_delay,
+            "input_price_per_million_tokens": self.input_price_per_million_tokens,
+            "output_price_per_million_tokens": self.output_price_per_million_tokens,
             "reasoning_effort": self.reasoning_effort,
         }
         self.update_model_params(shared_config)
@@ -696,6 +706,8 @@ class Config:
                 "timeout": self.llm.timeout,
                 "retries": self.llm.retries,
                 "retry_delay": self.llm.retry_delay,
+                "input_price_per_million_tokens": self.llm.input_price_per_million_tokens,
+                "output_price_per_million_tokens": self.llm.output_price_per_million_tokens,
             },
             "prompt": {
                 "template": self.context_builder.template,
@@ -905,6 +917,8 @@ def apply_overrides(
                 "timeout": config.llm.timeout,
                 "retries": config.llm.retries,
                 "retry_delay": config.llm.retry_delay,
+                "input_price_per_million_tokens": config.llm.input_price_per_million_tokens,
+                "output_price_per_million_tokens": config.llm.output_price_per_million_tokens,
                 "reasoning_effort": config.llm.reasoning_effort,
             },
             overwrite=True,

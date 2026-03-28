@@ -13,6 +13,7 @@ import openai
 
 from skydiscover.config import LLMModelConfig
 from skydiscover.llm.base import LLMInterface, LLMResponse
+from skydiscover.llm.cost import compute_token_costs, extract_usage_counts, lookup_default_pricing
 
 logger = logging.getLogger("skydiscover.llm")
 
@@ -58,6 +59,23 @@ class OpenAILLM(LLMInterface):
         self.timeout = model_cfg.timeout
         self.retries = model_cfg.retries
         self.retry_delay = model_cfg.retry_delay
+        # Resolve pricing: explicit config > built-in default table
+        input_price = model_cfg.input_price_per_million_tokens
+        output_price = model_cfg.output_price_per_million_tokens
+        if input_price is None or output_price is None:
+            default_in, default_out = lookup_default_pricing(model_cfg.name)
+            if input_price is None:
+                input_price = default_in
+            if output_price is None:
+                output_price = default_out
+        self.input_price_per_million_tokens = input_price
+        self.output_price_per_million_tokens = output_price
+        if self.input_price_per_million_tokens is None:
+            logger.warning(
+                "No pricing for model '%s', costs will show $0. "
+                "Set input/output_price_per_million_tokens in config.",
+                model_cfg.name,
+            )
         self.api_base = model_cfg.api_base
         self.api_key = model_cfg.api_key
         self.reasoning_effort = getattr(model_cfg, "reasoning_effort", None)
@@ -111,8 +129,7 @@ class OpenAILLM(LLMInterface):
         """Generate a response. Pass image_output=True for image generation."""
         if kwargs.get("image_output"):
             return await self._generate_with_image(system_message, messages, **kwargs)
-        text = await self._generate_text(system_message, messages, **kwargs)
-        return LLMResponse(text=text)
+        return await self._generate_text(system_message, messages, **kwargs)
 
     # ------------------------------------------------------------------
     # Text generation (Chat Completions API)
@@ -120,7 +137,7 @@ class OpenAILLM(LLMInterface):
 
     async def _generate_text(
         self, system_message: str, messages: List[Dict[str, Any]], **kwargs
-    ) -> str:
+    ) -> LLMResponse:
         system_content = system_message if system_message is not None else ""
         formatted_messages = [{"role": "system", "content": system_content}]
         formatted_messages.extend(messages)
@@ -172,13 +189,12 @@ class OpenAILLM(LLMInterface):
                 else:
                     raise
 
-    async def _call_api(self, params: Dict[str, Any]) -> str:
+    async def _call_api(self, params: Dict[str, Any]) -> LLMResponse:
         loop = asyncio.get_running_loop()
         try:
             response = await loop.run_in_executor(
                 None, lambda: self.client.chat.completions.create(**params)
             )
-            return response.choices[0].message.content
         except (openai.BadRequestError, openai.APIStatusError) as exc:
             # Some Azure deployments only expose the Responses API.
             # Fall back transparently when Chat Completions is unsupported.
@@ -186,10 +202,30 @@ class OpenAILLM(LLMInterface):
                 raise
             logger.info("Chat Completions unsupported; falling back to Responses API")
             return await self._call_api_via_responses(params)
+        input_tokens, output_tokens, total_tokens = extract_usage_counts(
+            getattr(response, "usage", None)
+        )
+        input_cost_usd, output_cost_usd, total_cost_usd = compute_token_costs(
+            input_tokens,
+            output_tokens,
+            self.input_price_per_million_tokens,
+            self.output_price_per_million_tokens,
+        )
+        return LLMResponse(
+            text=response.choices[0].message.content or "",
+            model_name=getattr(response, "model", None) or self.model,
+            usage_source="api" if getattr(response, "usage", None) is not None else None,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+            input_cost_usd=input_cost_usd,
+            output_cost_usd=output_cost_usd,
+            total_cost_usd=total_cost_usd,
+        )
 
-    async def _call_api_via_responses(self, params: Dict[str, Any]) -> str:
+    async def _call_api_via_responses(self, params: Dict[str, Any]) -> LLMResponse:
         """Translate a Chat-Completions-style *params* dict into a Responses API
-        call and return the assistant text."""
+        call and return an LLMResponse with cost metadata."""
         messages = params.get("messages", [])
         input_items = self._convert_to_responses_input(
             [m for m in messages if m.get("role") != "system"]
@@ -215,7 +251,26 @@ class OpenAILLM(LLMInterface):
             None, lambda: self.client.responses.create(**resp_params)
         )
         text, _ = self._extract_responses_output(response)
-        return text or ""
+        input_tokens, output_tokens, total_tokens = extract_usage_counts(
+            getattr(response, "usage", None)
+        )
+        input_cost_usd, output_cost_usd, total_cost_usd = compute_token_costs(
+            input_tokens,
+            output_tokens,
+            self.input_price_per_million_tokens,
+            self.output_price_per_million_tokens,
+        )
+        return LLMResponse(
+            text=text or "",
+            model_name=getattr(response, "model", None) or self.model,
+            usage_source="api" if getattr(response, "usage", None) is not None else None,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+            input_cost_usd=input_cost_usd,
+            output_cost_usd=output_cost_usd,
+            total_cost_usd=total_cost_usd,
+        )
 
     def _resolve_retry_options(self, **kwargs) -> Tuple[int, int, int]:
         """Resolve retry/timeout options from kwargs, falling back to instance defaults."""
@@ -271,6 +326,15 @@ class OpenAILLM(LLMInterface):
             try:
                 response = await asyncio.wait_for(self._call_responses_api(params), timeout=timeout)
                 text, image_b64 = self._extract_responses_output(response)
+                input_tokens, output_tokens, total_tokens = extract_usage_counts(
+                    getattr(response, "usage", None)
+                )
+                input_cost_usd, output_cost_usd, total_cost_usd = compute_token_costs(
+                    input_tokens,
+                    output_tokens,
+                    self.input_price_per_million_tokens,
+                    self.output_price_per_million_tokens,
+                )
 
                 image_path = None
                 if image_b64:
@@ -281,7 +345,18 @@ class OpenAILLM(LLMInterface):
                         f.write(base64.b64decode(image_b64))
                     logger.info(f"Image saved: {image_path}")
 
-                return LLMResponse(text=text, image_path=image_path)
+                return LLMResponse(
+                    text=text,
+                    image_path=image_path,
+                    model_name=getattr(response, "model", None) or self.model,
+                    usage_source="api" if getattr(response, "usage", None) is not None else None,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    total_tokens=total_tokens,
+                    input_cost_usd=input_cost_usd,
+                    output_cost_usd=output_cost_usd,
+                    total_cost_usd=total_cost_usd,
+                )
 
             except asyncio.TimeoutError:
                 if attempt < retries:

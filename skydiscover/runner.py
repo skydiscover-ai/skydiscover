@@ -8,6 +8,7 @@ import uuid
 from typing import Optional
 
 from skydiscover.config import Config, build_output_dir, load_config
+from skydiscover.llm.cost import CostTracker
 from skydiscover.search.base_database import Program
 from skydiscover.search.default_discovery_controller import (
     DiscoveryController,
@@ -74,6 +75,7 @@ class Runner:
         self.database = create_database(self.config.search.type, self.config.search.database)
         self.database.language = self.config.language or "python"
         self.evaluation_file = evaluation_file
+        self.cost_tracker = CostTracker()
 
         # Initialize the discovery controller
         self.discovery_controller: Optional[DiscoveryController] = None
@@ -133,6 +135,7 @@ class Runner:
             database=self.database,
             file_suffix=self.config.file_suffix,
             output_dir=self.output_dir,
+            cost_tracker=self.cost_tracker,
         )
 
         # Get the discovery controller
@@ -196,6 +199,7 @@ class Runner:
                     self._save_best_program(best)
                 except Exception as e:
                     logger.warning(f"Test-mode re-evaluation failed: {e}")
+            self._save_llm_cost_summary()
 
         finally:
             # Stop the monitor
@@ -218,6 +222,15 @@ class Runner:
 
         # Get the best program
         best_program = self._get_best_program()
+        llm_summary = self.get_llm_cost_summary()
+        logger.info(
+            "LLM usage summary: calls=%s, tokens(in/out/total)=%s/%s/%s, cost=$%.6f",
+            llm_summary["total"]["call_count"],
+            llm_summary["total"]["input_tokens"],
+            llm_summary["total"]["output_tokens"],
+            llm_summary["total"]["total_tokens"],
+            llm_summary["total"]["total_cost_usd"],
+        )
         if best_program:
             status = "early stopping" if early_stopped else "completed"
             logger.info(f"Discovery {status}. Best: {format_metrics(best_program.metrics)}")
@@ -385,6 +398,10 @@ class Runner:
         log_dir = self.config.log_dir or os.path.join(self.output_dir, "logs")
         setup_search_logging(log_level=self.config.log_level, log_dir=log_dir, name=self.name)
 
+    def get_llm_cost_summary(self) -> dict:
+        """Return the current run-level LLM usage summary."""
+        return self.cost_tracker.snapshot()
+
     def _load_initial_program(self) -> str:
         with open(self.initial_program_path, "r") as f:
             return f.read()
@@ -421,6 +438,11 @@ class Runner:
                     cls=SafeJSONEncoder,
                 )
             logger.info(f"Checkpoint {iteration}: best={format_metrics(best.metrics)}")
+
+        # Save cost snapshot with checkpoint
+        cost_path = os.path.join(checkpoint_path, "llm_cost_summary.json")
+        with open(cost_path, "w") as f:
+            json.dump(self.get_llm_cost_summary(), f, indent=2)
 
         logger.info(f"Checkpoint saved to {checkpoint_path}")
 
@@ -473,3 +495,10 @@ class Runner:
                 shutil.copy2(img, os.path.join(best_dir, "best_image" + os.path.splitext(img)[1]))
 
         logger.info(f"Best program saved to {best_dir}")
+
+    def _save_llm_cost_summary(self) -> None:
+        """Persist the latest run-level LLM usage summary to disk."""
+        summary_path = os.path.join(self.output_dir, "llm_cost_summary.json")
+        with open(summary_path, "w") as f:
+            json.dump(self.get_llm_cost_summary(), f, indent=2)
+        logger.info(f"LLM cost summary saved to {summary_path}")

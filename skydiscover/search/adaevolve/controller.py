@@ -69,7 +69,11 @@ class AdaEvolveController(DiscoveryController):
         self.num_context_programs = self.config.search.num_context_programs
 
         # Components
-        self.llms = LLMPool(self.config.llm.models)
+        self.llms = LLMPool(
+            self.config.llm.models,
+            cost_tracker=self.cost_tracker,
+            usage_category="generation",
+        )
         self.context_builder = AdaEvolveContextBuilder(self.config)
 
         # Paradigm generator (if paradigm breakthrough is enabled)
@@ -207,6 +211,9 @@ class AdaEvolveController(DiscoveryController):
                     "generation": child_program.get("generation"),
                     "parent_id": child_program.get("parent_id"),
                 }
+
+            # Add cumulative cost snapshot
+            stats["llm_cost_summary"] = self.cost_tracker.snapshot()
 
             # Write to JSONL file
             with open(self._iteration_stats_log_path, "a") as f:
@@ -604,6 +611,7 @@ class AdaEvolveController(DiscoveryController):
 
         # Generate
         llm_generation_time = 0.0
+        llm_result = None
         try:
             llm_start = time.time()
             if self.config.language == "image":
@@ -612,22 +620,22 @@ class AdaEvolveController(DiscoveryController):
                 user_content = build_image_content(
                     prompt["user"], parent, other_context_programs or {}
                 )
-                result = await self._call_llm(
+                llm_result = await self._call_llm(
                     prompt["system"],
                     user_content,
                     image_output=True,
                     output_dir=self._get_image_output_dir(),
                     program_id=child_id,
                 )
-                response = result.text or ""
-                image_path = result.image_path
+                response = llm_result.text or ""
+                image_path = llm_result.image_path
                 if not image_path:
                     return SerializableResult(
                         error="VLM did not generate an image", iteration=iteration
                     )
             else:
-                result = await self._call_llm(prompt["system"], prompt["user"])
-                response = result.text
+                llm_result = await self._call_llm(prompt["system"], prompt["user"])
+                response = llm_result.text
             llm_generation_time = time.time() - llm_start
         except Exception as e:
             return SerializableResult(error=f"LLM error: {e}", iteration=iteration)
@@ -676,7 +684,11 @@ class AdaEvolveController(DiscoveryController):
             )
 
         # Build child program with full tracking info
-        child_metadata = {"changes": changes, "parent_metrics": parent.metrics}
+        child_metadata = {
+            "changes": changes,
+            "parent_metrics": parent.metrics,
+            **self._llm_usage_metadata(llm_result),
+        }
         if image_path:
             child_metadata["image_path"] = image_path
         child = Program(
@@ -706,4 +718,5 @@ class AdaEvolveController(DiscoveryController):
             prompt=prompt,
             llm_response=response,
             iteration=iteration,
+            **self._llm_usage_metadata(llm_result),
         )
