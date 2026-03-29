@@ -48,6 +48,7 @@ class DiscoveryResult:
     metrics: Dict[str, Any]
     output_dir: Optional[str]
     initial_score: Optional[float] = None
+    llm_cost_summary: Optional[Dict[str, Any]] = None
 
     def __repr__(self) -> str:
         init = f"{self.initial_score:.4f}" if self.initial_score is not None else "N/A"
@@ -234,6 +235,7 @@ async def _run_discovery_async(
             best_score = get_score(metrics)
 
         initial_score = controller.initial_score
+        llm_cost_summary = controller.get_llm_cost_summary()
 
         # Return the result
         return DiscoveryResult(
@@ -243,6 +245,7 @@ async def _run_discovery_async(
             metrics=metrics,
             output_dir=actual_output_dir if not cleanup else None,
             initial_score=initial_score,
+            llm_cost_summary=llm_cost_summary,
         )
 
     finally:

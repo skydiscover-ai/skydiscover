@@ -11,7 +11,6 @@ sys.path.insert(0, parent_dir)
 from utils import *
 from simulator import *
 from broadcast import *
-from initial_program import search_algorithm
 import networkx as nx
 
 

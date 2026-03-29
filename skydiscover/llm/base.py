@@ -11,10 +11,20 @@ class LLMResponse:
 
     text: generated text content.
     image_path: path to generated image file, or None for text-only.
+    model_name: resolved provider model name.
+    usage_source: how token usage was obtained ("api", "estimated", etc.).
     """
 
     text: str = ""
     image_path: Optional[str] = None
+    model_name: Optional[str] = None
+    usage_source: Optional[str] = None
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    input_cost_usd: float = 0.0
+    output_cost_usd: float = 0.0
+    total_cost_usd: float = 0.0
 
 
 class LLMInterface(ABC):

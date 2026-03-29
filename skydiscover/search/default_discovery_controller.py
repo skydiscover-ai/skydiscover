@@ -21,6 +21,7 @@ from skydiscover.context_builder.evox import EvoxContextBuilder
 from skydiscover.evaluation import create_evaluator
 from skydiscover.evaluation.llm_judge import LLMJudge
 from skydiscover.llm.base import LLMResponse
+from skydiscover.llm.cost import CostTracker
 from skydiscover.llm.llm_pool import LLMPool
 from skydiscover.search.base_database import Program, ProgramDatabase
 from skydiscover.search.utils.discovery_utils import SerializableResult, build_image_content
@@ -43,6 +44,7 @@ class DiscoveryControllerInput:
     database: ProgramDatabase
     file_suffix: str = ".py"
     output_dir: Optional[str] = None
+    cost_tracker: Optional[CostTracker] = None
 
 
 class DiscoveryController:
@@ -66,10 +68,23 @@ class DiscoveryController:
 
         self.shutdown_event = mp.Event()
         self.early_stopping_triggered = False
+        self.cost_tracker = controller_input.cost_tracker or CostTracker()
 
-        self.llms = LLMPool(self.config.llm.models)
-        self.evaluator_llms = LLMPool(self.config.llm.evaluator_models)
-        self.guide_llms = LLMPool(self.config.llm.guide_models)
+        self.llms = LLMPool(
+            self.config.llm.models,
+            cost_tracker=self.cost_tracker,
+            usage_category="generation",
+        )
+        self.evaluator_llms = LLMPool(
+            self.config.llm.evaluator_models,
+            cost_tracker=self.cost_tracker,
+            usage_category="evaluator",
+        )
+        self.guide_llms = LLMPool(
+            self.config.llm.guide_models,
+            cost_tracker=self.cost_tracker,
+            usage_category="guide",
+        )
 
         self._init_context_builder()
 
@@ -153,9 +168,9 @@ class DiscoveryController:
     async def _call_llm(self, system_message: str, user_message: str, **kwargs) -> LLMResponse:
         """Call the LLM, using agentic mode if enabled (text-only)."""
         if self.agentic_generator and not kwargs.get("image_output"):
-            text = await self.agentic_generator.generate(system_message, user_message)
-            if text:
-                return LLMResponse(text=text)
+            agentic_result = await self.agentic_generator.generate(system_message, user_message)
+            if agentic_result:
+                return agentic_result
         return await self.llms.generate(
             system_message, [{"role": "user", "content": user_message}], **kwargs
         )
@@ -380,9 +395,9 @@ class DiscoveryController:
 
             llm_generation_time = 0.0
             llm_start = time.time()
-            result = await self._call_llm(prompt["system"], prompt["user"])
+            llm_result = await self._call_llm(prompt["system"], prompt["user"])
             llm_generation_time = time.time() - llm_start
-            llm_response = result.text
+            llm_response = llm_result.text
             if not llm_response:
                 return SerializableResult(error="Empty LLM response", iteration=iteration)
 
@@ -393,6 +408,7 @@ class DiscoveryController:
                     iteration=iteration,
                     prompt=prompt,
                     llm_response=llm_response,
+                    **self._llm_usage_metadata(llm_result),
                 )
 
             child_id = str(uuid.uuid4())
@@ -407,7 +423,10 @@ class DiscoveryController:
                 parent_id=None,
                 metrics=eval_result.metrics,
                 iteration_found=iteration,
-                metadata={"changes": "Generated from scratch"},
+                metadata={
+                    "changes": "Generated from scratch",
+                    **self._llm_usage_metadata(llm_result),
+                },
                 artifacts=eval_result.artifacts or {},
             )
 
@@ -421,6 +440,7 @@ class DiscoveryController:
                 prompt=prompt,
                 llm_response=llm_response,
                 iteration=iteration,
+                **self._llm_usage_metadata(llm_result),
             )
         except Exception as e:
             logger.exception(f"From-scratch generation failed: {e}")
@@ -484,6 +504,7 @@ class DiscoveryController:
 
             image_path = None  # set by image mode or evaluator
             eval_time = 0.0
+            llm_result: Optional[LLMResponse] = None
 
             # Build prompt with parent and context programs
             for retry in range(retry_times):
@@ -516,17 +537,17 @@ class DiscoveryController:
                         user_content = build_image_content(
                             prompt["user"], parent, context_programs_dict
                         )
-                        result = await self._call_llm(
+                        llm_result = await self._call_llm(
                             prompt["system"],
                             user_content,
                             image_output=True,
                             output_dir=self._get_image_output_dir(),
                             program_id=child_id,
                         )
-                        llm_response = result.text or ""
-                        image_path = result.image_path
+                        llm_response = llm_result.text or ""
+                        image_path = llm_result.image_path
                         if image_path:
-                            child_solution = result.text or "(image generated)"
+                            child_solution = llm_result.text or "(image generated)"
                             changes_summary = "Image generation"
                             parse_error = None
                         else:
@@ -534,8 +555,8 @@ class DiscoveryController:
                             changes_summary = None
                             parse_error = "VLM did not generate an image"
                     else:
-                        result = await self._call_llm(prompt["system"], prompt["user"])
-                        llm_response = result.text
+                        llm_result = await self._call_llm(prompt["system"], prompt["user"])
+                        llm_response = llm_result.text
                     llm_generation_time = time.time() - llm_start
                 except Exception as e:
                     logger.error(f"LLM generation failed: {e}")
@@ -552,6 +573,7 @@ class DiscoveryController:
                             error="LLM returned None response",
                             iteration=iteration,
                             attempts_used=retry + 1,
+                            **self._llm_usage_metadata(llm_result),
                         )
 
                     child_solution, changes_summary, parse_error = self._parse_llm_response(
@@ -595,6 +617,7 @@ class DiscoveryController:
                         prompt=prompt,
                         llm_response=llm_response,
                         attempts_used=retry_times,
+                        **self._llm_usage_metadata(llm_result),
                     )
 
                 if self.config.language != "image":
@@ -695,12 +718,15 @@ class DiscoveryController:
                         prompt=prompt,
                         llm_response=llm_response,
                         attempts_used=retry_times,
+                        **self._llm_usage_metadata(llm_result),
                     )
                 break
 
             extra_meta = {}
             if image_path:
                 extra_meta["image_path"] = image_path
+            if llm_result:
+                extra_meta.update(self._llm_usage_metadata(llm_result))
             child_program = self._create_child_program(
                 child_id=child_id,
                 child_solution=child_solution,
@@ -727,6 +753,7 @@ class DiscoveryController:
                 llm_response=llm_response,
                 iteration=iteration,
                 attempts_used=retry + 1,
+                **self._llm_usage_metadata(llm_result),
             )
         except Exception as e:
             logger.exception(f"Error in iteration {iteration}")
@@ -888,6 +915,25 @@ class DiscoveryController:
         d = os.path.join(base, "generated_images")
         os.makedirs(d, exist_ok=True)
         return d
+
+    def get_llm_cost_summary(self) -> Dict[str, Any]:
+        """Return the current run-level LLM usage summary."""
+        return self.cost_tracker.snapshot()
+
+    @staticmethod
+    def _llm_usage_metadata(llm_result: Optional[LLMResponse]) -> Dict[str, Any]:
+        """Convert one LLM response into metadata/result-friendly fields."""
+        if llm_result is None:
+            return {}
+        return {
+            "llm_model_name": llm_result.model_name,
+            "llm_input_tokens": llm_result.input_tokens,
+            "llm_output_tokens": llm_result.output_tokens,
+            "llm_total_tokens": llm_result.total_tokens,
+            "llm_input_cost_usd": llm_result.input_cost_usd,
+            "llm_output_cost_usd": llm_result.output_cost_usd,
+            "llm_total_cost_usd": llm_result.total_cost_usd,
+        }
 
     def request_shutdown(self) -> None:
         """Request graceful shutdown"""

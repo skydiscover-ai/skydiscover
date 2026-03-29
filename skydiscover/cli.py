@@ -228,18 +228,38 @@ async def main_async() -> int:
             iterations=args.iterations,
             checkpoint_path=args.checkpoint,
         )
+        llm_cost_summary = runner.get_llm_cost_summary()
 
         checkpoint_dir = os.path.join(runner.output_dir, "checkpoints")
         latest_checkpoint = _find_latest_checkpoint(checkpoint_dir)
 
-        print("\nDiscovery complete!")
+        print("\n" + "=" * 50)
+        print("  Discovery Run Summary")
+        print("=" * 50)
         if best_program is None:
-            print("No valid programs were found.")
+            print("  Best score: N/A (no valid programs found)")
         else:
-            print("Best program metrics:")
+            print("  Best program metrics:")
             for name, value in best_program.metrics.items():
                 formatted = f"{value:.4f}" if isinstance(value, (int, float)) else str(value)
-                print(f"  {name}: {formatted}")
+                print(f"    {name}: {formatted}")
+        print("-" * 50)
+        totals = llm_cost_summary["total"]
+        print("  LLM Cost Breakdown:")
+        print(f"    Calls:         {totals['call_count']}")
+        print(f"    Input tokens:  {totals['input_tokens']:,}")
+        print(f"    Output tokens: {totals['output_tokens']:,}")
+        print(f"    Input cost:    ${totals['input_cost_usd']:.6f}")
+        print(f"    Output cost:   ${totals['output_cost_usd']:.6f}")
+        print(f"    Total cost:    ${totals['total_cost_usd']:.6f}")
+        by_cat = llm_cost_summary.get("by_category", {})
+        if by_cat:
+            print("  By category:")
+            for cat, cat_data in by_cat.items():
+                print(
+                    f"    {cat}: {cat_data['call_count']} calls, ${cat_data['total_cost_usd']:.6f}"
+                )
+        print("=" * 50)
 
         if latest_checkpoint:
             print(f"\nLatest checkpoint: {latest_checkpoint}")

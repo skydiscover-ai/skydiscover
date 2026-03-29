@@ -62,6 +62,7 @@ class CoEvolutionController(DiscoveryController):
             config_path=db_cfg.config_path,
             output_dir=self.config.search.output_dir,
             parent_llm_config=self.config.llm if self.config.search.share_llm else None,
+            cost_tracker=self.cost_tracker,
         )
         self.search_controller = DiscoveryController(controller_input)
         self.search_scorer = LogWindowScorer()
