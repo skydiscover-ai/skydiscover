@@ -4,7 +4,7 @@ Registries and factory functions for search components.
 
 import logging
 import os
-from typing import Any, Dict, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type
 
 from skydiscover.config import Config, DatabaseConfig, build_output_dir, load_config
 from skydiscover.search.base_database import Program, ProgramDatabase
@@ -118,6 +118,7 @@ def setup_search(
     evaluation_file: str,
     config_path: str,
     output_dir: Optional[str] = None,
+    parent_llm_config: Optional["LLMConfig"] = None,
 ) -> Tuple[DiscoveryControllerInput, str]:
     """
     Load config, create database, and build a DiscoveryControllerInput from a config path.
@@ -126,10 +127,30 @@ def setup_search(
     you only need the config/database/controller (e.g. for the search side of
     co-evolution).
 
+    Args:
+        parent_llm_config: If provided, inherit LLM settings (api_base, api_key,
+            models) from the parent config so the search-side evolution uses the
+            same endpoint as the main discovery process.
+
     Returns:
         Tuple of (controller_input, initial_program_solution)
     """
     config = load_config(config_path)
+
+    # Inherit LLM settings from parent config when provided.
+    # Use the parent's actual model configs (which have the correct per-model
+    # api_base/api_key, e.g. Azure endpoints) rather than the top-level
+    # LLMConfig defaults which may still point to api.openai.com.
+    if parent_llm_config is not None and parent_llm_config.models:
+        import copy
+
+        parent_models = [copy.deepcopy(m) for m in parent_llm_config.models]
+        config.llm.models = parent_models
+        config.llm.evaluator_models = [copy.deepcopy(m) for m in parent_llm_config.models]
+        config.llm.guide_models = [copy.deepcopy(m) for m in parent_llm_config.models]
+        # Sync top-level api_base/api_key from the first parent model
+        config.llm.api_base = parent_models[0].api_base or config.llm.api_base
+        config.llm.api_key = parent_models[0].api_key or config.llm.api_key
 
     with open(initial_program_path, "r") as f:
         initial_program_solution = f.read()

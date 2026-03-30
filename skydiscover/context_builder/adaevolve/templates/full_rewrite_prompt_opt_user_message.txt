@@ -16,9 +16,9 @@
 {search_guidance}
 
 # Task
-Suggest improvements to the prompt that will improve its COMBINED_SCORE.
-The system maintains diversity across these dimensions: score, complexity.
-Different prompts with similar combined_score but different strategies are valuable.
+{task_objective}
+{diversity_dimensions}
+{diversity_note}
 
 Provide the complete rewritten prompt.
 

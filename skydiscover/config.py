@@ -505,6 +505,9 @@ class SearchConfig:
     switch_interval: Optional[int] = (
         None  # EvoX: stagnation iters before strategy switch. Auto-calculated if None.
     )
+    share_llm: bool = (
+        False  # EvoX: if True, meta-level search evolution uses the same LLM as the main discovery process.
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -786,6 +789,10 @@ def load_config(config_path: Optional[Union[str, Path]] = None) -> Config:
 
     # Make the system message available to the individual models, in case it is not provided from the prompt sampler
     config.llm.update_model_params({"system_message": config.context_builder.system_message})
+
+    # Bridge provider env vars so that downstream configs (e.g. evox search.yaml)
+    # can resolve ${OPENAI_API_KEY} from the environment.
+    bridge_provider_env(config)
 
     return config
 

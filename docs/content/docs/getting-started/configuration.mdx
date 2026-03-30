@@ -1,0 +1,117 @@
+---
+title: "Configuration"
+description: "Models, algorithms, config files, and the Python API."
+---
+
+## Pick a model
+
+SkyDiscover uses [LiteLLM](https://docs.litellm.ai/) under the hood, so any
+compatible model works:
+
+```bash
+--model gpt-5                           # OpenAI (default)
+--model gemini/gemini-3-pro-preview      # Google Gemini
+--model anthropic/claude-sonnet-4-6      # Anthropic
+--model ollama/llama3 --api-base http://localhost:11434/v1  # Local
+```
+
+## Pick an algorithm
+
+| Algorithm | Flag | Best for |
+|:---|:---|:---|
+| **EvoX** | `--search evox` | Self-evolving strategy that adapts how it searches |
+| **AdaEvolve** | `--search adaevolve` | Multi-island adaptive search with breakthroughs |
+| **Best-of-N** | `--search best_of_n` | Quick baseline — generates N variants, keeps the best |
+| **Top-K** | `--search topk` | Iteratively refines the top K solutions |
+| **Beam Search** | `--search beam_search` | Breadth-first expansion of promising solutions |
+
+## Config files
+
+Pass a YAML config with `--config` for full control:
+
+```yaml
+max_iterations: 100
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 0.7
+    - name: "gemini/gemini-3-pro-preview"
+      weight: 0.3
+  max_tokens: 8192
+  timeout: 120
+
+search:
+  type: "evox"
+
+prompt:
+  system_message: |
+    You are an expert at optimizing algorithms.
+
+evaluator:
+  timeout: 60
+```
+
+Multi-model pools with weighted sampling let you blend different LLMs —
+SkyDiscover samples from them probabilistically each iteration.
+
+## Live dashboard
+
+Add this to your config to get a real-time monitoring dashboard:
+
+```yaml
+monitor:
+  enabled: true
+```
+
+The dashboard URL prints at run start — it shows a scatter plot of all
+programs, code diffs, metrics, and lets you give human feedback to steer
+evolution in real time.
+
+## Python API
+
+You can also run SkyDiscover programmatically:
+
+```python
+from skydiscover import run_discovery
+
+result = run_discovery(
+    initial_program="initial_program.py",
+    evaluator="evaluator.py",
+    search="evox",
+    model="gpt-5",
+    iterations=50,
+)
+
+print(result.best_score, result.best_solution)
+```
+
+Or use the inline convenience wrapper for quick experiments:
+
+```python
+from skydiscover import discover_solution
+
+result = discover_solution(
+    initial_solution="def solve(x): return x",
+    evaluator=lambda path: {"combined_score": run_tests(path)},
+    iterations=50,
+    search="evox",
+)
+```
+
+## CLI reference
+
+```
+uv run skydiscover-run [INITIAL_PROGRAM] EVALUATOR [options]
+```
+
+| Flag | Description |
+|:---|:---|
+| `-c, --config FILE` | Config YAML |
+| `-i, --iterations N` | Number of iterations |
+| `-m, --model MODEL` | LLM model (overrides config) |
+| `-s, --search TYPE` | Search algorithm |
+| `-o, --output DIR` | Output directory |
+| `--api-base URL` | Override LLM API endpoint |
+| `--checkpoint DIR` | Resume from checkpoint |
+| `--agentic` | Enable agentic mode (LLM can read your files) |
+| `-l, --log-level LEVEL` | DEBUG, INFO, WARNING, or ERROR |

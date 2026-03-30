@@ -1,0 +1,51 @@
+---
+title: "Installation"
+description: "Install SkyDiscover and configure your LLM API keys."
+---
+
+## Prerequisites
+
+- **Python** >= 3.10
+- **[uv](https://docs.astral.sh/uv/)** — fast Python package manager
+- **[Docker](https://docs.docker.com/get-docker/)** — for containerized evaluators
+- An **LLM API key** (OpenAI, Gemini, Anthropic, or a local model)
+
+## Install SkyDiscover
+
+```bash
+git clone https://github.com/skydiscover-ai/skydiscover.git
+cd skydiscover
+uv sync
+```
+
+## Verify the installation
+
+```bash
+uv run skydiscover-run --help
+```
+
+You should see the help text with available flags.
+
+## Set your API key
+
+SkyDiscover uses [LiteLLM](https://docs.litellm.ai/) under the hood, so any
+provider works. Set the key for the provider you want to use:
+
+```bash
+export ANTHROPIC_API_KEY="..."
+# Or for other providers:
+# export OPENAI_API_KEY="sk-..."
+# export GEMINI_API_KEY="..."
+```
+
+## Optional extras
+
+Running some comparison benchmarks requires additional dependencies. Install them as needed:
+
+```bash
+uv sync --extra adrs         # ADRS systems benchmarks
+uv sync --extra external     # OpenEvolve / GEPA / ShinkaEvolve backends
+uv sync --extra math         # Math benchmarks (SciPy, JAX, etc.)
+```
+
+You can combine extras: `uv sync --extra external --extra math`

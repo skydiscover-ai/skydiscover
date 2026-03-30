@@ -15,7 +15,7 @@ import logging
 import os
 import random
 import uuid
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from skydiscover.config import DatabaseConfig
 from skydiscover.search.adaevolve.adaptation import AdaptiveState, MultiDimensionalAdapter
@@ -26,7 +26,7 @@ from skydiscover.search.adaevolve.archive import (
 )
 from skydiscover.search.adaevolve.paradigm import ParadigmTracker
 from skydiscover.search.base_database import Program, ProgramDatabase
-from skydiscover.utils.metrics import get_score
+from skydiscover.utils.metrics import compute_proxy_score, get_score
 
 logger = logging.getLogger(__name__)
 
@@ -175,6 +175,9 @@ class AdaEvolveDatabase(ProgramDatabase):
         self.migration_count = getattr(config, "migration_count", 3)
         self._iteration_count = 0
         self.population_size = config.population_size
+        self.higher_is_better = getattr(config, "higher_is_better", {}) or {}
+        self.fitness_key = getattr(config, "fitness_key", None)
+        self.pareto_objectives = list(getattr(config, "pareto_objectives", []) or [])
 
         # Unified archive flag (can be disabled for ablation studies)
         self.use_unified_archive = getattr(config, "use_unified_archive", True)
@@ -260,6 +263,10 @@ class AdaEvolveDatabase(ProgramDatabase):
         # Global best tracking
         self._global_best_score = float("-inf")
 
+        # Cached global Pareto front (lazy, invalidated on population changes)
+        self._global_pareto_cache: Optional[List[Program]] = None
+        self._global_pareto_cache_valid: bool = False
+
         # Last sampling mode (stashed by sample() for the controller to read)
         self._last_sampling_mode: Optional[str] = None
 
@@ -273,7 +280,8 @@ class AdaEvolveDatabase(ProgramDatabase):
             f"adaptive_search={self.use_adaptive_search}, "
             f"ucb_selection={self.use_ucb_selection}, "
             f"dynamic_islands={self.use_dynamic_islands}, "
-            f"paradigm_breakthrough={self.use_paradigm_breakthrough}"
+            f"paradigm_breakthrough={self.use_paradigm_breakthrough}, "
+            f"multiobjective={self.is_multiobjective_enabled()}"
         )
 
     def _init_archives(self, config: DatabaseConfig) -> None:
@@ -462,6 +470,10 @@ class AdaEvolveDatabase(ProgramDatabase):
                 # UCB stats remain unchanged (island didn't earn the improvement)
                 # This fixes: 1) future delta calculations, 2) exploitation mode trigger
                 self.adapter.receive_external_improvement(island_idx, fitness)
+
+            # Invalidate BEFORE _update_best_program so it can read the stale
+            # cache as the "previous" front and detect front membership changes.
+            self._invalidate_global_pareto_cache()
 
             # Update global best and track for paradigm
             global_improved = self._update_best_program(program)
@@ -700,18 +712,24 @@ class AdaEvolveDatabase(ProgramDatabase):
 
     def _sample_global_top(self, exclude_id: str, n: int) -> List[Program]:
         """Sample top programs from ALL islands for cross-pollination."""
-        all_programs = []
-        if self.use_unified_archive and self.archives:
-            for archive in self.archives:
-                all_programs.extend(archive.get_all())
-        else:
-            for island in self.islands:
-                all_programs.extend(island)
-
+        all_programs = self._all_population_programs()
         candidates = [p for p in all_programs if p.id != exclude_id]
 
         if len(candidates) <= n:
             return candidates
+
+        if self.is_multiobjective_enabled():
+            pareto_front = [p for p in self.get_global_pareto_front() if p.id != exclude_id]
+            if len(pareto_front) >= n:
+                return pareto_front[:n]
+
+            front_ids = {program.id for program in pareto_front}
+            remaining = sorted(
+                [program for program in candidates if program.id not in front_ids],
+                key=self._get_fitness,
+                reverse=True,
+            )
+            return pareto_front + remaining[: max(0, n - len(pareto_front))]
 
         sorted_candidates = sorted(candidates, key=self._get_fitness, reverse=True)
         return sorted_candidates[:n]
@@ -994,6 +1012,7 @@ class AdaEvolveDatabase(ProgramDatabase):
         # Global statistics
         # =========================================================================
         best_program = self.get_best_program()
+        pareto_front = self.get_global_pareto_front() if self.is_multiobjective_enabled() else []
         global_stats = {
             "iteration": iteration,
             "num_islands": self.num_islands,
@@ -1002,6 +1021,12 @@ class AdaEvolveDatabase(ProgramDatabase):
                 self._global_best_score if not math.isinf(self._global_best_score) else None
             ),
             "global_best_program_id": self.best_program_id,
+            "optimization_mode": "pareto" if self.is_multiobjective_enabled() else "scalar",
+            "pareto_objectives": list(self.pareto_objectives),
+            "higher_is_better": dict(self.higher_is_better),
+            "fitness_proxy_key": self.fitness_key,
+            "global_pareto_front_size": len(pareto_front),
+            "global_pareto_front_ids": [program.id for program in pareto_front],
             "global_productivity": self.adapter.get_global_productivity(),
             "total_programs": len(self.programs),
             # UCB global state
@@ -1026,6 +1051,7 @@ class AdaEvolveDatabase(ProgramDatabase):
                 "metrics": best_program.metrics,
                 "generation": best_program.generation,
                 "iteration_found": best_program.iteration_found,
+                "is_pareto_representative": self.is_multiobjective_enabled(),
                 "code_length": len(best_program.solution),
                 "code_preview": code_preview,
             }
@@ -1260,7 +1286,9 @@ class AdaEvolveDatabase(ProgramDatabase):
         os.makedirs(save_path, exist_ok=True)
         metadata_path = os.path.join(save_path, "adaevolve_metadata.json")
         with open(metadata_path, "w") as f:
-            json.dump(metadata, f, indent=2)
+            from skydiscover.search.utils.checkpoint_manager import SafeJSONEncoder
+
+            json.dump(metadata, f, indent=2, cls=SafeJSONEncoder)
 
         logger.info(f"Saved AdaEvolve state to {save_path}")
 
@@ -1372,6 +1400,7 @@ class AdaEvolveDatabase(ProgramDatabase):
                     if pid in self.programs:
                         self.islands[island_idx].append(self.programs[pid])
 
+        self._invalidate_global_pareto_cache()
         logger.info(
             f"Loaded AdaEvolve state from {path}: "
             f"{self.num_islands} islands, {len(self.programs)} programs, "
@@ -1401,6 +1430,7 @@ class AdaEvolveDatabase(ProgramDatabase):
                 if island_idx < len(self.islands):
                     self.islands[island_idx].append(program)
 
+        self._invalidate_global_pareto_cache()
         logger.info(f"Distributed {len(programs_list)} programs across {self.num_islands} islands")
 
     def _expand_to_island_count(self, target_count: int, metadata: Dict[str, Any]) -> None:
@@ -1473,11 +1503,170 @@ class AdaEvolveDatabase(ProgramDatabase):
     # Helpers
     # =========================================================================
 
-    def _get_fitness(self, program: Program) -> float:
-        """Get fitness score from program metrics."""
-        if not program.metrics:
+    def is_multiobjective_enabled(self) -> bool:
+        """Return True when explicit Pareto objectives are configured."""
+        return bool(self.pareto_objectives)
+
+    def _metric_to_maximization_value(self, metric_name: str, value: Any) -> Optional[float]:
+        """Convert a metric to an internal score where larger is always better."""
+        from skydiscover.utils.metrics import normalize_metric_value
+
+        return normalize_metric_value(metric_name, value, self.higher_is_better)
+
+    def _get_multiobjective_proxy_score(self, program: Program) -> float:
+        """Return a scalar proxy for adaptive state and deterministic tie-breaking."""
+        metrics = getattr(program, "metrics", None) or {}
+        return compute_proxy_score(
+            metrics,
+            fitness_key=self.fitness_key,
+            pareto_objectives=self.pareto_objectives if self.is_multiobjective_enabled() else None,
+            higher_is_better=self.higher_is_better,
+        )
+
+    def get_program_proxy_score(self, program: Optional[Program]) -> float:
+        """Public wrapper for the scalar proxy used by AdaEvolve internals."""
+        if program is None:
             return float("-inf")
-        return get_score(program.metrics)
+        return self._get_multiobjective_proxy_score(program)
+
+    def _all_population_programs(self) -> List[Program]:
+        """Return all currently active programs across islands."""
+        if self.use_unified_archive and self.archives:
+            programs = []
+            for archive in self.archives:
+                programs.extend(archive.get_all())
+            return programs
+        if self.islands:
+            programs = []
+            for island in self.islands:
+                programs.extend(island)
+            return programs
+        return list(self.programs.values())
+
+    def _get_objective_vector(self, program: Program) -> Optional[List[float]]:
+        """Return the configured objective vector for a program.
+
+        Missing or non-numeric objectives are filled with ``-inf`` so that
+        programs with incomplete metrics cannot accidentally dominate
+        fully-evaluated programs (all objectives are in "higher is better"
+        space after normalisation).
+        """
+        if not self.is_multiobjective_enabled():
+            return None
+
+        metrics = getattr(program, "metrics", None) or {}
+        vector: List[float] = []
+        for objective in self.pareto_objectives:
+            normalized = self._metric_to_maximization_value(objective, metrics.get(objective))
+            vector.append(normalized if normalized is not None else float("-inf"))
+        return vector
+
+    @staticmethod
+    def _dominates(vec_a: List[float], vec_b: List[float]) -> bool:
+        """True if vec_a Pareto-dominates vec_b (same-length vectors required)."""
+        if len(vec_a) != len(vec_b):
+            raise ValueError(
+                f"Objective vectors must have equal length, got {len(vec_a)} vs {len(vec_b)}"
+            )
+        at_least_one_better = False
+        for a, b in zip(vec_a, vec_b):
+            if a < b:
+                return False
+            if a > b:
+                at_least_one_better = True
+        return at_least_one_better
+
+    def _get_archive_crowding_distance(self, program: Program) -> float:
+        """Return archive crowding distance when available."""
+        if not (self.use_unified_archive and self.archives):
+            return 0.0
+
+        for archive in self.archives:
+            if archive.contains(program.id):
+                archive._ensure_cache_valid()
+                return archive._crowding_distances.get(program.id, 0.0)
+        return 0.0
+
+    def _get_archive_elite_score(self, program: Program) -> float:
+        """Return cached archive elite score when available."""
+        if not (self.use_unified_archive and self.archives):
+            return 0.0
+
+        for archive in self.archives:
+            if archive.contains(program.id):
+                archive._ensure_cache_valid()
+                return archive._elite_scores.get(program.id, 0.0)
+        return 0.0
+
+    def _get_pareto_representative_sort_key(
+        self, program: Program
+    ) -> Tuple[float, float, float, int, str]:
+        """Sort key for choosing one stable representative from a Pareto front.
+
+        Higher values win (used with ``max``).  Ties are broken by:
+        proxy score → crowding distance → elite score → newer iteration → ID.
+        """
+        return (
+            self._get_multiobjective_proxy_score(program),
+            self._get_archive_crowding_distance(program),
+            self._get_archive_elite_score(program),
+            getattr(program, "iteration_found", 0),  # newer wins ties
+            program.id,
+        )
+
+    def _choose_pareto_representative(self, front: List[Program]) -> Optional[Program]:
+        """Choose a deterministic representative program from a Pareto front."""
+        if not front:
+            return None
+        return max(front, key=self._get_pareto_representative_sort_key)
+
+    def _invalidate_global_pareto_cache(self) -> None:
+        """Mark the cached global Pareto front as stale.
+
+        The *stale* cache is intentionally preserved (not cleared) so that
+        ``_update_best_program`` can read the pre-mutation front and detect
+        whether a newly added program entered the front.
+        """
+        self._global_pareto_cache_valid = False
+
+    def _compute_global_pareto_front(self) -> List[Program]:
+        """O(n²) computation of the non-dominated front across all islands."""
+        programs = self._all_population_programs()
+        if not programs:
+            return []
+
+        objective_vectors = {
+            program.id: self._get_objective_vector(program) or [] for program in programs
+        }
+        front = []
+        for candidate in programs:
+            vec_candidate = objective_vectors[candidate.id]
+            dominated = False
+            for challenger in programs:
+                if challenger.id == candidate.id:
+                    continue
+                if self._dominates(objective_vectors[challenger.id], vec_candidate):
+                    dominated = True
+                    break
+            if not dominated:
+                front.append(candidate)
+
+        return sorted(front, key=self._get_pareto_representative_sort_key, reverse=True)
+
+    def get_global_pareto_front(self) -> List[Program]:
+        """Return the non-dominated Pareto front across all islands (cached)."""
+        if not self.is_multiobjective_enabled():
+            return []
+
+        if not self._global_pareto_cache_valid:
+            self._global_pareto_cache = self._compute_global_pareto_front()
+            self._global_pareto_cache_valid = True
+
+        return list(self._global_pareto_cache or [])
+
+    def _get_fitness(self, program: Program) -> float:
+        """Get scalar fitness score used by adaptive state and fallbacks."""
+        return self._get_multiobjective_proxy_score(program)
 
     def _update_best_program(self, program: Program) -> bool:
         """
@@ -1486,6 +1675,34 @@ class AdaEvolveDatabase(ProgramDatabase):
         Returns:
             True if this program is a new global best, False otherwise
         """
+        if self.is_multiobjective_enabled():
+            previous_best_id = self.best_program_id
+            previous_best_score = self._global_best_score
+
+            # Read the STALE cache (snapshot of the front before this program
+            # was added).  The cache was invalidated by add() but the old list
+            # is intentionally preserved for exactly this comparison.
+            previous_front_ids: Set[str] = (
+                {p.id for p in (self._global_pareto_cache or [])}
+                if not self._global_pareto_cache_valid
+                else set()
+            )
+
+            # Now recompute (cache is invalid, so this triggers O(n²) rebuild).
+            front = self.get_global_pareto_front()
+            representative = self._choose_pareto_representative(front)
+            if representative is None:
+                return False
+
+            self.best_program_id = representative.id
+            self._global_best_score = self._get_fitness(representative)
+
+            front_ids = {p.id for p in front}
+            entered_front = program.id in front_ids and program.id not in previous_front_ids
+            representative_changed = representative.id != previous_best_id
+            score_improved = self._global_best_score > previous_best_score
+            return entered_front or representative_changed or score_improved
+
         fitness = self._get_fitness(program)
         if fitness > self._global_best_score:
             self._global_best_score = fitness
@@ -1539,6 +1756,14 @@ class AdaEvolveDatabase(ProgramDatabase):
         archive/island search. This prevents silent data loss when the best program
         has been evicted from archives but is still tracked.
         """
+        if metric is None and self.is_multiobjective_enabled():
+            front = self.get_global_pareto_front()
+            representative = self._choose_pareto_representative(front)
+            if representative is not None:
+                self.best_program_id = representative.id
+                self._global_best_score = self._get_fitness(representative)
+            return representative
+
         # First, check if we have a tracked best program (authoritative)
         # This handles the case where best program was evicted from archives
         if self.best_program_id and self.best_program_id in self.programs:
@@ -1609,16 +1834,40 @@ class AdaEvolveDatabase(ProgramDatabase):
         return best
 
     def get_top_programs(self, n: int = 10, metric: Optional[str] = None) -> List[Program]:
-        """Get top n programs across all islands."""
-        all_programs = []
-        if self.use_unified_archive and self.archives:
-            for archive in self.archives:
-                all_programs.extend(archive.get_all())
-        else:
-            for island in self.islands:
-                all_programs.extend(island)
-        sorted_programs = sorted(all_programs, key=self._get_fitness, reverse=True)
-        return sorted_programs[:n]
+        """Get top n programs across all islands.
+
+        When *metric* is provided, programs are sorted by that specific metric
+        (respecting ``higher_is_better`` if configured).  Otherwise, multiobjective
+        mode returns the non-dominated front padded with proxy-score-ranked
+        programs, and scalar mode sorts by the default proxy fitness.
+        """
+        all_programs = self._all_population_programs()
+
+        if metric:
+            # Sort by the requested metric, applying direction normalisation.
+            def _metric_key(p: Program) -> float:
+                val = (getattr(p, "metrics", None) or {}).get(metric)
+                normalized = self._metric_to_maximization_value(metric, val)
+                return normalized if normalized is not None else float("-inf")
+
+            sorted_programs = sorted(all_programs, key=_metric_key, reverse=True)
+            return sorted_programs[:n]
+
+        if not self.is_multiobjective_enabled():
+            sorted_programs = sorted(all_programs, key=self._get_fitness, reverse=True)
+            return sorted_programs[:n]
+
+        pareto_front = self.get_global_pareto_front()
+        if len(pareto_front) >= n:
+            return pareto_front[:n]
+
+        front_ids = {program.id for program in pareto_front}
+        remaining = sorted(
+            [program for program in all_programs if program.id not in front_ids],
+            key=self._get_fitness,
+            reverse=True,
+        )
+        return pareto_front + remaining[: max(0, n - len(pareto_front))]
 
     def get_top_programs_for_island(self, island_idx: Optional[int] = None) -> List[Program]:
         """Get top programs for an island (current island if not specified)."""
@@ -1636,8 +1885,40 @@ class AdaEvolveDatabase(ProgramDatabase):
         return []
 
     def get_pareto_front(self, island_idx: Optional[int] = None) -> List[Program]:
-        """Deprecated: Use get_top_programs_for_island() instead."""
-        return self.get_top_programs_for_island(island_idx)
+        """Get the Pareto front for a specific island or globally across all islands."""
+        if not self.is_multiobjective_enabled():
+            return self.get_top_programs_for_island(island_idx)
+
+        if island_idx is None:
+            return self.get_global_pareto_front()
+
+        if 0 <= island_idx < self.num_islands:
+            if self.use_unified_archive and self.archives:
+                return self.archives[island_idx].get_pareto_front()
+
+            population = self.get_island_population(island_idx)
+            if not population:
+                return []
+
+            front = []
+            objective_vectors = {
+                program.id: self._get_objective_vector(program) or [] for program in population
+            }
+            for candidate in population:
+                dominated = False
+                for challenger in population:
+                    if challenger.id == candidate.id:
+                        continue
+                    if self._dominates(
+                        objective_vectors[challenger.id], objective_vectors[candidate.id]
+                    ):
+                        dominated = True
+                        break
+                if not dominated:
+                    front.append(candidate)
+            return sorted(front, key=self._get_pareto_representative_sort_key, reverse=True)
+
+        return []
 
     def get_archive_stats(self, island_idx: Optional[int] = None) -> Dict[str, Any]:
         """Get archive statistics for an island."""
@@ -1705,6 +1986,7 @@ class AdaEvolveDatabase(ProgramDatabase):
             self.programs[program.id] = program
             fitness = self._get_fitness(program)
             self.adapter.record_evaluation(idx, fitness)
+            self._invalidate_global_pareto_cache()
             self._update_best_program(program)
 
             if self.config.db_path:
@@ -1869,6 +2151,8 @@ class AdaEvolveDatabase(ProgramDatabase):
             )
             self.archives[island_idx].add(copy)
             self.programs[copy.id] = copy
+
+        self._invalidate_global_pareto_cache()
 
     # =========================================================================
     # Paradigm Breakthrough

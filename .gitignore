@@ -19,6 +19,7 @@ env/
 .vscode/
 *.swp
 *.swo
+.claude/
 
 # OS
 .DS_Store
@@ -51,6 +52,9 @@ benchmarks/ADRS/llm_sql/datasets/
 
 # Generated test outputs (re-generate with test_all_benchmarks.sh)
 tests/**/test_outputs_*/
+
+# Evaluation run outputs
+eval_runs/
 
 # Local documentation
 tasks/

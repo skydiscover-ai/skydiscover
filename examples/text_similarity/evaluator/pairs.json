@@ -1,0 +1,51 @@
+[
+  ["the cat sat on the mat", "the cat sat on the mat", 1.0],
+  ["the cat sat on the mat", "the cat sat on a mat", 0.9],
+  ["restaurant", "restarant", 0.9],
+
+  ["the movie was great", "the film was excellent", 0.85],
+  ["she is happy", "she feels joyful", 0.8],
+  ["the car is fast", "the vehicle moves quickly", 0.8],
+  ["it is raining outside", "rain is falling outdoors", 0.85],
+  ["he fixed the bug", "he resolved the defect", 0.8],
+  ["prices went up", "costs increased", 0.85],
+
+  ["the dog chased the cat", "the cat was chased by the dog", 0.85],
+  ["I love programming in Python", "programming in Python is something I love", 0.8],
+
+  ["machine learning is a subset of AI", "machine learning uses data", 0.4],
+  ["the weather is nice today", "today is a good day", 0.5],
+  ["I went to the store", "I drove to the mall", 0.45],
+
+  ["the cat is on the mat", "the dog is in the yard", 0.25],
+  ["she plays piano", "he plays guitar", 0.35],
+  ["New York is a big city", "Tokyo has a large population", 0.3],
+  ["I ate breakfast", "the morning meal was consumed", 0.7],
+
+  ["the test passed", "the test did not pass", 0.2],
+  ["I love this movie", "I hate this movie", 0.2],
+  ["the system is working", "the system is not working", 0.15],
+
+  ["the cat sat on the mat", "quantum physics is fascinating", 0.0],
+  ["hello world", "purple elephants dance on mars", 0.0],
+  ["database optimization", "chocolate cake recipe", 0.0],
+  ["she went to school", "the stock market crashed", 0.05],
+
+  ["yes", "yeah", 0.8],
+  ["no", "nope", 0.8],
+  ["hi", "hello", 0.75],
+  ["error", "bug", 0.6],
+  ["fast", "quick", 0.85],
+  ["big", "large", 0.9],
+  ["happy", "sad", 0.15],
+  ["good", "bad", 0.15],
+
+  ["the server returned a 500 error", "the server threw an internal error", 0.85],
+  ["null pointer exception", "segmentation fault", 0.4],
+  ["open a pull request", "submit a PR", 0.85],
+  ["the function returns a list", "the method outputs an array", 0.7],
+
+  ["the meeting is at 3pm", "the meeting is at 3:00 PM", 0.95],
+  ["version 2.0", "v2.0", 0.9],
+  ["100 dollars", "$100", 0.9]
+]

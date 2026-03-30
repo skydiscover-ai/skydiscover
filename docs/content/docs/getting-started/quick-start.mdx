@@ -1,0 +1,314 @@
+---
+title: "Quick Start"
+description: "Run your first SkyDiscover task in under 5 minutes."
+---
+
+## Goal
+
+We'll evolve a text similarity function that matches human judgments.
+The baseline uses raw edit distance — here's what it gets wrong:
+
+- "I love this movie" vs "I hate this movie" → **82% similar** (should be low)
+- "the film was excellent" vs "the movie was great" → **45% similar** (should be high)
+- "hi" vs "hello" → **20% similar** (should be high)
+
+## 1. Set up the task folder
+
+First, create the folder structure for the task containing the mandatory files:
+
+<Files>
+  <Folder name="examples/text_similarity" defaultOpen>
+    <File name="config.yaml" />
+    <Folder name="evaluator" defaultOpen>
+      <File name="evaluate.sh" />
+      <File name="Dockerfile" />
+    </Folder>
+    <File name="initial_program.py" />
+  </Folder>
+</Files>
+
+- **`config.yaml`** — model, search algorithm, and task description
+- **`evaluator/`** — containerized evaluator that runs in Docker, with `evaluate.sh` as the entry point
+- **`initial_program.py`** — seed solution with `EVOLVE-BLOCK` markers around the code to mutate
+
+## 2. Configure the task
+
+Populate the config with the system_message to give context about the problem, and which LLM to use.
+
+```yaml title="config.yaml"
+language: python
+max_iterations: 50
+checkpoint_interval: 5
+
+llm:
+  models:
+    - name: "anthropic/claude-sonnet-4-6"
+      weight: 1.0
+  max_tokens: 8192
+
+prompt:
+  system_message: |-
+    You are an expert in NLP and string similarity. Write a function
+    that scores how alike two strings are, matching human intuition.
+    Return a float between 0.0 (unrelated) and 1.0 (identical).
+    Only use the Python standard library.
+
+    The evaluation dataset includes typos, paraphrases, word
+    reordering, negation, and unrelated pairs.
+
+evaluator:
+  timeout: 30
+
+# Live dashboard — opens in your browser
+monitor:
+  enabled: true
+```
+
+## 3. Implement the evaluator
+
+The evaluator runs in Docker. `evaluate.sh` is the entry point — it receives
+a candidate program path and prints a JSON score to stdout. Here are all
+four files:
+
+<Tabs items={["evaluator.py", "pairs.json", "evaluate.sh", "Dockerfile"]}>
+  <Tab value="evaluator.py">
+```python title="evaluator/evaluator.py"
+#!/usr/bin/env python3
+import importlib.util
+import json
+import sys
+
+from scipy.stats import spearmanr
+
+# 40 string pairs with human similarity ratings — see pairs.json
+PAIRS = json.load(open("/benchmark/pairs.json"))
+
+
+def main():
+    program_path = sys.argv[1]
+
+    # Load the candidate's similarity() function
+    spec = importlib.util.spec_from_file_location("candidate", program_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    # Score every pair
+    predicted = []
+    for a, b, _ in PAIRS:
+        try:
+            score = max(0.0, min(1.0, float(mod.similarity(a, b))))
+        except Exception:
+            score = 0.0
+        predicted.append(score)
+
+    human = [h for _, _, h in PAIRS]
+    correlation = spearmanr(predicted, human).statistic
+
+    import random
+    samples = random.sample(range(len(PAIRS)), 3)
+    lines = [f"Spearman correlation: {correlation:.4f}", ""]
+    for i in samples:
+        a, b, h = PAIRS[i]
+        lines.append(f"  '{a}' vs '{b}': predicted={predicted[i]:.2f}, human={h:.2f}")
+
+    print(json.dumps({
+        "status": "success",
+        "combined_score": round(max(0.0, correlation), 4),
+        "artifacts": {"feedback": "\n".join(lines)},
+    }))
+
+
+if __name__ == "__main__":
+    main()
+```
+  </Tab>
+  <Tab value="pairs.json">
+```json title="evaluator/pairs.json"
+[
+  ["the cat sat on the mat", "the cat sat on the mat", 1.0],
+  ["the cat sat on the mat", "the cat sat on a mat", 0.9],
+  ["restaurant", "restarant", 0.9],
+
+  ["the movie was great", "the film was excellent", 0.85],
+  ["she is happy", "she feels joyful", 0.8],
+  ["the car is fast", "the vehicle moves quickly", 0.8],
+  ["it is raining outside", "rain is falling outdoors", 0.85],
+  ["he fixed the bug", "he resolved the defect", 0.8],
+  ["prices went up", "costs increased", 0.85],
+
+  ["the dog chased the cat", "the cat was chased by the dog", 0.85],
+  ["I love programming in Python", "programming in Python is something I love", 0.8],
+
+  ["machine learning is a subset of AI", "machine learning uses data", 0.4],
+  ["the weather is nice today", "today is a good day", 0.5],
+  ["I went to the store", "I drove to the mall", 0.45],
+
+  ["the cat is on the mat", "the dog is in the yard", 0.25],
+  ["she plays piano", "he plays guitar", 0.35],
+  ["New York is a big city", "Tokyo has a large population", 0.3],
+  ["I ate breakfast", "the morning meal was consumed", 0.7],
+
+  ["the test passed", "the test did not pass", 0.2],
+  ["I love this movie", "I hate this movie", 0.2],
+  ["the system is working", "the system is not working", 0.15],
+
+  ["the cat sat on the mat", "quantum physics is fascinating", 0.0],
+  ["hello world", "purple elephants dance on mars", 0.0],
+  ["database optimization", "chocolate cake recipe", 0.0],
+  ["she went to school", "the stock market crashed", 0.05],
+
+  ["yes", "yeah", 0.8],
+  ["no", "nope", 0.8],
+  ["hi", "hello", 0.75],
+  ["error", "bug", 0.6],
+  ["fast", "quick", 0.85],
+  ["big", "large", 0.9],
+  ["happy", "sad", 0.15],
+  ["good", "bad", 0.15],
+
+  ["the server returned a 500 error", "the server threw an internal error", 0.85],
+  ["null pointer exception", "segmentation fault", 0.4],
+  ["open a pull request", "submit a PR", 0.85],
+  ["the function returns a list", "the method outputs an array", 0.7],
+
+  ["the meeting is at 3pm", "the meeting is at 3:00 PM", 0.95],
+  ["version 2.0", "v2.0", 0.9],
+  ["100 dollars", "$100", 0.9]
+]
+```
+  </Tab>
+  <Tab value="evaluate.sh">
+```bash title="evaluator/evaluate.sh"
+#!/usr/bin/env bash
+set -euo pipefail
+python /benchmark/evaluator.py "$1"
+```
+  </Tab>
+  <Tab value="Dockerfile">
+```dockerfile title="evaluator/Dockerfile"
+FROM python:3.12-slim
+WORKDIR /benchmark
+
+RUN pip install --no-cache-dir scipy
+
+COPY evaluator.py pairs.json evaluate.sh ./
+RUN chmod +x evaluate.sh
+
+ENTRYPOINT ["./evaluate.sh"]
+```
+  </Tab>
+</Tabs>
+
+The key contract: print JSON to stdout with `combined_score`
+(the number SkyDiscover maximizes) and optional `artifacts` (feedback
+passed to the LLM on the next iteration).
+
+## 4. Provide a starting solution (optional)
+
+If you skip this step, SkyDiscover inspects the evaluator and generates
+a scaffold automatically. But providing one lets you control the starting
+point — here we seed it with a basic edit distance implementation:
+
+```python title="initial_program.py"
+# EVOLVE-BLOCK-START
+def similarity(a: str, b: str) -> float:
+    """
+    Return a similarity score between 0.0 (unrelated) and 1.0 (identical)
+    for two input strings.
+
+    This should capture not just character-level similarity but also
+    meaning — paraphrases should score high, negations should score low,
+    and typos should be forgiven.
+
+    Only use the Python standard library (no external packages).
+    """
+    # Baseline: normalized Levenshtein distance
+    if a == b:
+        return 1.0
+    if not a or not b:
+        return 0.0
+
+    m, n = len(a), len(b)
+    dp = list(range(n + 1))
+    for i in range(1, m + 1):
+        prev = dp[0]
+        dp[0] = i
+        for j in range(1, n + 1):
+            temp = dp[j]
+            if a[i - 1] == b[j - 1]:
+                dp[j] = prev
+            else:
+                dp[j] = 1 + min(dp[j], dp[j - 1], prev)
+            prev = temp
+
+    max_len = max(m, n)
+    return 1.0 - dp[n] / max_len
+# EVOLVE-BLOCK-END
+```
+
+Everything between `EVOLVE-BLOCK-START` and `EVOLVE-BLOCK-END` is what
+SkyDiscover will mutate. Code outside the markers stays fixed.
+
+## 5. Run the evolution
+
+```bash
+uv run skydiscover-run examples/text_similarity/initial_program.py \
+  examples/text_similarity/evaluator/ \
+  --config examples/text_similarity/config.yaml \
+  --search best_of_n \
+  --iterations 20
+```
+
+The live dashboard URL prints at startup — open it to watch solutions
+evolve in real time.
+
+## 6. Inspect the results
+
+Results go to `outputs/<algorithm>/<task>_<timestamp>/`:
+
+<Files>
+  <Folder name="outputs/best_of_n/text_similarity_0319_1710" defaultOpen>
+    <Folder name="best" defaultOpen>
+      <File name="best_program.py" />
+      <File name="best_program_info.json" />
+    </Folder>
+    <Folder name="checkpoints">
+      <File name="checkpoint_5/" />
+    </Folder>
+    <Folder name="logs">
+      <File name="best_of_n_20260319_171027.log" />
+    </Folder>
+    <File name="human_feedback.md" />
+  </Folder>
+</Files>
+
+```bash
+# Read the best solution
+cat outputs/best_of_n/text_similarity_*/best/best_program.py
+
+# Check its score
+cat outputs/best_of_n/text_similarity_*/best/best_program_info.json
+```
+
+In our test run, the correlation climbed from **0.26 to 0.69 in 5 iterations**
+(~2 minutes):
+
+| Iteration | Correlation | What changed |
+|:---------:|:-----------:|:-------------|
+| Baseline  | 0.26        | Raw edit distance |
+| 1         | 0.57        | Token overlap + synonym matching |
+| 3         | 0.69        | Negation penalty, tuned weights |
+
+The winning solution combined synonym dictionaries, character n-gram overlap,
+token Jaccard similarity, and negation detection — all discovered by the LLM
+without any hand-tuning.
+
+To keep improving from where you left off:
+
+```bash
+uv run skydiscover-run examples/text_similarity/initial_program.py \
+  examples/text_similarity/evaluator/ \
+  --config examples/text_similarity/config.yaml \
+  --search best_of_n --iterations 20 \
+  --checkpoint outputs/best_of_n/text_similarity_*/checkpoints/checkpoint_5
+```

@@ -174,10 +174,48 @@ class OpenAILLM(LLMInterface):
 
     async def _call_api(self, params: Dict[str, Any]) -> str:
         loop = asyncio.get_running_loop()
-        response = await loop.run_in_executor(
-            None, lambda: self.client.chat.completions.create(**params)
+        try:
+            response = await loop.run_in_executor(
+                None, lambda: self.client.chat.completions.create(**params)
+            )
+            return response.choices[0].message.content
+        except (openai.BadRequestError, openai.APIStatusError) as exc:
+            # Some Azure deployments only expose the Responses API.
+            # Fall back transparently when Chat Completions is unsupported.
+            if "unsupported" not in str(exc).lower() and "not found" not in str(exc).lower():
+                raise
+            logger.info("Chat Completions unsupported; falling back to Responses API")
+            return await self._call_api_via_responses(params)
+
+    async def _call_api_via_responses(self, params: Dict[str, Any]) -> str:
+        """Translate a Chat-Completions-style *params* dict into a Responses API
+        call and return the assistant text."""
+        messages = params.get("messages", [])
+        input_items = self._convert_to_responses_input(
+            [m for m in messages if m.get("role") != "system"]
         )
-        return response.choices[0].message.content
+        system_msg = next((m["content"] for m in messages if m.get("role") == "system"), None)
+        resp_params: Dict[str, Any] = {
+            "model": params.get("model", self.model),
+            "input": input_items,
+        }
+        if system_msg:
+            resp_params["instructions"] = system_msg
+        if params.get("max_tokens"):
+            resp_params["max_output_tokens"] = params["max_tokens"]
+        if params.get("max_completion_tokens"):
+            resp_params["max_output_tokens"] = params["max_completion_tokens"]
+        if params.get("temperature") is not None:
+            resp_params["temperature"] = params["temperature"]
+        if params.get("reasoning_effort") is not None:
+            resp_params["reasoning"] = {"effort": params["reasoning_effort"]}
+
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None, lambda: self.client.responses.create(**resp_params)
+        )
+        text, _ = self._extract_responses_output(response)
+        return text or ""
 
     def _resolve_retry_options(self, **kwargs) -> Tuple[int, int, int]:
         """Resolve retry/timeout options from kwargs, falling back to instance defaults."""

@@ -403,6 +403,8 @@ class Runner:
             ) as f:
                 f.write(best.solution)
             with open(os.path.join(checkpoint_path, "best_program_info.json"), "w") as f:
+                from skydiscover.search.utils.checkpoint_manager import SafeJSONEncoder
+
                 json.dump(
                     {
                         "id": best.id,
@@ -416,6 +418,7 @@ class Runner:
                     },
                     f,
                     indent=2,
+                    cls=SafeJSONEncoder,
                 )
             logger.info(f"Checkpoint {iteration}: best={format_metrics(best.metrics)}")
 
@@ -444,6 +447,8 @@ class Runner:
 
         info_path = os.path.join(best_dir, "best_program_info.json")
         with open(info_path, "w") as f:
+            from skydiscover.search.utils.checkpoint_manager import SafeJSONEncoder
+
             json.dump(
                 {
                     "id": program.id,
@@ -457,6 +462,7 @@ class Runner:
                 },
                 f,
                 indent=2,
+                cls=SafeJSONEncoder,
             )
 
         if self.config.language == "image" and program.metadata:

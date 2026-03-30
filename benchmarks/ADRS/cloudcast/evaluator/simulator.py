@@ -165,8 +165,10 @@ class BCSimulator:
         for dst in self.dsts:
             partition_time = float("-inf")
             for i in range(self.num_partitions):
-                for edge in self.paths[dst][str(i)]:
-                    edge_data = self.g[edge[0]][edge[1]]
+                path_edges = self.paths[dst][str(i)]
+                bottleneck = min(self.g[e[0]][e[1]]['flow'] for e in path_edges)
+                t = self.partition_data_vol / bottleneck if bottleneck > 0 else float('inf')
+                partition_time = max(partition_time, t)
             t_dict[dst] = partition_time
 
         max_t = max(t_dict.values())

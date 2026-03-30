@@ -39,7 +39,6 @@ from skydiscover.utils.code_utils import (
     format_diff_summary,
     parse_full_rewrite,
 )
-from skydiscover.utils.metrics import get_score
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +86,9 @@ class AdaEvolveController(DiscoveryController):
                 num_paradigms=self.database.get_paradigm_num_to_generate(),
                 eval_timeout=self.config.evaluator.timeout,
                 language=self.config.language or "python",
+                objective_names=getattr(db_config, "pareto_objectives", []),
+                higher_is_better=getattr(db_config, "higher_is_better", {}),
+                fitness_key=getattr(db_config, "fitness_key", None),
             )
         else:
             self.paradigm_generator = None
@@ -348,7 +350,7 @@ class AdaEvolveController(DiscoveryController):
         # Get current best program for context
         best_program = self.database.get_best_program()
         best_solution = best_program.solution if best_program else ""
-        best_score = get_score(best_program.metrics if best_program else {})
+        best_score = self.database.get_program_proxy_score(best_program)
 
         # Extract evaluator feedback from the best program's artifacts
         evaluator_feedback = None
@@ -441,7 +443,13 @@ class AdaEvolveController(DiscoveryController):
             logger.info(f"Metrics: {metrics_str}")
 
         # Check for new best
-        if self.database.best_program_id == child.id:
+        if self.database.is_multiobjective_enabled():
+            pareto_front_ids = {program.id for program in self.database.get_pareto_front()}
+            if child.id in pareto_front_ids:
+                logger.info(f"Program entered the global Pareto front at iteration {iteration}")
+            if self.database.best_program_id == child.id:
+                logger.info(f"New representative Pareto solution found at iteration {iteration}")
+        elif self.database.best_program_id == child.id:
             logger.info(f"New best solution found at iteration {iteration}")
 
         # Checkpoint callback
