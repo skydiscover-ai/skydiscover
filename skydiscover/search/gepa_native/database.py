@@ -22,10 +22,9 @@ import os
 import random
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-import numpy as np
-
 from skydiscover.config import DatabaseConfig
 from skydiscover.search.base_database import Program, ProgramDatabase
+from skydiscover.search.utils.checkpoint_manager import SafeJSONEncoder
 from skydiscover.utils.metrics import get_score
 
 from .pareto_utils import select_program_candidate_from_pareto_front
@@ -238,18 +237,8 @@ class GEPANativeDatabase(ProgramDatabase):
         }
         os.makedirs(save_path, exist_ok=True)
 
-        class _NumpyEncoder(json.JSONEncoder):
-            def default(self, obj):
-                if isinstance(obj, np.ndarray):
-                    return obj.tolist()
-                if isinstance(obj, (np.integer,)):
-                    return int(obj)
-                if isinstance(obj, (np.floating,)):
-                    return float(obj)
-                return super().default(obj)
-
         with open(os.path.join(save_path, "gepa_metadata.json"), "w") as f:
-            json.dump(metadata, f, indent=2, cls=_NumpyEncoder)
+            json.dump(metadata, f, indent=2, cls=SafeJSONEncoder)
 
     def load(self, path: str) -> None:
         """Load base state plus GEPA-specific metadata."""
