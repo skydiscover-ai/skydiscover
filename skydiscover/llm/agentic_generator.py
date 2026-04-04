@@ -12,6 +12,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from skydiscover.llm.openai import is_openai_reasoning_model
+from skydiscover.llm.responses_utils import (
+    convert_messages_to_responses_input,
+    extract_responses_output,
+)
 from skydiscover.utils.code_utils import build_repo_map
 
 logger = logging.getLogger(__name__)
@@ -19,6 +23,17 @@ logger = logging.getLogger(__name__)
 _TOOL_SCHEMAS_PATH = Path(__file__).parent / "tool_schemas" / "agentic_tools.json"
 with open(_TOOL_SCHEMAS_PATH, "r") as _f:
     TOOL_SCHEMAS = json.load(_f)
+
+# Responses API uses a flattened tool format (name/description/parameters at top level)
+TOOL_SCHEMAS_RESPONSES = [
+    {
+        "type": "function",
+        "name": t["function"]["name"],
+        "description": t["function"]["description"],
+        "parameters": t["function"]["parameters"],
+    }
+    for t in TOOL_SCHEMAS
+]
 
 _AGENTIC_PROMPT_PATH = (
     Path(__file__).parent.parent
@@ -146,7 +161,11 @@ class AgenticGenerator:
     async def _call_llm(
         self, system_message: str, conversation: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """Call a sampled LLM with tool schemas."""
+        """Call a sampled LLM with tool schemas.
+
+        Tries Chat Completions first; falls back to Responses API if the
+        deployment does not support Chat Completions (common on Azure).
+        """
         model = self.llm_pool.models[
             self.llm_pool.random_state.choices(
                 range(len(self.llm_pool.models)), weights=self.llm_pool.weights, k=1
@@ -157,6 +176,10 @@ class AgenticGenerator:
             raise RuntimeError(
                 f"Agentic mode requires an OpenAI-compatible LLM ({type(model).__name__} has no .client)"
             )
+
+        # If we already know this model needs the Responses API, skip Chat Completions
+        if getattr(model, "_use_responses_api", False):
+            return await self._call_llm_responses(model, system_message, conversation)
 
         messages = [{"role": "system", "content": system_message}] + conversation
         is_reasoning = is_openai_reasoning_model(model.model, getattr(model, "api_base", "") or "")
@@ -181,9 +204,16 @@ class AgenticGenerator:
                 params["max_tokens"] = model.max_tokens
 
         loop = asyncio.get_running_loop()
-        resp = await loop.run_in_executor(
-            None, lambda: model.client.chat.completions.create(**params)
-        )
+        try:
+            resp = await loop.run_in_executor(
+                None, lambda: model.client.chat.completions.create(**params)
+            )
+        except Exception as exc:
+            if "unsupported" not in str(exc).lower() and "not found" not in str(exc).lower():
+                raise
+            logger.info("Chat Completions unsupported for agentic; falling back to Responses API")
+            model._use_responses_api = True
+            return await self._call_llm_responses(model, system_message, conversation)
 
         msg = resp.choices[0].message
         out: Dict[str, Any] = {"role": "assistant", "content": msg.content or ""}
@@ -196,6 +226,46 @@ class AgenticGenerator:
                 }
                 for tc in msg.tool_calls
             ]
+        return out
+
+    async def _call_llm_responses(
+        self,
+        model,
+        system_message: str,
+        conversation: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Call the LLM via the Responses API (Azure-compatible) with tool support."""
+        is_reasoning = is_openai_reasoning_model(model.model, getattr(model, "api_base", "") or "")
+
+        input_items = convert_messages_to_responses_input(conversation)
+
+        resp_params: Dict[str, Any] = {
+            "model": model.model,
+            "input": input_items,
+            "instructions": system_message,
+            "tools": TOOL_SCHEMAS_RESPONSES,
+            "tool_choice": "auto",
+        }
+        if is_reasoning:
+            if model.max_tokens:
+                resp_params["max_output_tokens"] = model.max_tokens
+            if getattr(model, "reasoning_effort", None):
+                resp_params["reasoning"] = {"effort": model.reasoning_effort}
+        else:
+            if model.temperature is not None:
+                resp_params["temperature"] = model.temperature
+            if model.max_tokens is not None:
+                resp_params["max_output_tokens"] = model.max_tokens
+
+        loop = asyncio.get_running_loop()
+        resp = await loop.run_in_executor(
+            None, lambda: model.client.responses.create(**resp_params)
+        )
+
+        text, _, tool_calls = extract_responses_output(resp)
+        out: Dict[str, Any] = {"role": "assistant", "content": text}
+        if tool_calls:
+            out["tool_calls"] = tool_calls
         return out
 
     # ------------------------------------------------------------------
