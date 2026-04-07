@@ -77,7 +77,7 @@ The two methods are **composable**: EvoX can evolve using AdaEvolve as its start
 | Benchmark | AdaEvolve | EvoX (Random Init) | EvoX (AdaEvolve Init) |
 |:--|--:|--:|--:|
 | Signal Proc. (↑) | 0.718 | 0.721 | **0.760** |
-| Heilbronn Cvx. (↑) | 0.029 | 0.027 | **0.0291** |
+| Heilbronn Cvx. (↑) | 0.0290 | 0.0270 | **0.0291** |
 | Cloudcast (↓) | 640.5 | 637.1 | **623.4** |
 | Prism (↑) | 26.37 | **30.52** | 26.27 |
 
