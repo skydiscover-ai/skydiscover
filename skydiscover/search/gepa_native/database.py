@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from skydiscover.config import DatabaseConfig
 from skydiscover.search.base_database import Program, ProgramDatabase
+from skydiscover.search.utils.checkpoint_manager import SafeJSONEncoder
 from skydiscover.utils.metrics import get_score
 
 from .pareto_utils import select_program_candidate_from_pareto_front
@@ -235,8 +236,9 @@ class GEPANativeDatabase(ProgramDatabase):
             "rejection_history": [prog.to_dict() for prog in self.rejection_history],
         }
         os.makedirs(save_path, exist_ok=True)
+
         with open(os.path.join(save_path, "gepa_metadata.json"), "w") as f:
-            json.dump(metadata, f, indent=2)
+            json.dump(metadata, f, indent=2, cls=SafeJSONEncoder)
 
     def load(self, path: str) -> None:
         """Load base state plus GEPA-specific metadata."""

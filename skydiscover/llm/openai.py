@@ -13,6 +13,10 @@ import openai
 
 from skydiscover.config import LLMModelConfig
 from skydiscover.llm.base import LLMInterface, LLMResponse
+from skydiscover.llm.responses_utils import (
+    convert_messages_to_responses_input,
+    extract_responses_output,
+)
 
 logger = logging.getLogger("skydiscover.llm")
 
@@ -248,7 +252,7 @@ class OpenAILLM(LLMInterface):
         output_dir = kwargs.get("output_dir", tempfile.gettempdir())
         program_id = kwargs.get("program_id", "")
 
-        input_items = self._convert_to_responses_input(messages)
+        input_items = convert_messages_to_responses_input(messages)
 
         params: Dict[str, Any] = {
             "model": self.model,
@@ -275,7 +279,7 @@ class OpenAILLM(LLMInterface):
         for attempt in range(retries + 1):
             try:
                 response = await asyncio.wait_for(self._call_responses_api(params), timeout=timeout)
-                text, image_b64 = self._extract_responses_output(response)
+                text, image_b64, _ = extract_responses_output(response)
 
                 image_path = None
                 if image_b64:
@@ -308,44 +312,3 @@ class OpenAILLM(LLMInterface):
     async def _call_responses_api(self, params: Dict[str, Any]):
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, lambda: self.client.responses.create(**params))
-
-    @staticmethod
-    def _extract_responses_output(response) -> Tuple[str, Optional[str]]:
-        text_parts: List[str] = []
-        image_b64: Optional[str] = None
-        for item in response.output:
-            if item.type == "message":
-                for part in item.content:
-                    if hasattr(part, "text"):
-                        text_parts.append(part.text)
-            elif item.type == "image_generation_call":
-                if item.result:
-                    image_b64 = item.result
-        return "\n".join(text_parts), image_b64
-
-    @staticmethod
-    def _convert_to_responses_input(messages: List[Dict[str, Any]]) -> list:
-        """Convert Chat Completions-style messages to Responses API input format."""
-        items = []
-        for msg in messages:
-            role = msg.get("role", "user")
-            content = msg.get("content", "")
-            if isinstance(content, str):
-                items.append(
-                    {
-                        "type": "message",
-                        "role": role,
-                        "content": [{"type": "input_text", "text": content}],
-                    }
-                )
-            elif isinstance(content, list):
-                parts = []
-                for part in content:
-                    ptype = part.get("type", "")
-                    if ptype == "text":
-                        parts.append({"type": "input_text", "text": part["text"]})
-                    elif ptype == "image_url":
-                        url = part.get("image_url", {}).get("url", "")
-                        parts.append({"type": "input_image", "image_url": url, "detail": "auto"})
-                items.append({"type": "message", "role": role, "content": parts})
-        return items
