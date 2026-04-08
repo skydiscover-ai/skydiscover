@@ -139,8 +139,61 @@ def evaluate(program_path):
 
                 # Validate result format
                 if not isinstance(result, dict):
-                    print(f"Placement {i}: Invalid result format")
-                    continue
+                    return {
+                        "max_kvpr": 0.0,
+                        "success_rate": 0.0,
+                        "combined_score": 0.0,
+                        "error": f"Placement {i}: Expected dict, got {type(result).__name__}",
+                    }
+
+                # Validate all models are placed
+                placed_models = []
+                for gpu_id, assigned_models in result.items():
+                    if not isinstance(assigned_models, list):
+                        return {
+                            "max_kvpr": 0.0,
+                            "success_rate": 0.0,
+                            "combined_score": 0.0,
+                            "error": f"GPU {gpu_id} value must be list, got {type(assigned_models).__name__}",
+                        }
+                    placed_models.extend(assigned_models)
+
+                if len(placed_models) != len(gpu_models):
+                    return {
+                        "max_kvpr": 0.0,
+                        "success_rate": 0.0,
+                        "combined_score": 0.0,
+                        "error": f"Not all models placed: {len(placed_models)}/{len(gpu_models)}",
+                    }
+
+                # Check for duplicate placements (by object identity)
+                placed_ids = [id(m) for m in placed_models]
+                if len(set(placed_ids)) != len(placed_ids):
+                    return {
+                        "max_kvpr": 0.0,
+                        "success_rate": 0.0,
+                        "combined_score": 0.0,
+                        "error": f"Duplicate models detected",
+                    }
+
+                # Check placed models are the exact input objects
+                original_ids = {id(m) for m in gpu_models}
+                if set(placed_ids) != original_ids:
+                    return {
+                        "max_kvpr": 0.0,
+                        "success_rate": 0.0,
+                        "combined_score": 0.0,
+                        "error": "Placed models don't match input models (missing or foreign models)",
+                    }
+
+                # Verify GPU memory constraints
+                if not verify_gpu_mem_constraint(result):
+                    return {
+                        "max_kvpr": 0.0,
+                        "success_rate": 0.0,
+                        "combined_score": 0.0,
+                        "error": f"GPU memory constraint violated",
+                    }
 
                 # Calculate metrics using the generated test signal
                 max_kvpr = calculate_kvcache_pressure(result)
