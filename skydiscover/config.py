@@ -725,6 +725,7 @@ class Config:
                 "max_retries": self.evaluator.max_retries,
                 "cascade_evaluation": self.evaluator.cascade_evaluation,
                 "cascade_thresholds": self.evaluator.cascade_thresholds,
+                "inject_evaluator_context": self.evaluator.inject_evaluator_context,
                 "llm_as_judge": self.evaluator.llm_as_judge,
             },
             # Agentic generation
