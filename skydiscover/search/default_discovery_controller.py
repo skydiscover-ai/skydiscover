@@ -627,8 +627,7 @@ class DiscoveryController:
                     )
                     or (
                         child_metrics.get("combined_score") == 0
-                        and (child_metrics.get("error") is not None 
-                             or "error" in child_artifacts)
+                        and (child_metrics.get("error") is not None or "error" in child_artifacts)
                     )
                 ):
                     error_msg = (

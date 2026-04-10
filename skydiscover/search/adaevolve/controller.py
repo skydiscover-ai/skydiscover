@@ -670,14 +670,10 @@ class AdaEvolveController(DiscoveryController):
         # Check for eval failure (e.g., constraint violation, malformed solution)
         if (
             metrics.get("validity") in (0, -1)
+            or (metrics.get("timeout") is True and metrics.get("validity") is None)
             or (
-                metrics.get("timeout") is True 
-                and metrics.get("validity") is None
-            )
-            or (
-                metrics.get("combined_score") == 0 
-                and (metrics.get("error") is not None 
-                     or "error" in (artifacts or {}))
+                metrics.get("combined_score") == 0
+                and (metrics.get("error") is not None or "error" in (artifacts or {}))
             )
         ):
             error_msg = (
