@@ -618,6 +618,7 @@ class DiscoveryController:
                         else None
                     )
 
+                child_artifacts = child_eval_result.artifacts or {}
                 if (
                     child_metrics.get("validity") in (0, -1)
                     or (
@@ -626,7 +627,8 @@ class DiscoveryController:
                     )
                     or (
                         child_metrics.get("combined_score") == 0
-                        and child_metrics.get("error") is not None
+                        and (child_metrics.get("error") is not None 
+                             or "error" in child_artifacts)
                     )
                 ):
                     error_msg = (
@@ -635,6 +637,7 @@ class DiscoveryController:
                             if isinstance(child_metrics.get("error"), str)
                             else None
                         )
+                        or child_artifacts.get("error")
                         or child_metrics.get("error_message")
                         or "Evaluation failed (validity=0)"
                     )
