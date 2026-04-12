@@ -1,0 +1,4 @@
+# KernelBench library for problem fetching (resolver)
+# Note: The evaluator uses kernelbench[gpu] which includes GPU support
+# For resolver-only usage (fetching problems), the base package is sufficient
+kernelbench @ git+https://github.com/ScalingIntelligence/KernelBench.git

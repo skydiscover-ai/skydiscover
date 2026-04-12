@@ -1,0 +1,86 @@
+# KernelBench optimization benchmark configuration
+# Usage: skydiscover-run evaluator/ -c config.yaml -s <strategy>
+# Note: initial_program is automatically fetched from KernelBench dataset, based on the `level` and `problem_id` fields.
+
+language: python
+
+# Benchmark loader configuration
+benchmark:
+  enabled: true
+  name: kernelbench
+  resolver: benchmarks.kernelbench.resolver
+  
+  # Evaluator mode: set to false for native Python (no Docker), true for containerized
+  use_docker: true  # Set to false when running on clusters without Docker/Podman privileges
+  
+  # KernelBench problem specification
+  level: 1                    # Problem difficulty level (1, 2, 3 or 4)
+  problem_id: 1               # Specific problem ID within the level
+  
+  dataset_src: huggingface    # 'huggingface' or 'local'
+  dataset_name: ScalingIntelligence/KernelBench
+  
+  # Evaluation configuration
+  eval_mode: local            # 'local' or 'modal'
+  gpu: H100                   # GPU type for evaluation
+  num_correct_trials: 5       # Number of correctness validation runs
+  num_perf_trials: 100        # Number of performance measurement runs
+
+diff_based_generation: true
+max_iterations: 100
+checkpoint_interval: 10
+max_solution_length: 60000
+
+llm:
+  api_base: "${BASE_URL}"
+  api_key: "${API_KEY}"
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+  max_tokens: 32000
+  timeout: 600
+
+prompt:
+  system_message: |-
+    You are an expert in GPU kernel optimization and PyTorch performance engineering with deep expertise
+    in writing high-performance CUDA kernels, Triton kernels, and optimized PyTorch operations.
+    
+    PROBLEM SPECIFICATION:
+    
+    Your task is to optimize a PyTorch neural network operation to achieve maximum speedup
+    over the baseline execution. The execution is evaluated on GPU hardware and compared against:
+    1. PyTorch eager mode (baseline)
+    2. torch.compile() optimization
+    
+    PERFORMANCE METRICS:
+    
+    1. **speedup_over_eager**: Speedup compared to PyTorch eager execution (PRIMARY OBJECTIVE - maximize)
+    2. **combined_score**: Same as speedup_over_eager (used for optimization)
+    3. **speedup_over_compile**: Speedup compared to torch.compile() (SECONDARY - maximize)
+    4. **kernel_time_ms**: Execution time of your optimized kernel in milliseconds (minimize)
+    5. **ref_eager_time_ms**: Reference eager execution time in milliseconds (for comparison)
+    
+    OPTIMIZATION STRATEGIES:
+    
+    - Consider writing custom kernels in CUDA or Triton
+    - Use efficient memory access patterns (coalesced reads/writes)
+    - Minimize memory transfers between CPU and GPU
+    - Leverage tensor cores when applicable
+    - Use fused operations to reduce kernel launches
+    - Optimize for the specific GPU architecture (H100, A100, etc.)
+    - Use appropriate data types (fp16, bf16, fp32)
+    - Minimize synchronization points
+    
+    TECHNICAL REQUIREMENTS:
+    
+    - **Correctness**: Your implementation must produce numerically correct results
+    - **Determinism**: Use fixed random seeds if employing stochastic methods
+    - **Error handling**: Graceful handling of edge cases and invalid inputs
+    - **GPU compatibility**: Code must run on the specified GPU hardware
+  
+  # change the SkyDiscover default of 500 which causes the model to focus only on simplification
+  suggest_simplification_after_chars: 5000
+
+evaluator:
+  timeout: 600
+  max_retries: 3

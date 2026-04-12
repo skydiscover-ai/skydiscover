@@ -1,0 +1,2 @@
+# KernelBench library with GPU support
+kernelbench[gpu] @ git+https://github.com/ScalingIntelligence/KernelBench.git
