@@ -88,6 +88,87 @@ The `evaluator/` directory is the Docker build context. Everything inside it get
 
 Simpler but runs evaluator code directly on the host. Fine for pure-Python tasks with no system dependencies.
 
+### Benchmark resolvers (dynamic problem loading)
+
+Some benchmarks support **dynamic problem loading** through a resolver pattern. Instead of providing a static `initial_program.py`, the resolver fetches problems from an external dataset based on configuration parameters.
+
+This is useful for benchmark suites with many problems (e.g., KernelBench has hundreds of GPU kernel optimization tasks). The resolver pattern allows you to:
+
+1. Select specific problems via config parameters (e.g., difficulty level, problem ID)
+2. Automatically generate the initial program from the benchmark dataset
+3. Configure evaluator settings based on the problem specification
+
+#### Using a benchmark with a resolver
+
+Benchmarks that support resolvers include a `benchmark` section in their `config.yaml`:
+
+```yaml
+benchmark:
+  enabled: true                    # Enable benchmark loader
+  name: kernelbench                # Benchmark name (for logging)
+  resolver: benchmarks.kernelbench.resolver  # Python module path
+  
+  # Benchmark-specific parameters
+  level: 2                         # Example: difficulty level
+  problem_id: 5                    # Example: specific problem ID
+```
+
+When running such a benchmark, you don't need to provide an `initial_program` argument:
+
+```bash
+uv run skydiscover-run benchmarks/kernelbench/evaluator/ \
+  -c benchmarks/kernelbench/config.yaml \
+  --search adaevolve \
+  --iterations 50
+```
+
+The resolver automatically fetches the problem and generates the initial program based on the config parameters.
+
+#### Implementing a benchmark resolver
+
+To add resolver support to a new benchmark:
+
+1. **Create `benchmarks/your_benchmark/resolver.py`** implementing the `BenchmarkResolver` interface:
+
+```python
+from pathlib import Path
+from typing import Any, Dict, Tuple
+from skydiscover.benchmarks.base import BenchmarkResolver
+
+class YourBenchmarkResolver(BenchmarkResolver):
+    def resolve(self, config: Dict[str, Any], output_dir: Path) -> Tuple[str, str]:
+        """
+        Fetch problem and generate initial program.
+        
+        Args:
+            config: The benchmark section from config.yaml
+            output_dir: Directory where generated files should be placed
+            
+        Returns:
+            Tuple of (initial_program_path, evaluator_path)
+        """
+        # 1. Fetch problem from dataset based on config parameters
+        # 2. Generate initial_program.py with EVOLVE-BLOCK markers
+        # 3. Set any evaluator environment variables via os.environ
+        # 4. Return paths to generated initial program and evaluator
+        
+        initial_program_path = output_dir / "initial_program.py"
+        evaluator_path = Path(__file__).parent / "evaluator"
+        
+        return str(initial_program_path), str(evaluator_path)
+
+# Module-level resolver instance
+resolver = YourBenchmarkResolver()
+```
+
+2. **Add `benchmark` section to `config.yaml`** with your resolver module path and all benchmark-specific parameters
+
+3. **Use the same CLI pattern** (no initial_program argument needed)
+
+See the implementation in:
+- `skydiscover/benchmarks/base.py` - Base resolver interface
+- `benchmarks/kernelbench/resolver.py` - KernelBench example implementation
+
 ## Adding a Benchmark
 
 ### Option 1: Containerized evaluator (recommended)
