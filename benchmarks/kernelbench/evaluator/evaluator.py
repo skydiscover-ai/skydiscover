@@ -73,8 +73,7 @@ def evaluate(program_path: str):
             # Replace class Model with class ModelNew (if not already ModelNew)
             converted_content = program_content
             if 'class ModelNew' not in converted_content:
-                converted_content = converted_content.replace('class Model(', 'class ModelNew(')
-                converted_content = converted_content.replace('class Model:', 'class ModelNew:')
+                converted_content = re.sub(r'^class Model(?=[(:])', 'class ModelNew', converted_content, flags=re.MULTILINE)
                 # Fix super() calls - use modern Python 3 super() without arguments
                 converted_content = re.sub(r'super\(Model,\s*self\)', 'super()', converted_content)
                 converted_content = re.sub(r'super\(Model,\s*cls\)', 'super()', converted_content)
