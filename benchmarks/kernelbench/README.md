@@ -63,6 +63,10 @@ Then, run optimization on this problem:
 
 ```bash
 uv run skydiscover-run benchmarks/kernelbench/evaluator/ \
+  -c benchmarks/kernelbench/config.yaml \
+  --search adaevolve \
+  --iterations 50
+```
 
 ### Using Native Python (No Docker Required)
 
@@ -103,11 +107,6 @@ uv run skydiscover-run \
 ```
 
 **Note:** The `run_and_check.py` script from KernelBench will be automatically downloaded on first run.
-
-  -c benchmarks/kernelbench/config.yaml \
-  --search adaevolve \
-  --iterations 50
-```
 
 **Note:** No initial_program argument is needed - it is fetched automatically based on the `benchmark` section in config.yaml.
 
