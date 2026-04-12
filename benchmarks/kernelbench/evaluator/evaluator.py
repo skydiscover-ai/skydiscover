@@ -81,27 +81,27 @@ def evaluate(program_path: str):
             tmp_file.write(converted_content)
             kernel_src_path = tmp_file.name
         
-        # Ensure run_and_check.py is available (downloads if needed)
-        evaluator_dir = Path(__file__).parent
-        run_and_check_path = ensure_run_and_check(evaluator_dir)
-        
-        # Build command to run run_and_check.py
-        cmd = [
-            sys.executable,
-            str(run_and_check_path),
-            "ref_origin=kernelbench",
-            f"level={level}",
-            f"problem_id={problem_id}",
-            f"kernel_src_path={kernel_src_path}",
-            f"eval_mode={eval_mode}",
-            f"gpu={gpu}",
-            f"num_correct_trials={num_correct_trials}",
-            f"num_perf_trials={num_perf_trials}",
-            f"timeout={timeout}",
-            "check_kernel=False",  # Disable static checker to allow reference code
-        ]
-        
         try:
+            # Ensure run_and_check.py is available (downloads if needed)
+            evaluator_dir = Path(__file__).parent
+            run_and_check_path = ensure_run_and_check(evaluator_dir)
+            
+            # Build command to run run_and_check.py
+            cmd = [
+                sys.executable,
+                str(run_and_check_path),
+                "ref_origin=kernelbench",
+                f"level={level}",
+                f"problem_id={problem_id}",
+                f"kernel_src_path={kernel_src_path}",
+                f"eval_mode={eval_mode}",
+                f"gpu={gpu}",
+                f"num_correct_trials={num_correct_trials}",
+                f"num_perf_trials={num_perf_trials}",
+                f"timeout={timeout}",
+                "check_kernel=False",  # Disable static checker to allow reference code
+            ]
+            
             # Set up environment
             env = os.environ.copy()
             
