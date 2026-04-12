@@ -14,6 +14,7 @@ from skydiscover.config import (
     _parse_model_spec,
     apply_overrides,
     load_config,
+    resolve_benchmark_problem,
 )
 
 try:
@@ -132,6 +133,18 @@ async def main_async() -> int:
         except ValueError as exc:
             print(f"Error: {exc}", file=sys.stderr)
             return 1
+
+        # Resolve benchmark problem if configured and no initial_program provided
+        if args.initial_program is None and config.benchmark and config.benchmark.enabled:
+            try:
+                initial_program, evaluator = resolve_benchmark_problem(config.benchmark)
+                args.initial_program = initial_program
+                args.evaluation_file = evaluator
+                print(f"[Benchmark Loader] Benchmark: {config.benchmark.name}, Initial program: {initial_program}, Evaluator: {evaluator}")
+            except Exception as exc:
+                print(f"Error: Failed to load benchmark problem: {exc}", file=sys.stderr)
+                traceback.print_exc()
+                return 1
 
         if args.model:
             print("Active models:")
