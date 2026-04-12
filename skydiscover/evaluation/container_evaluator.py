@@ -16,6 +16,9 @@ from skydiscover.utils.metrics import format_metrics
 
 logger = logging.getLogger(__name__)
 
+# Environment variable prefix for passing variables to containerized evaluators
+CONTAINER_ENV_PREFIX = "SKYDISCOVER_ENV_"
+
 
 class ContainerizedEvaluator:
     """Evaluates programs by running them inside a persistent Docker container.
@@ -79,6 +82,15 @@ class ContainerizedEvaluator:
         self.program_suffix = config.file_suffix
         self.task_pool = TaskPool(max_concurrency=max_concurrent)
         self.llm_judge = None
+        # Capture environment variables from host with CONTAINER_ENV_PREFIX
+        # and strip the prefix before passing to container
+        self.env_vars = {
+            key[len(CONTAINER_ENV_PREFIX):]: value
+            for key, value in os.environ.items()
+            if key.startswith(CONTAINER_ENV_PREFIX)
+        }
+        if self.env_vars:
+            logger.info(f"Passing {len(self.env_vars)} environment variables to container: {list(self.env_vars.keys())}")
         self.image_tag = self._build_image()
         self.container_id = self._start_container()
         logger.info(f"ContainerizedEvaluator ready: container={self.container_id[:12]}")
@@ -209,15 +221,19 @@ class ContainerizedEvaluator:
     def _run_single_in_container(self, candidate_path: str, mode: str) -> EvaluationResult:
         """Execute evaluate.sh inside the container and parse its JSON output."""
         try:
+            # Build docker exec command with environment variables
+            cmd = ["docker", "exec"]
+            for key, value in self.env_vars.items():
+                cmd.extend(["-e", f"{key}={value}"])
+            cmd.extend([
+                self.container_id,
+                "/benchmark/evaluate.sh",
+                candidate_path,
+                mode,
+            ])
+            
             proc = subprocess.run(
-                [
-                    "docker",
-                    "exec",
-                    self.container_id,
-                    "/benchmark/evaluate.sh",
-                    candidate_path,
-                    mode,
-                ],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=self.config.timeout,
@@ -292,8 +308,14 @@ class ContainerizedEvaluator:
 
     def _start_container(self) -> str:
         """Start a persistent container and return its ID."""
+        # Build docker run command with environment variables
+        cmd = ["docker", "run", "-d", "--rm"]
+        for key, value in self.env_vars.items():
+            cmd.extend(["-e", f"{key}={value}"])
+        cmd.extend(["--entrypoint", "sleep", self.image_tag, "infinity"])
+        
         result = subprocess.run(
-            ["docker", "run", "-d", "--rm", "--entrypoint", "sleep", self.image_tag, "infinity"],
+            cmd,
             capture_output=True,
             text=True,
             check=True,
