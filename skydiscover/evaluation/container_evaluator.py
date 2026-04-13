@@ -85,12 +85,14 @@ class ContainerizedEvaluator:
         # Capture environment variables from host with CONTAINER_ENV_PREFIX
         # and strip the prefix before passing to container
         self.env_vars = {
-            key[len(CONTAINER_ENV_PREFIX):]: value
+            key[len(CONTAINER_ENV_PREFIX) :]: value
             for key, value in os.environ.items()
             if key.startswith(CONTAINER_ENV_PREFIX)
         }
         if self.env_vars:
-            logger.info(f"Passing {len(self.env_vars)} environment variables to container: {list(self.env_vars.keys())}")
+            logger.info(
+                f"Passing {len(self.env_vars)} environment variables to container: {list(self.env_vars.keys())}"
+            )
         self.image_tag = self._build_image()
         self.container_id = self._start_container()
         logger.info(f"ContainerizedEvaluator ready: container={self.container_id[:12]}")
@@ -225,13 +227,15 @@ class ContainerizedEvaluator:
             cmd = ["docker", "exec"]
             for key, value in self.env_vars.items():
                 cmd.extend(["-e", f"{key}={value}"])
-            cmd.extend([
-                self.container_id,
-                "/benchmark/evaluate.sh",
-                candidate_path,
-                mode,
-            ])
-            
+            cmd.extend(
+                [
+                    self.container_id,
+                    "/benchmark/evaluate.sh",
+                    candidate_path,
+                    mode,
+                ]
+            )
+
             proc = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -313,7 +317,7 @@ class ContainerizedEvaluator:
         for key, value in self.env_vars.items():
             cmd.extend(["-e", f"{key}={value}"])
         cmd.extend(["--entrypoint", "sleep", self.image_tag, "infinity"])
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,

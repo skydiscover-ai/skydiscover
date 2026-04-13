@@ -140,7 +140,9 @@ async def main_async() -> int:
                 initial_program, evaluator = resolve_benchmark_problem(config.benchmark)
                 args.initial_program = initial_program
                 args.evaluation_file = evaluator
-                print(f"[Benchmark Loader] Benchmark: {config.benchmark.name}, Initial program: {initial_program}, Evaluator: {evaluator}")
+                print(
+                    f"[Benchmark Loader] Benchmark: {config.benchmark.name}, Initial program: {initial_program}, Evaluator: {evaluator}"
+                )
             except Exception as exc:
                 print(f"Error: Failed to load benchmark problem: {exc}", file=sys.stderr)
                 traceback.print_exc()

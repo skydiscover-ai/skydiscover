@@ -49,8 +49,8 @@ class KernelBenchResolver(BenchmarkResolver):
             Tuple of (initial_program_path, evaluator_path)
         """
         # Validate required parameters
-        level = config.get('level')
-        problem_id = config.get('problem_id')
+        level = config.get("level")
+        problem_id = config.get("problem_id")
 
         if level is None or problem_id is None:
             raise ValueError(
@@ -59,12 +59,12 @@ class KernelBenchResolver(BenchmarkResolver):
             )
 
         # Extract optional parameters with defaults
-        dataset_src = config.get('dataset_src', 'huggingface')
-        dataset_name = config.get('dataset_name', 'ScalingIntelligence/KernelBench')
-        eval_mode = config.get('eval_mode', 'local')
-        gpu = config.get('gpu', 'H100')
-        num_correct_trials = config.get('num_correct_trials', 5)
-        num_perf_trials = config.get('num_perf_trials', 100)
+        dataset_src = config.get("dataset_src", "huggingface")
+        dataset_name = config.get("dataset_name", "ScalingIntelligence/KernelBench")
+        eval_mode = config.get("eval_mode", "local")
+        gpu = config.get("gpu", "H100")
+        num_correct_trials = config.get("num_correct_trials", 5)
+        num_perf_trials = config.get("num_perf_trials", 100)
 
         logger.info(f"Resolving KernelBench problem: level={level}, problem_id={problem_id}")
         logger.info(f"Eval mode: {eval_mode}, GPU: {gpu}")
@@ -96,14 +96,12 @@ class KernelBenchResolver(BenchmarkResolver):
         # Generate initial_program.py with EVOLVE-BLOCK markers using prepare_program
         output_dir.mkdir(parents=True, exist_ok=True)
         initial_program_path = prepare_program(
-            initial_program=problem.code,
-            temp_dir=str(output_dir),
-            temp_files=[]
+            initial_program=problem.code, temp_dir=str(output_dir), temp_files=[]
         )
         logger.info(f"Generated initial program: {initial_program_path}")
 
-        use_docker = config.get('use_docker', True)
-        
+        use_docker = config.get("use_docker", True)
+
         # Use evaluator.py file for native mode, directory for container mode
         if use_docker:
             evaluator_path = Path(__file__).parent / "evaluator"
@@ -115,15 +113,15 @@ class KernelBenchResolver(BenchmarkResolver):
         # Set environment variables with or without CONTAINER_ENV_PREFIX
         # Native mode: set directly in os.environ (no prefix)
         # Container mode: use prefix so ContainerizedEvaluator can strip and pass to container
-        env_prefix = CONTAINER_ENV_PREFIX if use_docker else ''
-        
-        os.environ[f'{env_prefix}KERNELBENCH_LEVEL'] = str(level)
-        os.environ[f'{env_prefix}KERNELBENCH_PROBLEM_ID'] = str(problem_id)
-        os.environ[f'{env_prefix}KERNELBENCH_EVAL_MODE'] = eval_mode
-        os.environ[f'{env_prefix}KERNELBENCH_GPU'] = gpu
-        os.environ[f'{env_prefix}KERNELBENCH_NUM_CORRECT_TRIALS'] = str(num_correct_trials)
-        os.environ[f'{env_prefix}KERNELBENCH_NUM_PERF_TRIALS'] = str(num_perf_trials)
-        os.environ[f'{env_prefix}KERNELBENCH_TIMEOUT'] = str(config.get('timeout', 300))
+        env_prefix = CONTAINER_ENV_PREFIX if use_docker else ""
+
+        os.environ[f"{env_prefix}KERNELBENCH_LEVEL"] = str(level)
+        os.environ[f"{env_prefix}KERNELBENCH_PROBLEM_ID"] = str(problem_id)
+        os.environ[f"{env_prefix}KERNELBENCH_EVAL_MODE"] = eval_mode
+        os.environ[f"{env_prefix}KERNELBENCH_GPU"] = gpu
+        os.environ[f"{env_prefix}KERNELBENCH_NUM_CORRECT_TRIALS"] = str(num_correct_trials)
+        os.environ[f"{env_prefix}KERNELBENCH_NUM_PERF_TRIALS"] = str(num_perf_trials)
+        os.environ[f"{env_prefix}KERNELBENCH_TIMEOUT"] = str(config.get("timeout", 300))
 
         mode_desc = "container" if use_docker else "native evaluator"
         logger.info(f"Set environment variables for {mode_desc}:")

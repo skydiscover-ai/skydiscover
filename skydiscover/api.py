@@ -140,10 +140,14 @@ async def _run_discovery_async(
         # Resolve benchmark problem if configured and no initial_program provided
         if initial_program is None and config_obj.benchmark and config_obj.benchmark.enabled:
             try:
-                initial_program_resolved, evaluator_resolved = resolve_benchmark_problem(config_obj.benchmark)
+                initial_program_resolved, evaluator_resolved = resolve_benchmark_problem(
+                    config_obj.benchmark
+                )
                 initial_program = initial_program_resolved
                 evaluator = evaluator_resolved
-                logger.info(f"[Benchmark Loader] Benchmark: {config_obj.benchmark.name}, Initial program: {initial_program}, Evaluator: {evaluator}")
+                logger.info(
+                    f"[Benchmark Loader] Benchmark: {config_obj.benchmark.name}, Initial program: {initial_program}, Evaluator: {evaluator}"
+                )
             except Exception as exc:
                 raise ValueError(f"Failed to load benchmark problem: {exc}") from exc
 

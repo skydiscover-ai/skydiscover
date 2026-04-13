@@ -40,7 +40,7 @@ class BenchmarkResolver(ABC):
             Tuple of (initial_program_path, evaluator_path):
                 - initial_program_path: Path to the generated initial program file
                 - evaluator_path: Path to the evaluator (file or directory)
-                
+
         Note:
             Resolvers can set environment variables with the CONTAINER_ENV_PREFIX
             (from skydiscover.evaluation.container_evaluator) to pass configuration

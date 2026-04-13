@@ -540,18 +540,20 @@ class MonitorConfig:
 @dataclass
 class BenchmarkConfig:
     """Configuration for loading problems from external benchmark datasets.
-    
+
     When enabled, allows SkyDiscover to fetch problems from external
     benchmark datasets (e.g., KernelBench, Frontier-CS) without requiring
     explicit initial_program paths.
-    
+
     Benchmark specification and evaluation parameters (e.g., target problem)
     are stored in a `params` dictionary.
     """
-    
+
     enabled: bool = False
     name: Optional[str] = None
-    resolver: Optional[str] = None  # Python import path to resolver module (e.g., 'benchmarks.kernelbench.resolver')
+    resolver: Optional[str] = (
+        None  # Python import path to resolver module (e.g., 'benchmarks.kernelbench.resolver')
+    )
     params: Dict[str, Any] = field(default_factory=dict)  # Benchmark-specific parameters
 
 
@@ -700,7 +702,7 @@ class Config:
         if "benchmark" in config_dict:
             benchmark_dict = config_dict["benchmark"]
             # Separate known dataclass fields from benchmark-specific parameters
-            known_fields = {f.name for f in fields(BenchmarkConfig) if f.name != 'params'}
+            known_fields = {f.name for f in fields(BenchmarkConfig) if f.name != "params"}
             benchmark_known = {k: v for k, v in benchmark_dict.items() if k in known_fields}
             benchmark_params = {k: v for k, v in benchmark_dict.items() if k not in known_fields}
             config.benchmark = BenchmarkConfig(**benchmark_known, params=benchmark_params)
@@ -961,29 +963,29 @@ def apply_overrides(
 
 def resolve_benchmark_problem(benchmark_config: BenchmarkConfig):
     """Load benchmark problem from external dataset.
-    
+
     Args:
         benchmark_config: BenchmarkConfig object with resolver and benchmark-specific parameters
-        
+
     Returns:
         Tuple of (initial_program_path, evaluator_path)
     """
     if not benchmark_config.resolver:
         raise ValueError("BenchmarkConfig.resolver must be set to use benchmark loading")
-    
+
     # Add current working directory to sys.path to allow importing benchmark resolvers
     # This enables importing from the benchmarks/ directory in the workspace
     cwd = os.getcwd()
     if cwd not in sys.path:
         sys.path.insert(0, cwd)
-    
+
     # Import resolver module and get the resolver instance
     resolver_module = importlib.import_module(benchmark_config.resolver)
     resolver = resolver_module.resolver
-    
+
     # Create temp directory for generated files
     benchmark_name = benchmark_config.name or "benchmark"
     output_dir = Path(tempfile.mkdtemp(prefix=f"skydiscover_{benchmark_name}_"))
-    
+
     # Pass benchmark-specific parameters to resolver
     return resolver.resolve(config=benchmark_config.params, output_dir=output_dir)
