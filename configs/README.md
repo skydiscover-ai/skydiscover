@@ -266,6 +266,10 @@ evaluator:
   cascade_evaluation: true
   cascade_thresholds: [0.3, 0.6]
 
+  # Prepend evaluator source code (or instruction.md for Harbor tasks)
+  # to the LLM system message so the model can see how solutions are scored.
+  inject_evaluator_context: false  # default false
+
   # LLM-as-a-judge
   use_llm_feedback: false
   llm_feedback_weight: 1.0  # relative weight of LLM score in combined_score
