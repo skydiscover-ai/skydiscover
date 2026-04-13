@@ -24,6 +24,20 @@ class SafeJSONEncoder(json.JSONEncoder):
     """
 
     def default(self, obj):
+        # Convert numpy arrays/scalars to Python types
+        try:
+            import numpy as np
+
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            if isinstance(obj, (np.integer,)):
+                return int(obj)
+            if isinstance(obj, (np.floating,)):
+                return float(obj)
+            if isinstance(obj, np.bool_):
+                return bool(obj)
+        except ImportError:
+            pass
         # Convert sets to sorted lists for consistency
         if isinstance(obj, set):
             return sorted(list(obj))

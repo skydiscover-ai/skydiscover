@@ -1286,7 +1286,9 @@ class AdaEvolveDatabase(ProgramDatabase):
         os.makedirs(save_path, exist_ok=True)
         metadata_path = os.path.join(save_path, "adaevolve_metadata.json")
         with open(metadata_path, "w") as f:
-            json.dump(metadata, f, indent=2)
+            from skydiscover.search.utils.checkpoint_manager import SafeJSONEncoder
+
+            json.dump(metadata, f, indent=2, cls=SafeJSONEncoder)
 
         logger.info(f"Saved AdaEvolve state to {save_path}")
 

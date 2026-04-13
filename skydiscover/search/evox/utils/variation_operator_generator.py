@@ -264,30 +264,34 @@ def get_available_packages(problem_dir=None) -> list:
 
     repo_root = Path(__file__).resolve().parents[4]
 
-    # Priority 1: requirements.txt in problem directory
+    # Priority 1: requirements.txt in problem directory (or evaluator subdirectory)
     if problem_dir is not None:
         problem_dir = Path(problem_dir)
-        requirements_path = problem_dir / "requirements.txt"
-        if requirements_path.exists():
-            try:
-                with open(requirements_path, "r") as f:
-                    lines = f.readlines()
-                packages = []
-                for line in lines:
-                    line = line.strip()
-                    if (
-                        not line
-                        or line.startswith("#")
-                        or line.startswith("-e")
-                        or line.startswith("--")
-                    ):
-                        continue
-                    packages.append(line)
-                if packages:
-                    logger.info(f"Read {len(packages)} packages from {requirements_path}")
-                    return packages
-            except Exception as e:
-                logger.warning(f"Could not read {requirements_path} ({e}), trying repo root")
+        candidates = [
+            problem_dir / "requirements.txt",
+            problem_dir / "evaluator" / "requirements.txt",
+        ]
+        for requirements_path in candidates:
+            if requirements_path.exists():
+                try:
+                    with open(requirements_path, "r") as f:
+                        lines = f.readlines()
+                    packages = []
+                    for line in lines:
+                        line = line.strip()
+                        if (
+                            not line
+                            or line.startswith("#")
+                            or line.startswith("-e")
+                            or line.startswith("--")
+                        ):
+                            continue
+                        packages.append(line)
+                    if packages:
+                        logger.info(f"Read {len(packages)} packages from {requirements_path}")
+                        return packages
+                except Exception as e:
+                    logger.warning(f"Could not read {requirements_path} ({e})")
 
     # Priority 2: requirements.txt at repo root
     requirements_path = repo_root / "requirements.txt"

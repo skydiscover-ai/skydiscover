@@ -91,7 +91,7 @@ def simulate_inference(
     # Compute expert load
     expert_layer_avg = total_physical_load.mean(dim=1).sum().item()
     expert_layer_max = total_physical_load.max(dim=1).values.sum().item()
-    balancedness_expert = expert_layer_avg / expert_layer_max
+    balancedness_expert = expert_layer_avg / expert_layer_max if expert_layer_max > 0 else 0.0
 
     # 计算 GPU 负载
     gpu_load = total_physical_load.view(num_layers, NUM_GPUS, -1).sum(dim=2)
@@ -132,16 +132,13 @@ def evaluate(program_path: str) -> EvaluationResult:
                 "error": "Missing `rebalance_experts` function",
             }
 
-        if not hasattr(program, "rebalance_experts"):
-            raise ValueError("Program does not have rebalance_experts function")
-        
         balancedness_scores_gpu = []
         balancedness_scores_expert = []
         times_algorithm = []
         times_inference = []
         for i in range(len(workloads) - 1):
             start_time = time.perf_counter()
-            _, log2phy, logcnt = program.rebalance_experts(
+            phy2log, log2phy, logcnt = program.rebalance_experts(
                 workloads[i],
                 NUM_REPLICAS,
                 NUM_GROUPS,
@@ -149,6 +146,58 @@ def evaluate(program_path: str) -> EvaluationResult:
                 NUM_GPUS,
             )
             end_time_algorithm = time.perf_counter()
+
+            # Validate outputs to prevent reward hacking
+            if phy2log.shape[1] != NUM_REPLICAS:
+                return {
+                    "balancedness_score_gpu": 0.0,
+                    "balancedness_score_expert": 0.0,
+                    "times_algorithm": 0.0,
+                    "times_inference": 0.0,
+                    "speed_score": 0.0,
+                    "combined_score": 0.0,
+                    "error": f"phy2log shape wrong: {tuple(phy2log.shape)}",
+                }
+
+            if not torch.all(logcnt.sum(dim=1) == NUM_REPLICAS):
+                sums = logcnt.sum(dim=1)
+                return {
+                    "balancedness_score_gpu": 0.0,
+                    "balancedness_score_expert": 0.0,
+                    "times_algorithm": 0.0,
+                    "times_inference": 0.0,
+                    "speed_score": 0.0,
+                    "combined_score": 0.0,
+                    "error": f"logcnt sums != {NUM_REPLICAS}: {sums[:5].tolist()}...",
+                }
+
+            if (logcnt < 0).any():
+                return {
+                    "balancedness_score_gpu": 0.0,
+                    "balancedness_score_expert": 0.0,
+                    "times_algorithm": 0.0,
+                    "times_inference": 0.0,
+                    "speed_score": 0.0,
+                    "combined_score": 0.0,
+                    "error": "logcnt contains negative values",
+                }
+
+            next_workload = workloads[i + 1]
+            has_load = next_workload > 0
+            has_no_replicas = logcnt == 0
+            unhandled = has_load & has_no_replicas
+            if unhandled.any():
+                unhandled_count = int(unhandled.sum().item())
+                return {
+                    "balancedness_score_gpu": 0.0,
+                    "balancedness_score_expert": 0.0,
+                    "times_algorithm": 0.0,
+                    "times_inference": 0.0,
+                    "speed_score": 0.0,
+                    "combined_score": 0.0,
+                    "error": f"Unhandled load: {unhandled_count} experts have load but 0 replicas",
+                }
+
             balancedness_score_gpu, balancedness_score_expert = simulate_inference(log2phy, logcnt, workloads[i + 1])
             end_time = time.perf_counter()
             balancedness_scores_gpu.append(balancedness_score_gpu)
