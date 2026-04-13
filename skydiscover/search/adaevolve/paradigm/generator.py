@@ -236,7 +236,7 @@ class ParadigmGenerator:
             )
         return (
             "You are an expert algorithm researcher and strategic advisor. "
-            "Your task is to suggest breakthrough algorithmic IDEAS as a JSON array. "
+            "Your task is to suggest breakthrough algorithmic IDEAS in a JSON object with an 'ideas' array. "
             "Each idea describes a high-level strategy (not code). "
             "Think carefully and deeply. Analyze the problem thoroughly, understand "
             "the evaluation metric by reading the evaluator code, and suggest "
@@ -596,7 +596,7 @@ Specific: "Use scipy.optimize.minimize with SLSQP method"
             return self._build_image_output_format_section()
         return f"""## Output Format
 
-**IMPORTANT:** Respond with a JSON array containing exactly {self.num_paradigms} idea objects.
+**IMPORTANT:** Respond with a JSON object containing exactly {self.num_paradigms} idea objects under the "ideas" key.
 Do not include code patches or diffs — describe strategies in natural language.
 
 Generate {self.num_paradigms} breakthrough ideas of DIFFERENT types.
@@ -611,19 +611,21 @@ Each idea must be a JSON object with these fields:
 **Diversity Requirement:** Each idea must use a DIFFERENT approach type.
 Do not generate variations of the same technique.
 
-Return ONLY a JSON array with {self.num_paradigms} paradigm objects. No other text.
+Return ONLY a JSON object in this shape: {{"ideas": [ ... ]}} with {self.num_paradigms} paradigm objects. No other text.
 
 Example:
 ```json
-[
-  {{
-    "idea": "Use scipy.optimize.minimize with SLSQP",
-    "description": "Apply scipy.optimize.minimize directly to optimize all variables together...",
-    "what_to_optimize": "{', '.join(self.objective_names) if self.objective_names else 'primary evaluator score'}",
-    "cautions": "Ensure constraints are properly formulated, use multiple starting points",
-    "approach_type": "scipy.optimize.minimize"
-  }}
-]
+{{
+    "ideas": [
+        {{
+            "idea": "Use scipy.optimize.minimize with SLSQP",
+            "description": "Apply scipy.optimize.minimize directly to optimize all variables together...",
+            "what_to_optimize": "{', '.join(self.objective_names) if self.objective_names else 'primary evaluator score'}",
+            "cautions": "Ensure constraints are properly formulated, use multiple starting points",
+            "approach_type": "scipy.optimize.minimize"
+        }}
+    ]
+}}
 ```"""
 
     def _build_image_output_format_section(self) -> str:
@@ -642,19 +644,21 @@ Each strategy must be a JSON object with these fields:
 **Diversity Requirement:** Each strategy must use a FUNDAMENTALLY DIFFERENT approach.
 Do not generate variations of the same technique.
 
-Return ONLY a JSON array with {self.num_paradigms} strategy objects. No other text.
+Return ONLY a JSON object in this shape: {{"ideas": [ ... ]}} with {self.num_paradigms} strategy objects. No other text.
 
 Example:
 ```json
-[
-  {{
-    "idea": "Use explicit spatial anchoring with grid-based layout",
-    "description": "Divide the scene into a 3x3 grid and assign each required element to a specific grid cell. Describe the contents of each cell in order (top-left to bottom-right). This helps the image model place objects precisely. For example: top-left contains 3 shaped clouds, top-center contains the banner, top-right contains 3 more clouds...",
-    "what_to_optimize": "cloud_shapes, floating_island, spatial arrangement",
-    "cautions": "Grid descriptions can feel rigid - add natural transitions between cells to maintain visual coherence",
-    "approach_type": "prompt.spatial_grid"
-  }}
-]
+{{
+    "ideas": [
+        {{
+            "idea": "Use explicit spatial anchoring with grid-based layout",
+            "description": "Divide the scene into a 3x3 grid and assign each required element to a specific grid cell. Describe the contents of each cell in order (top-left to bottom-right). This helps the image model place objects precisely. For example: top-left contains 3 shaped clouds, top-center contains the banner, top-right contains 3 more clouds...",
+            "what_to_optimize": "cloud_shapes, floating_island, spatial arrangement",
+            "cautions": "Grid descriptions can feel rigid - add natural transitions between cells to maintain visual coherence",
+            "approach_type": "prompt.spatial_grid"
+        }}
+    ]
+}}
 ```"""
 
     # =========================================================================
@@ -807,19 +811,21 @@ Each idea must be a JSON object with these fields:
 **Diversity Requirement:** Each idea must use a DIFFERENT strategy type.
 Do not generate variations of the same technique.
 
-Return ONLY a JSON array with {self.num_paradigms} paradigm objects. No other text.
+Return ONLY a JSON object in this shape: {{"ideas": [ ... ]}} with {self.num_paradigms} paradigm objects. No other text.
 
 Example:
 ```json
-[
-  {{
-    "idea": "Add step-by-step multi-hop reasoning instructions",
-    "description": "Restructure the prompt to explicitly guide the LLM through multi-hop reasoning. First identify key entities in the question, then find relevant facts about each entity in the passages, then chain the facts together to arrive at the answer. Include explicit instructions like: Step 1: Identify what the question is asking. Step 2: Find passages mentioning the key entities. Step 3: Extract relevant facts. Step 4: Combine facts to answer.",
-    "what_to_optimize": "multi-hop reasoning accuracy",
-    "cautions": "Keep steps concise. Too many steps can confuse the model. Ensure the steps match the actual reasoning pattern needed.",
-    "approach_type": "chain-of-thought"
-  }}
-]
+{{
+    "ideas": [
+        {{
+            "idea": "Add step-by-step multi-hop reasoning instructions",
+            "description": "Restructure the prompt to explicitly guide the LLM through multi-hop reasoning. First identify key entities in the question, then find relevant facts about each entity in the passages, then chain the facts together to arrive at the answer. Include explicit instructions like: Step 1: Identify what the question is asking. Step 2: Find passages mentioning the key entities. Step 3: Extract relevant facts. Step 4: Combine facts to answer.",
+            "what_to_optimize": "multi-hop reasoning accuracy",
+            "cautions": "Keep steps concise. Too many steps can confuse the model. Ensure the steps match the actual reasoning pattern needed.",
+            "approach_type": "chain-of-thought"
+        }}
+    ]
+}}
 ```"""
 
     def _parse_response(self, response: str) -> List[Dict[str, Any]]:
