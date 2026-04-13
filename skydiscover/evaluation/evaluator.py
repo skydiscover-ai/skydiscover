@@ -8,6 +8,8 @@ import tempfile
 import time
 import traceback
 import uuid
+from contextlib import contextmanager
+from threading import RLock
 from typing import Any, Dict, List, Optional, Tuple
 
 from skydiscover.config import EvaluatorConfig
@@ -17,6 +19,7 @@ from skydiscover.utils.async_utils import TaskPool
 from skydiscover.utils.metrics import format_metrics
 
 logger = logging.getLogger(__name__)
+_EVALUATOR_ENV_LOCK = RLock()
 
 
 class Evaluator:
@@ -33,6 +36,7 @@ class Evaluator:
         config: EvaluatorConfig,
         llm_judge: Optional[LLMJudge] = None,
         max_concurrent: int = 4,
+        env_vars: Optional[Dict[str, str]] = None,
     ):
         if not config.evaluation_file:
             raise ValueError("EvaluatorConfig.evaluation_file must be set")
@@ -43,6 +47,7 @@ class Evaluator:
         self.is_image_mode = config.is_image_mode
         self.llm_judge = llm_judge
         self.task_pool = TaskPool(max_concurrency=max_concurrent)
+        self.env_vars = dict(env_vars or {})
 
         self._load_evaluation_function()
         logger.info(f"Initialized evaluator with {self.evaluation_file}")
@@ -204,9 +209,31 @@ class Evaluator:
         loop = asyncio.get_running_loop()
 
         return await asyncio.wait_for(
-            loop.run_in_executor(None, func, program_path),
+            loop.run_in_executor(None, self._call_with_env, func, program_path),
             timeout=self.config.timeout,
         )
+
+    @contextmanager
+    def _scoped_env(self):
+        if not self.env_vars:
+            yield
+            return
+
+        with _EVALUATOR_ENV_LOCK:
+            old_values = {k: os.environ.get(k) for k in self.env_vars}
+            try:
+                os.environ.update(self.env_vars)
+                yield
+            finally:
+                for key, old_value in old_values.items():
+                    if old_value is None:
+                        os.environ.pop(key, None)
+                    else:
+                        os.environ[key] = old_value
+
+    def _call_with_env(self, func, program_path: str) -> Any:
+        with self._scoped_env():
+            return func(program_path)
 
     def _normalize_result(self, result: Any) -> EvaluationResult:
         if isinstance(result, EvaluationResult):

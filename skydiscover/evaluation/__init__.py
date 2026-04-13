@@ -18,7 +18,7 @@ Supporting modules:
 """
 
 import os
-from typing import Optional, Union
+from typing import Dict, Optional, Union
 
 from skydiscover.evaluation.container_evaluator import ContainerizedEvaluator
 from skydiscover.evaluation.evaluation_result import EvaluationResult
@@ -60,6 +60,7 @@ def create_evaluator(
     config,
     llm_judge: Optional[LLMJudge] = None,
     max_concurrent: int = 4,
+    env_vars: Optional[Dict[str, str]] = None,
 ) -> Union[Evaluator, ContainerizedEvaluator, HarborEvaluator]:
     """Return the right evaluator for the given config.
 
@@ -70,7 +71,9 @@ def create_evaluator(
     """
     path = config.evaluation_file or ""
     if _is_harbor_task(path):
-        return HarborEvaluator(path, config, max_concurrent=max_concurrent)
+        return HarborEvaluator(path, config, max_concurrent=max_concurrent, env_vars=env_vars)
     if _is_containerized(path):
-        return ContainerizedEvaluator(path, config, max_concurrent=max_concurrent)
-    return Evaluator(config, llm_judge=llm_judge, max_concurrent=max_concurrent)
+        return ContainerizedEvaluator(
+            path, config, max_concurrent=max_concurrent, env_vars=env_vars
+        )
+    return Evaluator(config, llm_judge=llm_judge, max_concurrent=max_concurrent, env_vars=env_vars)

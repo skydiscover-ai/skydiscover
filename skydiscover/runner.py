@@ -44,6 +44,7 @@ class Runner:
         config_path: Optional[str] = None,
         config: Optional[Config] = None,
         output_dir: Optional[str] = None,
+        evaluator_env_vars: Optional[dict[str, str]] = None,
     ):
         self.config = config if config is not None else load_config(config_path)
         self.name = self.config.search.type
@@ -74,6 +75,7 @@ class Runner:
         self.database = create_database(self.config.search.type, self.config.search.database)
         self.database.language = self.config.language or "python"
         self.evaluation_file = evaluation_file
+        self.evaluator_env_vars = dict(evaluator_env_vars or {})
 
         # Initialize the discovery controller
         self.discovery_controller: Optional[DiscoveryController] = None
@@ -133,6 +135,7 @@ class Runner:
             database=self.database,
             file_suffix=self.config.file_suffix,
             output_dir=self.output_dir,
+            evaluator_env_vars=self.evaluator_env_vars,
         )
 
         # Get the discovery controller

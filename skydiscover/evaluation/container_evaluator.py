@@ -7,7 +7,7 @@ import os
 import subprocess
 import time
 import uuid
-from typing import List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from skydiscover.config import EvaluatorConfig
 from skydiscover.evaluation.evaluation_result import EvaluationResult
@@ -15,9 +15,6 @@ from skydiscover.utils.async_utils import TaskPool
 from skydiscover.utils.metrics import format_metrics
 
 logger = logging.getLogger(__name__)
-
-# Environment variable prefix for passing variables to containerized evaluators
-CONTAINER_ENV_PREFIX = "SKYDISCOVER_ENV_"
 
 
 class ContainerizedEvaluator:
@@ -76,19 +73,14 @@ class ContainerizedEvaluator:
         benchmark_dir: str,
         config: EvaluatorConfig,
         max_concurrent: int = 4,
+        env_vars: Optional[Dict[str, str]] = None,
     ):
         self.benchmark_dir = os.path.abspath(benchmark_dir)
         self.config = config
         self.program_suffix = config.file_suffix
         self.task_pool = TaskPool(max_concurrency=max_concurrent)
         self.llm_judge = None
-        # Capture environment variables from host with CONTAINER_ENV_PREFIX
-        # and strip the prefix before passing to container
-        self.env_vars = {
-            key[len(CONTAINER_ENV_PREFIX) :]: value
-            for key, value in os.environ.items()
-            if key.startswith(CONTAINER_ENV_PREFIX)
-        }
+        self.env_vars = dict(env_vars or {})
         if self.env_vars:
             logger.info(
                 f"Passing {len(self.env_vars)} environment variables to container: {list(self.env_vars.keys())}"

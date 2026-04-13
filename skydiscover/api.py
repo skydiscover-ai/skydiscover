@@ -29,7 +29,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from skydiscover.config import Config, apply_overrides, load_config, resolve_benchmark_problem
+from skydiscover.benchmarks.resolution import resolve_benchmark_problem
+from skydiscover.config import Config, apply_overrides, load_config
 from skydiscover.runner import Runner
 from skydiscover.search.base_database import Program
 from skydiscover.utils.metrics import get_score
@@ -121,6 +122,7 @@ async def _run_discovery_async(
 
     temp_dir: Optional[str] = None
     temp_files: List[str] = []
+    evaluator_env_vars: Dict[str, str] = {}
 
     try:
         if isinstance(config, Config):
@@ -140,11 +142,10 @@ async def _run_discovery_async(
         # Resolve benchmark problem if configured and no initial_program provided
         if initial_program is None and config_obj.benchmark and config_obj.benchmark.enabled:
             try:
-                initial_program_resolved, evaluator_resolved = resolve_benchmark_problem(
-                    config_obj.benchmark
-                )
-                initial_program = initial_program_resolved
-                evaluator = evaluator_resolved
+                resolution = resolve_benchmark_problem(config_obj.benchmark)
+                initial_program = resolution.initial_program_path
+                evaluator = resolution.evaluator_path
+                evaluator_env_vars = resolution.evaluator_env_vars
                 logger.info(
                     f"[Benchmark Loader] Benchmark: {config_obj.benchmark.name}, Initial program: {initial_program}, Evaluator: {evaluator}"
                 )
@@ -234,6 +235,7 @@ async def _run_discovery_async(
             evaluation_file=evaluator_path,
             config=config_obj,
             output_dir=actual_output_dir,
+            evaluator_env_vars=evaluator_env_vars,
         )
 
         best_program = await controller.run(iterations=iterations)

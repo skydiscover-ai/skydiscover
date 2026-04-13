@@ -10,12 +10,8 @@ import traceback
 from typing import Optional
 
 from skydiscover import Runner
-from skydiscover.config import (
-    _parse_model_spec,
-    apply_overrides,
-    load_config,
-    resolve_benchmark_problem,
-)
+from skydiscover.benchmarks.resolution import resolve_benchmark_problem
+from skydiscover.config import _parse_model_spec, apply_overrides, load_config
 
 try:
     multiprocessing.set_start_method("spawn")
@@ -117,10 +113,13 @@ async def main_async() -> int:
 
     has_overrides = any((args.api_base, args.model, args.agentic, args.search))
     config = None
+    evaluator_env_vars: Optional[dict[str, str]] = None
 
     # Load the configuration
     if args.config or has_overrides:
         config = load_config(args.config)
+
+        evaluator_env_vars = None
 
         try:
             apply_overrides(
@@ -137,11 +136,12 @@ async def main_async() -> int:
         # Resolve benchmark problem if configured and no initial_program provided
         if args.initial_program is None and config.benchmark and config.benchmark.enabled:
             try:
-                initial_program, evaluator = resolve_benchmark_problem(config.benchmark)
-                args.initial_program = initial_program
-                args.evaluation_file = evaluator
+                resolution = resolve_benchmark_problem(config.benchmark)
+                args.initial_program = resolution.initial_program_path
+                args.evaluation_file = resolution.evaluator_path
+                evaluator_env_vars = resolution.evaluator_env_vars
                 print(
-                    f"[Benchmark Loader] Benchmark: {config.benchmark.name}, Initial program: {initial_program}, Evaluator: {evaluator}"
+                    f"[Benchmark Loader] Benchmark: {config.benchmark.name}, Initial program: {args.initial_program}, Evaluator: {args.evaluation_file}"
                 )
             except Exception as exc:
                 print(f"Error: Failed to load benchmark problem: {exc}", file=sys.stderr)
@@ -229,6 +229,7 @@ async def main_async() -> int:
             config=config,
             config_path=args.config if config is None else None,
             output_dir=args.output,
+            evaluator_env_vars=evaluator_env_vars,
         )
 
         # Load the checkpoint if provided

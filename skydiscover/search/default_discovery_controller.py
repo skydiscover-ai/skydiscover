@@ -43,6 +43,7 @@ class DiscoveryControllerInput:
     database: ProgramDatabase
     file_suffix: str = ".py"
     output_dir: Optional[str] = None
+    evaluator_env_vars: Optional[Dict[str, str]] = None
 
 
 class DiscoveryController:
@@ -63,6 +64,7 @@ class DiscoveryController:
         self.database = controller_input.database
         self.file_suffix = controller_input.file_suffix
         self.output_dir = controller_input.output_dir
+        self.evaluator_env_vars = controller_input.evaluator_env_vars
 
         self.shutdown_event = mp.Event()
         self.early_stopping_triggered = False
@@ -87,6 +89,7 @@ class DiscoveryController:
             self.config.evaluator,
             llm_judge=llm_judge,
             max_concurrent=max(self.config.max_parallel_iterations, 4),
+            env_vars=controller_input.evaluator_env_vars,
         )
 
         self.agentic_generator = None

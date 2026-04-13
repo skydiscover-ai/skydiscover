@@ -142,7 +142,7 @@ benchmark:
 
 ### Environment Variables
 
-The resolver automatically sets these environment variables for the evaluator:
+The resolver provides these environment variables to the evaluator:
 
 - `KERNELBENCH_LEVEL`: Problem difficulty level (1, 2, or 3)
 - `KERNELBENCH_PROBLEM_ID`: Specific problem within the level
@@ -151,6 +151,8 @@ The resolver automatically sets these environment variables for the evaluator:
 - `KERNELBENCH_NUM_CORRECT_TRIALS`: Number of correctness validation runs
 - `KERNELBENCH_NUM_PERF_TRIALS`: Number of performance measurement runs
 - `KERNELBENCH_TIMEOUT`: Timeout per evaluation in seconds
+
+These variables are passed directly to the evaluator (not set globally), ensuring isolation between concurrent runs.
 
 ### Evaluation Modes
 

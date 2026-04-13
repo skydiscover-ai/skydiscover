@@ -61,6 +61,7 @@ class CoEvolutionController(DiscoveryController):
             evaluation_file=db_cfg.evaluation_file,
             config_path=db_cfg.config_path,
             output_dir=self.config.search.output_dir,
+            evaluator_env_vars=self.evaluator_env_vars,
         )
         self.search_controller = DiscoveryController(controller_input)
         self.search_scorer = LogWindowScorer()

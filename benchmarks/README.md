@@ -145,17 +145,28 @@ class YourBenchmarkResolver(BenchmarkResolver):
             output_dir: Directory where generated files should be placed
             
         Returns:
-            Tuple of (initial_program_path, evaluator_path)
+            BenchmarkResolution containing:
+                - initial_program_path: Path to generated initial program
+                - evaluator_path: Path to evaluator
+                - evaluator_env_vars: Dict of environment variables for the evaluator
         """
         # 1. Fetch problem from dataset based on config parameters
         # 2. Generate initial_program.py with EVOLVE-BLOCK markers
-        # 3. Set any evaluator environment variables via os.environ
-        # 4. Return paths to generated initial program and evaluator
+        # 3. Prepare evaluator environment variables (returned, not set globally)
+        # 4. Return BenchmarkResolution with paths and env vars
         
         initial_program_path = output_dir / "initial_program.py"
         evaluator_path = Path(__file__).parent / "evaluator"
+        evaluator_env_vars = {
+            "BENCHMARK_PARAM": "value",
+            # Add benchmark-specific configuration here
+        }
         
-        return str(initial_program_path), str(evaluator_path)
+        return BenchmarkResolution(
+            initial_program_path=str(initial_program_path),
+            evaluator_path=str(evaluator_path),
+            evaluator_env_vars=evaluator_env_vars,
+        )
 
 # Module-level resolver instance
 resolver = YourBenchmarkResolver()

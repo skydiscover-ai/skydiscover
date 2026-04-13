@@ -48,12 +48,12 @@ class HarborEvaluator(ContainerizedEvaluator):
     reading.
     """
 
-    def __init__(self, benchmark_dir, config, max_concurrent=4):
+    def __init__(self, benchmark_dir, config, max_concurrent=4, env_vars=None):
         self.task_dir = os.path.abspath(benchmark_dir)
         self.solution_path = self._extract_solution_path()
         self._tests_uploaded = False
         self._apply_task_toml_timeout(config)
-        super().__init__(benchmark_dir, config, max_concurrent)
+        super().__init__(benchmark_dir, config, max_concurrent, env_vars=env_vars)
         self._init_container()
 
     # ------------------------------------------------------------------

@@ -7,7 +7,9 @@ SkyDiscover to run optimization on them.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict
+
+from skydiscover.benchmarks.resolution import BenchmarkResolution
 
 
 class BenchmarkResolver(ABC):
@@ -27,8 +29,8 @@ class BenchmarkResolver(ABC):
     """
 
     @abstractmethod
-    def resolve(self, config: Dict[str, Any], output_dir: Path) -> Tuple[str, str]:
-        """Resolve a benchmark problem to concrete file paths.
+    def resolve(self, config: Dict[str, Any], output_dir: Path) -> BenchmarkResolution:
+        """Resolve a benchmark problem to concrete file paths and evaluator config.
 
         Args:
             config: Benchmark configuration dictionary containing benchmark-specific
@@ -37,15 +39,10 @@ class BenchmarkResolver(ABC):
             output_dir: Directory where generated files should be placed.
 
         Returns:
-            Tuple of (initial_program_path, evaluator_path):
+            BenchmarkResolution containing:
                 - initial_program_path: Path to the generated initial program file
                 - evaluator_path: Path to the evaluator (file or directory)
-
-        Note:
-            Resolvers can set environment variables with the CONTAINER_ENV_PREFIX
-            (from skydiscover.evaluation.container_evaluator) to pass configuration
-            to containerized evaluators. The prefix will be stripped before passing
-            to the container.
+                - evaluator_env_vars: Per-run environment variables for the evaluator
 
         """
         pass

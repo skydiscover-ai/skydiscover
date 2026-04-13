@@ -5,12 +5,10 @@ dataset and generates the necessary files for SkyDiscover to run optimization.
 """
 
 import logging
-import os
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
-from skydiscover.benchmarks.base import BenchmarkResolver
-from skydiscover.evaluation.container_evaluator import CONTAINER_ENV_PREFIX
+from skydiscover.benchmarks.base import BenchmarkResolution, BenchmarkResolver
 from skydiscover.utils.prepare import prepare_program
 
 logger = logging.getLogger(__name__)
@@ -38,7 +36,7 @@ class KernelBenchResolver(BenchmarkResolver):
         - num_perf_trials: Number of performance measurement runs (default: 100)
     """
 
-    def resolve(self, config: Dict[str, Any], output_dir: Path) -> Tuple[str, str]:
+    def resolve(self, config: Dict[str, Any], output_dir: Path) -> BenchmarkResolution:
         """Fetch KernelBench problem and generate initial_program + configure evaluator.
 
         Args:
@@ -46,7 +44,7 @@ class KernelBenchResolver(BenchmarkResolver):
             output_dir: Directory where generated files will be placed
 
         Returns:
-            Tuple of (initial_program_path, evaluator_path)
+            BenchmarkResolution with initial program, evaluator path, and evaluator env vars
         """
         # Validate required parameters
         level = config.get("level")
@@ -110,27 +108,28 @@ class KernelBenchResolver(BenchmarkResolver):
             evaluator_path = Path(__file__).parent / "evaluator" / "evaluator.py"
             logger.info("Using native Python evaluator (no Docker required)")
 
-        # Set environment variables with or without CONTAINER_ENV_PREFIX
-        # Native mode: set directly in os.environ (no prefix)
-        # Container mode: use prefix so ContainerizedEvaluator can strip and pass to container
-        env_prefix = CONTAINER_ENV_PREFIX if use_docker else ""
-
-        os.environ[f"{env_prefix}KERNELBENCH_LEVEL"] = str(level)
-        os.environ[f"{env_prefix}KERNELBENCH_PROBLEM_ID"] = str(problem_id)
-        os.environ[f"{env_prefix}KERNELBENCH_EVAL_MODE"] = eval_mode
-        os.environ[f"{env_prefix}KERNELBENCH_GPU"] = gpu
-        os.environ[f"{env_prefix}KERNELBENCH_NUM_CORRECT_TRIALS"] = str(num_correct_trials)
-        os.environ[f"{env_prefix}KERNELBENCH_NUM_PERF_TRIALS"] = str(num_perf_trials)
-        os.environ[f"{env_prefix}KERNELBENCH_TIMEOUT"] = str(config.get("timeout", 300))
+        evaluator_env_vars = {
+            "KERNELBENCH_LEVEL": str(level),
+            "KERNELBENCH_PROBLEM_ID": str(problem_id),
+            "KERNELBENCH_EVAL_MODE": eval_mode,
+            "KERNELBENCH_GPU": gpu,
+            "KERNELBENCH_NUM_CORRECT_TRIALS": str(num_correct_trials),
+            "KERNELBENCH_NUM_PERF_TRIALS": str(num_perf_trials),
+            "KERNELBENCH_TIMEOUT": str(config.get("timeout", 300)),
+        }
 
         mode_desc = "container" if use_docker else "native evaluator"
-        logger.info(f"Set environment variables for {mode_desc}:")
+        logger.info(f"Prepared evaluator environment for {mode_desc}:")
         logger.info(f"  KERNELBENCH_LEVEL={level}")
         logger.info(f"  KERNELBENCH_PROBLEM_ID={problem_id}")
         logger.info(f"  KERNELBENCH_EVAL_MODE={eval_mode}")
         logger.info(f"  KERNELBENCH_GPU={gpu}")
 
-        return str(initial_program_path), str(evaluator_path)
+        return BenchmarkResolution(
+            initial_program_path=str(initial_program_path),
+            evaluator_path=str(evaluator_path),
+            evaluator_env_vars=evaluator_env_vars,
+        )
 
 
 # Module-level resolver instance
