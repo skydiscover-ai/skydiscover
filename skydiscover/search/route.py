@@ -10,6 +10,8 @@ import logging
 
 from skydiscover.search.adaevolve.controller import AdaEvolveController
 from skydiscover.search.adaevolve.database import AdaEvolveDatabase
+from skydiscover.search.claude_code.controller import ClaudeCodeController
+from skydiscover.search.claude_code.database import ClaudeCodeDatabase
 from skydiscover.search.beam_search.database import BeamSearchDatabase
 
 # Algorithm implementations
@@ -69,3 +71,7 @@ register_database("evox_meta", SearchStrategyDatabase)
 # GEPA Native: guided evolution with acceptance gating and merge
 register_database("gepa_native", GEPANativeDatabase)
 register_controller("gepa_native", GEPANativeController)
+
+# Claude Code: single-agent baseline running claude CLI in a container
+register_database("claude_code", ClaudeCodeDatabase)
+register_controller("claude_code", ClaudeCodeController)

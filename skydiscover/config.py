@@ -468,6 +468,19 @@ class OpenEvolveNativeDatabaseConfig(DatabaseConfig):
 
 
 @dataclass
+class ClaudeCodeConfig(DatabaseConfig):
+    """Configuration for the Claude Code baseline.
+
+    Claude Code runs autonomously inside a Docker container, iterating on
+    the solution using the evaluator directly.  max_turns maps to the
+    --max-turns flag passed to the claude CLI.
+    """
+
+    max_turns: int = 50
+    docker_image: str = "skydiscover-claude-code:latest"
+
+
+@dataclass
 class GEPANativeDatabaseConfig(DatabaseConfig):
     """Configuration for GEPA Native search database.
 
@@ -497,6 +510,7 @@ _DB_CONFIG_BY_TYPE: Dict[str, type] = {
     "adaevolve": AdaEvolveDatabaseConfig,
     "openevolve_native": OpenEvolveNativeDatabaseConfig,
     "gepa_native": GEPANativeDatabaseConfig,
+    "claude_code": ClaudeCodeConfig,
 }
 
 
