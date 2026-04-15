@@ -72,6 +72,10 @@ def evaluate(program_path: str):
         with open(program_path, "r") as f:
             program_content = f.read()
 
+        is_triton = bool(
+            re.search(r"^(import triton|from triton)", program_content, flags=re.MULTILINE)
+        )
+
         # Create a temporary file with ModelNew wrapper
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as tmp_file:
             # Replace class Model with class ModelNew (if not already ModelNew)
@@ -107,6 +111,10 @@ def evaluate(program_path: str):
                 f"timeout={timeout}",
                 "check_kernel=False",  # Disable static checker to allow reference code
             ]
+
+            # Setting the backend is important for KernelBench triton evaluation to work
+            if is_triton:
+                cmd.append("backend=triton")
 
             # Set up environment
             env = os.environ.copy()
