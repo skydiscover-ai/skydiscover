@@ -4,12 +4,9 @@ Configuration handling for SkyDiscover
 
 from __future__ import annotations
 
-import importlib
 import logging
 import os
 import re
-import sys
-import tempfile
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
