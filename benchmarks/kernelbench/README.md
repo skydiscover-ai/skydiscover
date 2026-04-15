@@ -100,7 +100,7 @@ benchmark:
 #### 3. Run Optimization
 
 ```bash
-uv run skydiscover-run \
+uv run skydiscover-run benchmarks/kernelbench/evaluator/ \
   -c benchmarks/kernelbench/config.yaml \
   --search adaevolve \
   --iterations 50
