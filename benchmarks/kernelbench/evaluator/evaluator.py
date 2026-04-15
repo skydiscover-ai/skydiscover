@@ -140,7 +140,7 @@ def evaluate(program_path: str):
             print(f"[ERROR] stderr: {stderr}", file=sys.stderr)
             return {
                 "combined_score": -100.0,
-                "feedback": f"Evaluation subprocess failed: {stderr[:500]}",
+                "error": f"Evaluation subprocess failed: {stderr[:500]}",
                 "return_code": result.returncode,
             }
 
@@ -193,20 +193,20 @@ def evaluate(program_path: str):
 
             return {
                 "combined_score": -100.0,
-                "feedback": "Kernel failed correctness check or did not compile",
+                "error": "Kernel failed correctness check or did not compile",
                 "stdout_excerpt": stdout_excerpt,
             }
 
     except subprocess.TimeoutExpired:
         return {
             "combined_score": -1.0,
-            "feedback": f"Evaluation timed out after {timeout} seconds",
+            "error": f"Evaluation timed out after {timeout} seconds",
         }
     except Exception as e:
         traceback.print_exc()
         return {
             "combined_score": -100.0,
-            "feedback": f"Error during evaluation: {str(e)}",
+            "error": f"Error during evaluation: {str(e)}",
             "error_type": type(e).__name__,
         }
 
