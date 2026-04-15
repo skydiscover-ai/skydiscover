@@ -185,6 +185,14 @@ async def _run_discovery_async(
             from skydiscover.extras.external import KNOWN_EXTERNAL, get_runner, is_external
 
             if is_external(search_type):
+                if evaluator_env_vars:
+                    env_var_names = ", ".join(sorted(evaluator_env_vars))
+                    raise ValueError(
+                        "Passing evaluator environment variables to external backends is not yet supported. "
+                        f"External backend '{search_type}' cannot be used with evaluator env vars: "
+                        f"{env_var_names}"
+                    )
+
                 from skydiscover.extras.monitor import start_monitor, stop_monitor
 
                 monitor_server, monitor_callback, feedback_reader = start_monitor(

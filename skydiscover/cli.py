@@ -178,6 +178,17 @@ async def main_async() -> int:
 
             # External backends (openevolve, shinkaevolve, gepa)
             if is_external(search_type):
+                if evaluator_env_vars:
+                    env_var_names = ", ".join(sorted(evaluator_env_vars))
+                    print(
+                        "Error: Passing evaluator environment variables to external backends "
+                        "is not yet supported. "
+                        f"External backend '{search_type}' cannot be used with evaluator env vars: "
+                        f"{env_var_names}",
+                        file=sys.stderr,
+                    )
+                    return 1
+
                 from skydiscover.config import build_output_dir
 
                 output_dir = args.output or build_output_dir(
