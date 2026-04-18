@@ -91,6 +91,7 @@ The two methods are **composable**: EvoX can evolve using AdaEvolve as its start
 | 🔢 | [math/](benchmarks/math/) | Math | 14 | Circle packing, Erdos problems, geometric optimization |
 | 🖥️ | [ADRS/](benchmarks/ADRS/) | Systems | 5 | Cloud scheduling, load balancing, MoE expert placement |
 | ⚡ | [gpu_mode/](benchmarks/gpu_mode/) | Systems | 4 | GPU kernel optimization |
+| 🔧 | [kernelbench/](benchmarks/kernelbench/) | Systems | 250+ | [KernelBench](https://github.com/ScalingIntelligence/KernelBench) GPU kernel speedup optimization |
 | 🧩 | [frontier-cs-eval/](benchmarks/frontier-cs-eval/) | Algorithms | 172 | [Frontier-CS](https://frontier-cs.org/) competitive programming |
 | 🧠 | [arc_benchmark/](benchmarks/arc_benchmark/) | Reasoning | — | ARC-AGI visual reasoning |
 | 💻 | [ale_bench/](benchmarks/ale_bench/) | Algorithms | 10 | Algorithmic programming contests |

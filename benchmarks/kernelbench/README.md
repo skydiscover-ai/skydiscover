@@ -62,9 +62,10 @@ benchmark:
 Then, run optimization on this problem:
 
 ```bash
+# algo can be "adaevolve", "evox", "topk", "beam_search", "best_of_n", etc.
 uv run skydiscover-run benchmarks/kernelbench/evaluator/ \
   -c benchmarks/kernelbench/config.yaml \
-  --search adaevolve \
+  --search <algo> \
   --iterations 50
 ```
 
@@ -100,9 +101,10 @@ benchmark:
 #### 3. Run Optimization
 
 ```bash
+# algo can be "adaevolve", "evox", "topk", "beam_search", "best_of_n", etc.
 uv run skydiscover-run benchmarks/kernelbench/evaluator/ \
   -c benchmarks/kernelbench/config.yaml \
-  --search adaevolve \
+  --search <algo> \
   --iterations 50
 ```
 
@@ -182,7 +184,7 @@ You can still provide an initial program manually if needed:
 # Run with explicit initial program
 uv run skydiscover-run my_kernel.py benchmarks/kernelbench/evaluator/ \
   -c benchmarks/kernelbench/config.yaml \
-  --search adaevolve
+  --search <algo>
 ```
 
 ## Troubleshooting
