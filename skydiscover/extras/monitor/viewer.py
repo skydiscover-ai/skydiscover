@@ -203,7 +203,7 @@ def _to_monitor_format(prog: Dict, all_progs: Dict[str, Dict]) -> Dict:
 
 def main() -> None:
     # Load environment variables from .env file
-    load_dotenv(verbose=True)
+    load_dotenv()
 
     parser = argparse.ArgumentParser(
         description="Replay viewer for completed SkyDiscover runs",
