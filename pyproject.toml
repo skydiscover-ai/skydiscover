@@ -14,7 +14,7 @@ dependencies = [
     "pyyaml>=6.0",
     "tqdm>=4.64.0",
     "numpy>=1.22.0",
-    "python-dotenv>=1.0.0",
+    "python-dotenv>=1.2.1",
 ]
 
 [project.optional-dependencies]
