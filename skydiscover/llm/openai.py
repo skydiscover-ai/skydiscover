@@ -209,6 +209,10 @@ class OpenAILLM(LLMInterface):
         # Don't pass both temperature and top_p to Bedrock
         if "top_p" in params and "temperature" not in params:
             litellm_params["top_p"] = params["top_p"]
+        # Pass Bedrock API key if provided (bearer token auth, no IAM needed).
+        # litellm reads this as api_key param or AWS_BEARER_TOKEN_BEDROCK env var.
+        if self.api_key and self.api_key.lower() not in ("unused", "none", ""):
+            litellm_params["api_key"] = self.api_key
 
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(
