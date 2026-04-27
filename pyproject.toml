@@ -61,7 +61,6 @@ frontier-cs = [
     "google-genai>=1.55.0",
     "google-generativeai>=0.8.5",
     "numpy>=2.0.0",  # Frontier-CS requires numpy 2.x
-    "python-dotenv>=1.2.1",
     "skypilot>=0.10.5",
 ]
 prompt-optimization = [
