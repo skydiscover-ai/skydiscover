@@ -158,23 +158,74 @@ class OpenAILLM(LLMInterface):
             if reasoning_effort is not None:
                 params["reasoning_effort"] = reasoning_effort
 
-        retries, retry_delay, timeout = self._resolve_retry_options(**kwargs)
+        # Add response_format if requested (e.g. {"type": "json_object"})
+        response_format = kwargs.get("response_format")
+        if response_format is not None:
+            params["response_format"] = response_format
 
-        for attempt in range(retries + 1):
+        retries, retry_delay, timeout = self._resolve_retry_options(**kwargs)
+        attempt = 0
+
+        while attempt <= retries:
             try:
                 return await asyncio.wait_for(self._call_api(params), timeout=timeout)
             except asyncio.TimeoutError:
                 if attempt < retries:
                     logger.warning(f"Timeout attempt {attempt + 1}/{retries + 1}, retrying...")
+                    attempt += 1
                     await asyncio.sleep(retry_delay)
                 else:
                     raise
             except Exception as e:
+                downgrade_action = self._maybe_downgrade_response_format(params, e)
+                if downgrade_action is not None:
+                    logger.warning(
+                        f"response_format downgrade applied ({downgrade_action}) after API error: {e}"
+                    )
+                    continue
                 if attempt < retries:
                     logger.warning(f"Error attempt {attempt + 1}/{retries + 1}: {e}, retrying...")
+                    attempt += 1
                     await asyncio.sleep(retry_delay)
                 else:
                     raise
+
+    def _error_mentions_response_format(self, error: Exception) -> bool:
+        error_text_parts = [str(error)]
+
+        body = getattr(error, "body", None)
+        if body is not None:
+            error_text_parts.append(str(body))
+
+        response = getattr(error, "response", None)
+        if response is not None:
+            response_text = getattr(response, "text", None)
+            if response_text:
+                error_text_parts.append(str(response_text))
+
+        error_text = " ".join(error_text_parts).lower()
+        return "response_format" in error_text or "response format" in error_text
+
+    def _maybe_downgrade_response_format(
+        self, params: Dict[str, Any], error: Exception
+    ) -> Optional[str]:
+        if not self._error_mentions_response_format(error):
+            return None
+
+        response_format = params.get("response_format")
+        if not isinstance(response_format, dict):
+            return None
+
+        format_type = response_format.get("type")
+        if format_type == "json_schema":
+            params["response_format"] = {"type": "json_object"}
+            return "json_schema->json_object"
+
+        if format_type == "json_object":
+            params.pop("response_format", None)
+            return "json_object->none"
+
+        return None
 
     async def _call_api(self, params: Dict[str, Any]) -> str:
         loop = asyncio.get_running_loop()

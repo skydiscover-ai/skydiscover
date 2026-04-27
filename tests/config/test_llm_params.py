@@ -122,3 +122,55 @@ class TestOpenAILLMParams:
         params = llm._call_api.call_args[0][0]
         assert "temperature" not in params
         assert "top_p" not in params
+
+    @pytest.mark.asyncio
+    async def test_response_format_fallback_json_schema_to_json_object(self):
+        llm = self._make_llm()
+        captured_params = []
+
+        async def fake_call_api(params):
+            captured_params.append(dict(params))
+            if len(captured_params) == 1:
+                raise Exception("This response_format type is unavailable now")
+            return "response"
+
+        llm._call_api = fake_call_api
+
+        result = await llm.generate(
+            system_message="sys",
+            messages=[{"role": "user", "content": "user"}],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "test_schema",
+                    "schema": {"type": "object"},
+                },
+            },
+        )
+
+        assert result.text == "response"
+        assert captured_params[0]["response_format"]["type"] == "json_schema"
+        assert captured_params[1]["response_format"] == {"type": "json_object"}
+
+    @pytest.mark.asyncio
+    async def test_response_format_fallback_json_object_to_none(self):
+        llm = self._make_llm()
+        captured_params = []
+
+        async def fake_call_api(params):
+            captured_params.append(dict(params))
+            if len(captured_params) == 1:
+                raise Exception("response_format json_object is unsupported")
+            return "response"
+
+        llm._call_api = fake_call_api
+
+        result = await llm.generate(
+            system_message="sys",
+            messages=[{"role": "user", "content": "user"}],
+            response_format={"type": "json_object"},
+        )
+
+        assert result.text == "response"
+        assert captured_params[0]["response_format"]["type"] == "json_object"
+        assert "response_format" not in captured_params[1]
