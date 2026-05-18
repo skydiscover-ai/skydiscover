@@ -426,13 +426,29 @@ def _render_score_progression(report: dict, df: Optional[pd.DataFrame]) -> None:
                                   mode="lines", name="Best-so-far",
                                   line=dict(color="#1a73e8", width=2.5)))
 
-        # Annotate the worst score with an arrow
+        # Clip y-axis to the non-outlier range so sentinel scores don't collapse
+        # the visible range. Use 2nd–100th percentile of individual scores with
+        # 10% padding; keep autorange off so the range is respected.
+        finite_scores = work_df["child_score"].replace([float("inf"), float("-inf")], float("nan")).dropna()
+        if len(finite_scores) > 0:
+            y_low = float(np.percentile(finite_scores, 2))
+            y_high = float(np.percentile(finite_scores, 100))
+            padding = abs(y_high - y_low) * 0.10 or abs(y_high) * 0.10 or 1.0
+            y_min = y_low - padding
+            y_max = y_high + padding
+        else:
+            y_min, y_max = None, None
+
+        # Annotate the worst score; if it falls outside the clipped range, anchor
+        # the arrow tip to the bottom of the visible area instead of data coords.
+        ann_y = y_min if (y_min is not None and worst_val < y_min) else worst_val
+        ann_ay = 40 if (y_min is not None and worst_val < y_min) else -30
         fig.add_annotation(
-            x=worst_iter, y=worst_val,
+            x=worst_iter, y=ann_y,
             text=f"Worst: {worst_val:.6f}",
             showarrow=True, arrowhead=2, arrowcolor="#d93025",
             font=dict(color="#d93025", size=10),
-            ax=40, ay=-30,
+            ax=40, ay=ann_ay,
         )
 
         fig.update_layout(title="Score Progression — All Iterations",
@@ -441,7 +457,11 @@ def _render_score_progression(report: dict, df: Optional[pd.DataFrame]) -> None:
                           legend=dict(orientation="h", y=-0.25),
                           margin=dict(l=40, r=20, t=40, b=60), height=370)
         fig.update_xaxes(showgrid=True, gridcolor="#e0e0e0")
-        fig.update_yaxes(showgrid=True, gridcolor="#e0e0e0")
+        if y_min is not None:
+            fig.update_yaxes(showgrid=True, gridcolor="#e0e0e0",
+                             range=[y_min, y_max], autorange=False)
+        else:
+            fig.update_yaxes(showgrid=True, gridcolor="#e0e0e0")
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No iteration DataFrame available for score progression chart.")
