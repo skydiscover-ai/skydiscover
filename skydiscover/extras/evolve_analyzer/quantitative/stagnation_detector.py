@@ -119,6 +119,7 @@ def _make_iteration_summary(record: dict, failure_type: str) -> IterationSummary
             if isinstance(artifacts, dict):
                 crash_error = artifacts.get("stderr") or artifacts.get("error")
 
+    island_id = record.get("island_id")
     return IterationSummary(
         iteration=record.get("iteration", 0),
         mutation_type=record.get("mutation_type") or "unknown",
@@ -127,6 +128,7 @@ def _make_iteration_summary(record: dict, failure_type: str) -> IterationSummary
         compliance_status=compliance_status,
         format_valid=bool(record.get("format_valid", True)),
         crash_error=crash_error,
+        island_id=str(island_id) if island_id is not None else None,
     )
 
 

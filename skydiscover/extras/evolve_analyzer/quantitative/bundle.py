@@ -20,6 +20,7 @@ class IterationSummary:
     compliance_status: Optional[str]
     format_valid: bool
     crash_error: Optional[str] = None
+    island_id: Optional[str] = None
 
 
 @dataclass

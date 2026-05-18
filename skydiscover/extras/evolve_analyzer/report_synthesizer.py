@@ -351,6 +351,7 @@ def _build_convergence_dimension(
 def _build_stagnation_dimension(
     quant: Any,
     historical: List[Any],
+    num_islands: Optional[int] = None,
 ) -> DimensionReport:
     periods = getattr(quant, "stagnation_periods", None) or []
     alert_periods = [p for p in periods if p.is_alert]
@@ -370,14 +371,26 @@ def _build_stagnation_dimension(
     else:
         rating = 2
 
+    show_islands = num_islands is not None and num_islands > 1
+
     evidence = []
-    for p in periods:
+    for p in alert_periods:
         end_str = str(p.end_iteration) if p.end_iteration is not None else "ongoing"
+        island_part = ""
+        if show_islands:
+            islands = sorted({
+                s.island_id for s in p.failure_sequence if s.island_id is not None
+            })
+            if islands:
+                island_part = f", islands={islands}"
         evidence.append(
             f"Streak {p.streak_id}: iters {p.start_iteration}–{end_str}, "
             f"length={p.length}, severity={p.severity}, "
-            f"dominant_failure={p.dominant_failure_type}"
+            f"dominant_failure={p.dominant_failure_type}{island_part}"
         )
+    non_alert_count = len(periods) - len(alert_periods)
+    if non_alert_count > 0:
+        evidence.append(f"({non_alert_count} additional non-alert streaks not shown)")
     if not evidence:
         evidence.append("No stagnation periods detected.")
 
@@ -1715,9 +1728,10 @@ def synthesize_report(
     rating_context = _build_rating_context(algorithm_class, config or {})
 
     # --- Dimension reports ---
+    num_islands = _compute_num_islands(df)
     dimensions: List[DimensionReport] = [
         _build_convergence_dimension(quant, historical),
-        _build_stagnation_dimension(quant, historical),
+        _build_stagnation_dimension(quant, historical, num_islands=num_islands),
         _build_regression_dimension(quant, historical, rating_context=rating_context),
         _build_efficiency_dimension(quant, historical),
         _build_exploration_dimension(quant, historical, qual=qual, rating_context=rating_context),
