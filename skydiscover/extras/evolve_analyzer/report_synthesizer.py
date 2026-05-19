@@ -112,6 +112,9 @@ _RATING_LABELS = {
 
 _DEFAULT_REGRESSION_THRESHOLDS: List[float] = [0.05, 0.15, 0.30, 0.50]
 _DEFAULT_EXPLORATION_THRESHOLDS: List[float] = [0.70, 0.50, 0.30, 0.10]
+# convergence: [t5, t4] for time_to_best (higher=better); [t1, t2, t3] for plateau_fraction (lower=worse)
+_DEFAULT_CONVERGENCE_TTB_THRESHOLDS: List[float] = [0.8, 0.6]
+_DEFAULT_CONVERGENCE_PLATEAU_THRESHOLDS: List[float] = [0.20, 0.40, 0.60]
 
 
 def _rate_by_thresholds(
@@ -153,10 +156,12 @@ def _build_rating_context(algorithm_class: str, config: dict) -> dict:
     """Resolve per-algorithm-class rating thresholds from config.
 
     Returns a dict with keys:
-      algorithm_class, regression_frequency_thresholds, exploration_sdi_thresholds
+      algorithm_class, regression_frequency_thresholds, exploration_sdi_thresholds,
+      convergence_ttb_thresholds, convergence_plateau_thresholds
     Falls back to package defaults when the class is absent from config.
     """
     cls_cfg = (config or {}).get("algorithm_classes", {}).get(algorithm_class, {})
+    conv_cfg = cls_cfg.get("convergence_thresholds", {})
     return {
         "algorithm_class": algorithm_class,
         "regression_frequency_thresholds": cls_cfg.get(
@@ -164,6 +169,12 @@ def _build_rating_context(algorithm_class: str, config: dict) -> dict:
         ),
         "exploration_sdi_thresholds": cls_cfg.get(
             "exploration_sdi_thresholds", list(_DEFAULT_EXPLORATION_THRESHOLDS)
+        ),
+        "convergence_ttb_thresholds": conv_cfg.get(
+            "time_to_best_thresholds", list(_DEFAULT_CONVERGENCE_TTB_THRESHOLDS)
+        ),
+        "convergence_plateau_thresholds": conv_cfg.get(
+            "plateau_fraction_thresholds", list(_DEFAULT_CONVERGENCE_PLATEAU_THRESHOLDS)
         ),
     }
 
@@ -263,6 +274,7 @@ def _compute_aggregate_stats(df: pd.DataFrame) -> AggregateStats:
 def _build_convergence_dimension(
     quant: Any,
     historical: List[Any],
+    rating_context: Optional[dict] = None,
 ) -> DimensionReport:
     conv = getattr(quant, "convergence", None)
     if conv is None:
@@ -281,30 +293,28 @@ def _build_convergence_dimension(
     poi = conv.plateau_onset_iteration  # None means no plateau
     n = len(conv.best_so_far_curve) if conv.best_so_far_curve else 1
 
-    # Rating logic
-    # 5: best found in last 20% of run (ttbf >= 0.8) AND no plateau
-    # 4: ttbf >= 0.6 and no early plateau
-    # 3: moderate
-    # 2: plateau onset in first 40%
-    # 1: plateau onset in first 20%
+    if rating_context:
+        ttb_thresholds = rating_context["convergence_ttb_thresholds"]
+        plateau_thresholds = rating_context["convergence_plateau_thresholds"]
+    else:
+        ttb_thresholds = _DEFAULT_CONVERGENCE_TTB_THRESHOLDS
+        plateau_thresholds = _DEFAULT_CONVERGENCE_PLATEAU_THRESHOLDS
+
     plateau_fraction = (poi / n) if (poi is not None and n > 0) else None
 
     if poi is None:
-        # No plateau at all
-        if ttbf >= 0.8:
+        if ttbf >= ttb_thresholds[0]:
             rating = 5
-        elif ttbf >= 0.6:
+        elif ttbf >= ttb_thresholds[1]:
             rating = 4
-        elif ttbf >= 0.4:
-            rating = 3
         else:
             rating = 3
     else:
-        if plateau_fraction is not None and plateau_fraction <= 0.2:
+        if plateau_fraction is not None and plateau_fraction <= plateau_thresholds[0]:
             rating = 1
-        elif plateau_fraction is not None and plateau_fraction <= 0.4:
+        elif plateau_fraction is not None and plateau_fraction <= plateau_thresholds[1]:
             rating = 2
-        elif plateau_fraction is not None and plateau_fraction <= 0.6:
+        elif plateau_fraction is not None and plateau_fraction <= plateau_thresholds[2]:
             rating = 3
         else:
             rating = 4
@@ -320,6 +330,16 @@ def _build_convergence_dimension(
         evidence.append(f"Plateau onset at iteration {poi} ({plateau_fraction:.1%} into run)")
     evidence.append(f"Convergence rate: {conv.convergence_rate:.4g} per iteration")
     evidence.append(f"Time to best: {ttbf:.1%} of run")
+    if rating_context and (
+        ttb_thresholds != _DEFAULT_CONVERGENCE_TTB_THRESHOLDS
+        or plateau_thresholds != _DEFAULT_CONVERGENCE_PLATEAU_THRESHOLDS
+    ):
+        algo_class = rating_context.get("algorithm_class", "")
+        evidence.append(
+            f"Note: convergence thresholds adjusted for {algo_class} "
+            f"(excellent time-to-best >= {ttb_thresholds[0]:.0%} vs "
+            f"{_DEFAULT_CONVERGENCE_TTB_THRESHOLDS[0]:.0%} default)."
+        )
 
     summaries = {
         5: "Excellent convergence — best score found late in the run with no plateau.",
@@ -1730,7 +1750,7 @@ def synthesize_report(
     # --- Dimension reports ---
     num_islands = _compute_num_islands(df)
     dimensions: List[DimensionReport] = [
-        _build_convergence_dimension(quant, historical),
+        _build_convergence_dimension(quant, historical, rating_context=rating_context),
         _build_stagnation_dimension(quant, historical, num_islands=num_islands),
         _build_regression_dimension(quant, historical, rating_context=rating_context),
         _build_efficiency_dimension(quant, historical),

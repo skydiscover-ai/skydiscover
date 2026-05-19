@@ -75,16 +75,31 @@ algorithm_classes:
     regression_frequency_thresholds: [0.15, 0.30, 0.50, 0.70]
     # High diversity is the norm; use the same bar as the default
     exploration_sdi_thresholds: [0.70, 0.50, 0.30, 0.10]
+    convergence_thresholds:
+      # Population search distributes improvement across many parallel lines; finding
+      # the best in the latter 40% of the run is already excellent (vs 20% for default).
+      time_to_best_thresholds: [0.60, 0.40]   # [t5, t4]: ttbf >= t → rating
+      # Population convergence is gentler; plateau in first 15% is critical (vs 20%).
+      plateau_fraction_thresholds: [0.15, 0.30, 0.55]  # [t1, t2, t3]: fraction <= t → rating
   serial_refinement:
     # Each step should improve; even 10% regression rate is a concern
     regression_frequency_thresholds: [0.03, 0.10, 0.20, 0.35]
     # Single-chain search naturally has lower diversity; relax the thresholds
     exploration_sdi_thresholds: [0.40, 0.25, 0.10, 0.05]
+    convergence_thresholds:
+      # Serial refinement must keep improving throughout; same strict bar as default.
+      time_to_best_thresholds: [0.80, 0.60]
+      plateau_fraction_thresholds: [0.20, 0.40, 0.60]
   bayesian_optimization:
     # BO is exploitation-heavy; moderate regression rate is acceptable
     regression_frequency_thresholds: [0.05, 0.15, 0.30, 0.50]
     # BO explores less structurally; moderate diversity expected
     exploration_sdi_thresholds: [0.50, 0.30, 0.15, 0.05]
+    convergence_thresholds:
+      # BO is designed to converge efficiently; finding best in last 30% is excellent.
+      time_to_best_thresholds: [0.70, 0.50]
+      # BO plateaus can indicate surrogate model over-exploitation; use default bars.
+      plateau_fraction_thresholds: [0.20, 0.40, 0.60]
 
 # ── In-flight mode (Phase 2 — not active in Phase 1) ────────────────────────
 inflight:

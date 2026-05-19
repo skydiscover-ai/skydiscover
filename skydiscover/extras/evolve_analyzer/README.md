@@ -363,6 +363,8 @@ historical:
 
 Pass a custom config with `--config path/to/config.yaml`.
 
+For a full explanation of every threshold parameter and how each maps to a 1–5 rating, see [thresholds.md](thresholds.md).
+
 ---
 
 ## Architecture
