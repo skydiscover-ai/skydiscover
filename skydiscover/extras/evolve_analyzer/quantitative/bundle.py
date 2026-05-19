@@ -98,6 +98,7 @@ class SearchSpaceMetrics:
     frozen_params: List[str]
     effective_dimensionality: int
     trial_to_param_ratio: Optional[float]
+    dominant_island_id: Optional[int] = None   # set when island_id hits a bound
 
 
 # ── Evaluator Metrics ─────────────────────────────────────────────────────────

@@ -660,6 +660,7 @@ def _build_exploration_dimension(
     historical: List[Any],
     qual: Any = None,
     rating_context: Optional[dict] = None,
+    search_space: Any = None,
 ) -> DimensionReport:
     expl = getattr(quant, "exploration", None)
     if expl is None:
@@ -697,6 +698,18 @@ def _build_exploration_dimension(
             f"(good threshold {thresholds[1]:.2f} vs {_DEFAULT_EXPLORATION_THRESHOLDS[1]:.2f} default)."
         )
 
+    if (
+        search_space is not None
+        and "island_id" in getattr(search_space, "bound_hit_params", [])
+        and search_space.dominant_island_id is not None
+    ):
+        total_islands = int(search_space.param_distributions["island_id"].get("max", 0)) + 1
+        evidence.append(
+            f"Island concentration: top-k solutions skewed toward island"
+            f" {search_space.dominant_island_id} (out of {total_islands}) —"
+            " cross-island diversity may not be functioning as intended."
+        )
+
     summaries = {
         5: "Excellent exploration — high structural diversity across solutions.",
         4: "Good exploration — diverse solutions generated.",
@@ -714,6 +727,14 @@ def _build_exploration_dimension(
 
     evidence.extend(_build_exploration_qual_evidence(qual))
 
+    rec = recs[rating]
+    if (
+        search_space is not None
+        and "island_id" in getattr(search_space, "bound_hit_params", [])
+        and search_space.dominant_island_id is not None
+    ):
+        rec += " Check island initialization seeds and cross-island exchange mechanisms."
+
     return DimensionReport(
         name="Exploration",
         rating=rating,
@@ -721,7 +742,7 @@ def _build_exploration_dimension(
         summary=summaries[rating],
         evidence=evidence,
         historical=_find_historical(historical, "exploration", "diversity"),
-        recommendation=recs[rating],
+        recommendation=rec,
         data_available=True,
     )
 
@@ -813,7 +834,10 @@ def _build_search_space_dimension(
         ]
         for param, dist in sorted(ss.param_distributions.items()):
             if dist.get("type") == "numeric":
-                bound_flag = " ⚠ hits bound" if param in ss.bound_hit_params else ""
+                if param == "island_id" and param in ss.bound_hit_params:
+                    bound_flag = f" ⚠ top-k skewed to island {ss.dominant_island_id}"
+                else:
+                    bound_flag = " ⚠ hits bound" if param in ss.bound_hit_params else ""
                 frozen_flag = " ⚠ frozen (never varied)" if param in frozen else ""
                 evidence.append(
                     f"    {param} [numeric]: range={dist['min']:.4g}–{dist['max']:.4g},"
@@ -824,15 +848,22 @@ def _build_search_space_dimension(
                 counts_str = ", ".join(f"{k}={v}" for k, v in sorted(counts.items(), key=lambda x: -x[1]))
                 frozen_flag = " ⚠ frozen (never varied)" if param in frozen else ""
                 evidence.append(f"    {param} [categorical]: {counts_str}{frozen_flag}")
+        tunable_bound_hits = [p for p in ss.bound_hit_params if not p.endswith("_id")]
         evidence += [
             f"Trial-to-param ratio: {ratio:.2f}",
-            f"Bound-hit params: {ss.bound_hit_params or 'none'}",
+            f"Bound-hit params: {tunable_bound_hits or 'none'}",
         ]
         if frozen:
             evidence.append(
                 f"Frozen params (present but never varied — unexplored diversity): {frozen}"
             )
         rec = recs_frozen[rating] if frozen else recs_no_frozen[rating]
+        if tunable_bound_hits:
+            bound_names = ", ".join(tunable_bound_hits)
+            rec += (
+                f" Top-k solutions consistently hit the bound for: {bound_names} —"
+                " consider widening the search bounds for these parameters."
+            )
 
     return DimensionReport(
         name="Search Space",
@@ -1754,7 +1785,7 @@ def synthesize_report(
         _build_stagnation_dimension(quant, historical, num_islands=num_islands),
         _build_regression_dimension(quant, historical, rating_context=rating_context),
         _build_efficiency_dimension(quant, historical),
-        _build_exploration_dimension(quant, historical, qual=qual, rating_context=rating_context),
+        _build_exploration_dimension(quant, historical, qual=qual, rating_context=rating_context, search_space=quant.search_space),
         _build_search_space_dimension(quant, historical),
         _build_ceiling_dimension(quant, historical),
         _build_meta_analysis_dimension(quant, historical, qual=qual),

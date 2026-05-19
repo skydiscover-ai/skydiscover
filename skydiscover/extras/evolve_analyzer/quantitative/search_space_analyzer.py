@@ -159,10 +159,25 @@ def analyze_search_space(
     if effective_dimensionality > 0:
         trial_to_param_ratio = total_iterations / effective_dimensionality
 
+    # ── dominant_island_id ────────────────────────────────────────────────────
+    # When island_id is a bound-hit param, record which specific island the
+    # top-k solutions clustered on (the min or max island ID).
+    dominant_island_id: Optional[int] = None
+    if "island_id" in bound_hit_params:
+        top_island_values = [
+            rec["parameters"]["island_id"]
+            for rec in top_records
+            if "island_id" in rec["parameters"]
+            and _is_numeric(rec["parameters"]["island_id"])
+        ]
+        if top_island_values:
+            dominant_island_id = int(top_island_values[0])
+
     return SearchSpaceMetrics(
         param_distributions=param_distributions,
         bound_hit_params=bound_hit_params,
         frozen_params=sorted(frozen_params),
         effective_dimensionality=effective_dimensionality,
         trial_to_param_ratio=trial_to_param_ratio,
+        dominant_island_id=dominant_island_id,
     )
