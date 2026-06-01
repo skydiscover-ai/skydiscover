@@ -118,6 +118,7 @@ include = ["skydiscover*"]
 [tool.setuptools.package-data]
 skydiscover = [
     "context_builder/*/templates/*.txt",
+    "llm/tool_schemas/*.json",
     "search/evox/config/*.yaml",
     "search/evox/config/*.txt",
     "extras/external/defaults/*.yaml",

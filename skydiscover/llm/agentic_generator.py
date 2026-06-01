@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import time
+from importlib import resources
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -20,9 +21,11 @@ from skydiscover.utils.code_utils import build_repo_map
 
 logger = logging.getLogger(__name__)
 
-_TOOL_SCHEMAS_PATH = Path(__file__).parent / "tool_schemas" / "agentic_tools.json"
-with open(_TOOL_SCHEMAS_PATH, "r") as _f:
-    TOOL_SCHEMAS = json.load(_f)
+TOOL_SCHEMAS = json.loads(
+    resources.files("skydiscover.llm.tool_schemas")
+    .joinpath("agentic_tools.json")
+    .read_text(encoding="utf-8")
+)
 
 # Responses API uses a flattened tool format (name/description/parameters at top level)
 TOOL_SCHEMAS_RESPONSES = [
