@@ -77,7 +77,7 @@ class TestExtractDefInfoCUDA:
         assert name == "my_kernel"
         assert docstring == "Process one element per thread"
 
-    def test_global_kernel_with_launch_bounds(self):
+    def test_launch_bounds_before_return_type(self):
         code = """__global__ __launch_bounds__(256, 4)
 void fused_layer_norm(const half* x, half* y, int hidden, float eps) {
     // One block per row; blockDim=256
@@ -89,6 +89,18 @@ void fused_layer_norm(const half* x, half* y, int hidden, float eps) {
         assert kind == "kernel"
         assert name == "fused_layer_norm"
         assert "One block per row" in docstring
+
+    def test_launch_bounds_after_return_type(self):
+        code = """__global__ void __launch_bounds__(256, 4) fused_layer_norm(const half* x, half* y) {
+    // Alternate placement of launch_bounds
+    const int row = blockIdx.x;
+}"""
+        result = _extract_def_info(code)
+        assert result is not None
+        kind, name, docstring = result
+        assert kind == "kernel"
+        assert name == "fused_layer_norm"
+        assert "Alternate placement" in docstring
 
     def test_device_function(self):
         code = """__device__ float warp_reduce_sum(float val) {
@@ -160,6 +172,18 @@ class TestExtractDefInfoCCpp:
         assert kind == "function"
         assert name == "fast_rsqrt"
         assert docstring == "Quake III fast inverse square root"
+
+    def test_const_pointer_function(self):
+        code = """const char** get_names() {
+    // Return list of names
+    return names;
+}"""
+        result = _extract_def_info(code)
+        assert result is not None
+        kind, name, docstring = result
+        assert kind == "function"
+        assert name == "get_names"
+        assert docstring == "Return list of names"
 
     def test_struct(self):
         code = """struct SharedMemLayout {

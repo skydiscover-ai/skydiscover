@@ -126,7 +126,9 @@ def _extract_def_info(solution: str) -> Optional[Tuple[str, str, Optional[str]]]
     cuda_kernel_match = re.search(
         r"^\s*(?:__global__|__device__|__host__(?:\s+__device__)?)\s+"
         r"(?:__launch_bounds__\([^)]*\)\s*)?"
-        r"(?:\w+\s+)*?(\w+)\s*\(",
+        r"(?:\w+\s+)*?"
+        r"(?:__launch_bounds__\([^)]*\)\s*)?"
+        r"(\w+)\s*\(",
         solution,
         re.MULTILINE,
     )
@@ -137,9 +139,9 @@ def _extract_def_info(solution: str) -> Optional[Tuple[str, str, Optional[str]]]
         return (kind, name, _truncate_comment(comment))
 
     c_func_match = re.search(
-        r"^\s*(?:static\s+|inline\s+|__inline__\s+)*"
-        r"(?:void|int|float|double|half|bool|char|unsigned|long|size_t|auto|\w+_t)\s+"
-        r"(?:\*\s*)?(\w+)\s*\(",
+        r"^\s*(?:static\s+|inline\s+|__inline__\s+|const\s+)*"
+        r"(?:void|int|float|double|half|bool|char|unsigned|long|size_t|auto|\w+_t)"
+        r"(?:\s*\*+\s*|\s+)(\w+)\s*\(",
         solution,
         re.MULTILINE,
     )
