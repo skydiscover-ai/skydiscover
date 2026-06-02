@@ -86,7 +86,7 @@ The key is kept separate from your evolve framework's key so the analyzer runs o
 
 ## Getting Started
 
-### 1 — Analyse your own run
+### Analyse your own run
 
 **SkyDiscover** checkpoint directory:
 
@@ -154,7 +154,7 @@ uv run run-evolve-analysis postmortem \
 
 The report will show `+X% vs external baseline` in the executive summary and per-metric `vs baseline` deltas in the Sub-Metrics dimension.
 
-### 2 — View the report and launch the dashboard
+### View the report and launch the dashboard
 
 ```bash
 # Show the text report
@@ -165,7 +165,7 @@ uv run dashboard-evolve-analysis --report-dir output/
 # Press Ctrl+C in the terminal to stop the dashboard
 ```
 
-### 3 — JSONL record format
+### JSONL record format
 
 If you're exporting from a custom framework, each line should be a JSON object with these fields (all optional except `iteration` and `child_score`):
 
@@ -206,7 +206,7 @@ If you're exporting from a custom framework, each line should be a JSON object w
 }
 ```
 
-### 4 — Key CLI options
+### Key CLI options
 
 | Option | Default | Description |
 |---|---|---|
@@ -225,7 +225,7 @@ If you're exporting from a custom framework, each line should be a JSON object w
 | `--experiment-id` | auto | Label for this run in the historical DB |
 | `--config` | none | Path to a YAML config file (overrides defaults) |
 
-### 5 — Output
+### Output
 
 Every run writes to `--output-dir`:
 
@@ -288,7 +288,7 @@ If your organisation serves LLMs through a self-hosted [LiteLLM](https://github.
 
 A LiteLLM proxy exposes an OpenAI-compatible `/v1/chat/completions` endpoint, so the tool connects to it directly — all org-level access controls, audit logging, and cost attribution enforced by your proxy apply automatically.
 
-### 1 — Edit the config
+### Edit the config
 
 Open `skydiscover/extras/evolve_analyzer/config/internal_litellm.yaml` and set the two lines specific to your deployment:
 
@@ -310,13 +310,13 @@ The `overrides` block lets you route expensive judge steps to a stronger model a
     # mutation_quality and semantic_compliance use the cheap default
 ```
 
-### 2 — Set your virtual key
+### Set your virtual key
 
 ```bash
 export LITELLM_API_KEY="sk-..."    # your org's LiteLLM virtual key
 ```
 
-### 3 — Run
+### Run
 
 ```bash
 uv run run-evolve-analysis postmortem \
