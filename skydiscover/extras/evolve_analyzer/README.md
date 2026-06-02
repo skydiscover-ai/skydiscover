@@ -165,6 +165,13 @@ uv run dashboard-evolve-analysis --report-dir output/
 # Press Ctrl+C in the terminal to stop the dashboard
 ```
 
+#### Dashboard screens
+
+| | |
+|---|---|
+| ![Executive Summary](docs/resources/Executive%20Summary.png) | ![Dimension Overview](docs/resources/Dimension%20Overview.png) |
+| ![Score Progression](docs/resources/Score%20Progression.png) | ![Efficiency Curve](docs/resources/Efficiency%20Curve.png) |
+
 ### JSONL record format
 
 If you're exporting from a custom framework, each line should be a JSON object with these fields (all optional except `iteration` and `child_score`):
