@@ -242,7 +242,7 @@ def _extract_c_comment(solution: str, func_start: int) -> Optional[str]:
         return "\n".join(comment_lines)
 
     # Fallback: look for comments inside the function body
-    return _extract_first_comment(solution, func_start, is_c_style=True)
+    return _extract_first_comment(solution, func_start)
 
 
 def _extract_docstring(solution: str, start_pos: int) -> Optional[str]:
