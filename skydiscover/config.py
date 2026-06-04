@@ -332,6 +332,12 @@ class EvaluatorConfig:
     # This will read from prompt.evaluator_system_message if provided, otherwise use the default system prompt.
     llm_as_judge: bool = False
 
+    # When True, each evaluation runs in a separate Python subprocess.
+    # This provides process-level isolation: if a candidate crashes (e.g. CUDA
+    # illegal memory access, segfault), it cannot corrupt the parent process.
+    # Adds ~100-200ms overhead per evaluation for process startup.
+    subprocess_isolation: bool = False
+
 
 # ═════════════════════════════════════════════════════════════════════════════════════════════
 # 4. Solution Selector — maintains database and strategy to pick prior programs (search/)
