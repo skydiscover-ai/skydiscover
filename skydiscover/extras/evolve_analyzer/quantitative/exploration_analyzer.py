@@ -56,7 +56,8 @@ def analyze_exploration(records: List[dict]) -> ExplorationMetrics:
         # Build candidate pairs; sample if there are too many
         all_pairs = [(i, j) for i in range(len(codes)) for j in range(i + 1, len(codes))]
         if len(all_pairs) > _MAX_PAIRS:
-            sampled_pairs = random.sample(all_pairs, _MAX_PAIRS)
+            rng = random.Random(42)
+            sampled_pairs = rng.sample(all_pairs, _MAX_PAIRS)
         else:
             sampled_pairs = all_pairs
 

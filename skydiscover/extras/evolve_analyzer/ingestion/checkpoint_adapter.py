@@ -56,8 +56,8 @@ _STATUS_MAP: dict[str, str] = {
 
 
 def _normalise_status(raw: str) -> str:
-    """Map raw status strings to the canonical set: success / timeout / crash."""
-    return _STATUS_MAP.get(str(raw).lower(), "success")
+    """Map raw status strings to the canonical set: success / timeout / crash / unknown."""
+    return _STATUS_MAP.get(str(raw).lower(), "unknown")
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ def _read_first_json(directory: Path, *candidates: str) -> dict:
 _LOG_TS = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),(\d+)")
 _LOG_ITER_FAILED = re.compile(r"Iteration (\d+) failed: (.+)")
 _LOG_ITER_GEPA_OUTCOME = re.compile(
-    r"Iteration (\d+): (REJECTED|ACCEPTED) child \(child_score=([-\d.]+)[^)]*parent_score=([-\d.]+)\)"
+    r"Iteration (\d+): (REJECTED|ACCEPTED) child \(child_score=([-\d.eE+]+)[^)]*parent_score=([-\d.eE+]+)\)"
 )
 _LOG_ITER_PROG_COMPLETED = re.compile(
     r"Iteration (\d+): Program (\S+) \(parent: (\S+)\) completed in [\d.]+s"
@@ -583,10 +583,19 @@ def _collect_skydiscover_run_dirs(root: Path) -> list[Path]:
     return runs
 
 
+def _first_not_none(*values):
+    for v in values:
+        if v is not None:
+            return v
+    return None
+
+
 def _extract_score(d: dict) -> Optional[float]:
     if "metrics" in d and isinstance(d["metrics"], dict):
         m = d["metrics"]
-        return m.get("combined_score") or m.get("score")
+        from_metrics = _first_not_none(m.get("combined_score"), m.get("score"))
+        if from_metrics is not None:
+            return from_metrics
     return d.get("score")
 
 
@@ -602,11 +611,11 @@ def _best_checkpoint_state(run_dir: Path) -> dict:
     best_id = metadata.get("best_program_id")
     prog_data = _read_skydiscover_program(last_ckpt, best_id)
 
-    score = (
-        _extract_score(prog_data)
-        or _extract_score(info)
-        or _extract_score(solution)
-        or _extract_score(metadata)
+    score = _first_not_none(
+        _extract_score(prog_data),
+        _extract_score(info),
+        _extract_score(solution),
+        _extract_score(metadata),
     )
     code = (
         prog_data.get("solution") or prog_data.get("code")
@@ -975,10 +984,12 @@ def adapt_skydiscover(checkpoint_dir: str) -> Iterator[dict]:
             best_id = metadata.get("best_program_id")
             prog_data = _read_skydiscover_program(ckpt_dir, best_id)
 
-            child_score = (
-                _extract_score(prog_data) or _extract_score(info)
-                or _extract_score(solution) or _extract_score(metadata)
-                or _extract_score(evo_state)
+            child_score = _first_not_none(
+                _extract_score(prog_data),
+                _extract_score(info),
+                _extract_score(solution),
+                _extract_score(metadata),
+                _extract_score(evo_state),
             )
             child_code = (
                 prog_data.get("solution") or prog_data.get("code")

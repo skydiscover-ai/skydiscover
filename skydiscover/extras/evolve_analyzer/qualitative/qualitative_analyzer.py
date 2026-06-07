@@ -611,7 +611,7 @@ class QualitativeAnalyzer:
     def _call_llm_cached(self, prompt: str, step_name: str) -> str:
         """Call LLM with caching. Uses the per-step model override if configured."""
         client = self._get_step_client(step_name)
-        return cache_call(client.invoke, self.cache_dir, prompt)
+        return cache_call(client.invoke, self.cache_dir, prompt, model=getattr(client, "model", ""))
 
     def _get_step_client(self, step_name: str) -> LLMClient:
         """Return LLM client for the given step, using model overrides from config."""

@@ -81,8 +81,8 @@ class TestNormaliseStatus:
         assert _normalise_status("OK") == "success"
         assert _normalise_status("ERROR") == "crash"
 
-    def test_unknown_defaults_to_success(self):
-        assert _normalise_status("whatever") == "success"
+    def test_unknown_defaults_to_unknown(self):
+        assert _normalise_status("whatever") == "unknown"
 
 
 # ===========================================================================

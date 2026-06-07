@@ -45,12 +45,15 @@ def cache_call(
         cache_dir: Directory for the diskcache store.
         *args:     Positional arguments forwarded to func.
         **kwargs:  Keyword arguments forwarded to func.
+                   The special key ``model`` is included in the cache key
+                   but NOT forwarded to func.
 
     Returns:
         The string result from func (or cache).
     """
     cache = _get_cache(cache_dir)
-    key = _make_key(*args, **kwargs)
+    model = kwargs.pop("model", "")
+    key = _make_key(*args, model=model, **kwargs)
 
     if key in cache:
         logger.debug(f"Cache hit: {key[:12]}…")

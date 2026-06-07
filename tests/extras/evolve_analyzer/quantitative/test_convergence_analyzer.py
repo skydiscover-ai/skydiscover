@@ -273,8 +273,8 @@ class TestScalarMetrics:
             make_record(3, child_score=0.4),
         ]
         m = analyze_convergence(records)
-        # Best found at iteration 1 (index 0), total = 3 → 1/3
-        assert m.time_to_best_fraction == pytest.approx(1 / 3)
+        # Best found at index 0 → 0/(3-1) = 0.0 (found immediately)
+        assert m.time_to_best_fraction == pytest.approx(0.0)
 
     def test_time_to_best_fraction_last_record(self):
         records = [

@@ -77,7 +77,7 @@ def analyze_convergence(records: List[dict], window: int = 10) -> ConvergenceMet
         prev = best_so_far_curve[i - 1]
         curr = best_so_far_curve[i]
         if not np.isnan(curr) and not np.isnan(prev) and curr > prev:
-            change_points.append(sorted_records[i]["iteration"])
+            change_points.append(sorted_records[i].get("iteration", i))
 
     # ── scalar summary metrics ─────────────────────────────────────────────────
     valid_best = [v for v in best_so_far_curve if not np.isnan(v)]
@@ -99,16 +99,16 @@ def analyze_convergence(records: List[dict], window: int = 10) -> ConvergenceMet
         else 0.0
     )
 
-    # Iteration number (value, not index) where the best score was first achieved
-    best_iteration_number: int = sorted_records[0].get("iteration", 0)
+    # Index (position) where the best score was first achieved
+    best_index: int = 0
     if valid_best:
-        for i, rec in enumerate(sorted_records):
+        for i in range(len(sorted_records)):
             if not np.isnan(best_so_far_curve[i]) and best_so_far_curve[i] >= final_best:
-                best_iteration_number = rec.get("iteration", i)
+                best_index = i
                 break
 
     time_to_best_fraction = (
-        best_iteration_number / total_iterations if total_iterations > 0 else 0.0
+        best_index / (total_iterations - 1) if total_iterations > 1 else 0.0
     )
 
     # ── plateau onset: last iteration index where best_so_far improves ────────

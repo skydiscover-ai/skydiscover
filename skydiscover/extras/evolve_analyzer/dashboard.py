@@ -9,6 +9,7 @@ Invoke as:
 """
 from __future__ import annotations
 
+import ast
 import json
 import sys
 from pathlib import Path
@@ -170,6 +171,7 @@ def _fmt(value, decimals: int = 4) -> str:
 def _stars(rating) -> str:
     if rating is None:
         return '<span class="stars" style="color:#9aa0a6">N/A</span>'
+    rating = int(round(rating))
     filled = "●" * rating
     empty = '<span class="empty">●</span>' * (5 - rating)
     return f'<span class="stars">{filled}{empty}</span>'
@@ -550,7 +552,7 @@ def _render_alert_panel(report: dict, df: Optional[pd.DataFrame]) -> None:
         crash_html = ""
         if all_crash_samples:
             items = "".join(
-                f'<li><strong>iter {s["iteration"]}:</strong> <code style="color:#d93025">{s["error"]}</code></li>'
+                f'<li><strong>iter {s.get("iteration", "?")}:</strong> <code style="color:#d93025">{s.get("error", "unknown")}</code></li>'
                 for s in all_crash_samples
             )
             crash_html = f'<div class="llm-block"><strong>Crash errors:</strong><ul>{items}</ul></div>'
@@ -1337,7 +1339,7 @@ def _render_search_space(report: dict, df: Optional[pd.DataFrame]) -> None:
                 frozen_params = [s.strip().strip("'\"") for s in m.group(1).split(",") if s.strip()]
         elif ev.startswith("Bound-hit params:") and "none" not in ev.lower():
             try:
-                bound_hit = eval(ev.split(":", 1)[1].strip())  # noqa: S307
+                bound_hit = ast.literal_eval(ev.split(":", 1)[1].strip())
             except (ValueError, SyntaxError):
                 pass
 
