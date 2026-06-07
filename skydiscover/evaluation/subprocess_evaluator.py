@@ -14,7 +14,6 @@ import errno
 import json
 import logging
 import os
-import subprocess
 import sys
 import tempfile
 import time
@@ -39,7 +38,9 @@ sys.modules["_eval_mod"] = mod
 spec.loader.exec_module(mod)
 
 result = mod.evaluate(sys.argv[1])
-print(json.dumps(result))
+if hasattr(result, "to_dict"):
+    result = result.to_dict()
+print(json.dumps(result, default=str))
 """
 
 
@@ -77,10 +78,6 @@ class SubprocessEvaluator:
         self.task_pool = TaskPool(max_concurrency=max_concurrent)
         self.env_vars = dict(env_vars or {})
 
-        eval_dir = os.path.dirname(self.evaluation_file)
-        if eval_dir not in sys.path:
-            sys.path.insert(0, eval_dir)
-
         self._wrapper_script = _WRAPPER_TEMPLATE.format(evaluator_path=self.evaluation_file)
         logger.info(
             f"Initialized SubprocessEvaluator with {self.evaluation_file} "
@@ -99,12 +96,13 @@ class SubprocessEvaluator:
 
         last_exception = None
         for attempt in range(self.config.max_retries + 1):
+            temp_path = None
             try:
                 with tempfile.NamedTemporaryFile(
                     suffix=self.program_suffix, delete=False, mode="w", encoding="utf-8"
                 ) as f:
-                    f.write(program_solution)
                     temp_path = f.name
+                    f.write(program_solution)
             except OSError as e:
                 if e.errno == errno.ENOSPC:
                     logger.error("Disk full — cannot create temp file")
@@ -145,7 +143,7 @@ class SubprocessEvaluator:
                     await asyncio.sleep(1.0)
 
             finally:
-                if os.path.exists(temp_path):
+                if temp_path and os.path.exists(temp_path):
                     os.unlink(temp_path)
 
         logger.error(f"All attempts failed{label}: {last_exception}")
@@ -176,39 +174,32 @@ class SubprocessEvaluator:
         else:
             env["PYTHONPATH"] = eval_dir
 
-        loop = asyncio.get_running_loop()
-        proc_result = await asyncio.wait_for(
-            loop.run_in_executor(
-                None,
-                self._execute_subprocess,
-                program_path,
-                env,
-            ),
-            timeout=self.config.timeout,
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, "-c", self._wrapper_script, program_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+            cwd=os.path.dirname(self.evaluation_file),
         )
-        return proc_result
 
-    def _execute_subprocess(self, program_path: str, env: Dict[str, str]) -> Dict[str, Any]:
-        """Run the subprocess synchronously (called from executor thread)."""
         try:
-            result = subprocess.run(
-                [sys.executable, "-c", self._wrapper_script, program_path],
-                capture_output=True,
-                text=True,
-                timeout=self.config.timeout,
-                env=env,
-                cwd=os.path.dirname(self.evaluation_file),
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                proc.communicate(), timeout=self.config.timeout
             )
-        except subprocess.TimeoutExpired:
-            raise asyncio.TimeoutError()
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            raise
 
-        if result.returncode != 0:
-            stderr_tail = result.stderr[-1000:] if result.stderr else ""
+        stdout = stdout_bytes.decode("utf-8", errors="replace").strip()
+        stderr = stderr_bytes.decode("utf-8", errors="replace")
+
+        if proc.returncode != 0:
+            stderr_tail = stderr[-1000:] if stderr else ""
             raise RuntimeError(
-                f"Evaluation subprocess failed (exit {result.returncode}): {stderr_tail}"
+                f"Evaluation subprocess failed (exit {proc.returncode}): {stderr_tail}"
             )
 
-        stdout = result.stdout.strip()
         # Libraries may print warnings to stdout before the JSON.
         # Find the last JSON object in the output.
         json_start = stdout.rfind("\n{")
