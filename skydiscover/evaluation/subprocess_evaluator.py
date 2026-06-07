@@ -32,6 +32,22 @@ import json
 import sys
 import importlib.util
 
+try:
+    from skydiscover.search.utils.checkpoint_manager import SafeJSONEncoder
+except ImportError:
+    class SafeJSONEncoder(json.JSONEncoder):
+        def default(self, obj):
+            try:
+                import numpy as np
+                if isinstance(obj, np.ndarray): return obj.tolist()
+                if isinstance(obj, np.integer): return int(obj)
+                if isinstance(obj, np.floating): return float(obj)
+                if isinstance(obj, np.bool_): return bool(obj)
+            except ImportError:
+                pass
+            if isinstance(obj, (set, frozenset)): return sorted(list(obj))
+            return str(obj)
+
 spec = importlib.util.spec_from_file_location("_eval_mod", {evaluator_path!r})
 mod = importlib.util.module_from_spec(spec)
 sys.modules["_eval_mod"] = mod
@@ -40,7 +56,7 @@ spec.loader.exec_module(mod)
 result = mod.evaluate(sys.argv[1])
 if hasattr(result, "to_dict"):
     result = result.to_dict()
-print(json.dumps(result, default=str))
+print(json.dumps(result, cls=SafeJSONEncoder))
 """
 
 
