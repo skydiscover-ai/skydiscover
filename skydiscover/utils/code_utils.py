@@ -134,7 +134,9 @@ def _extract_def_info(solution: str) -> Optional[Tuple[str, str, Optional[str]]]
     )
     if cuda_kernel_match:
         name = cuda_kernel_match.group(1)
-        kind = "kernel" if "__global__" in solution[: cuda_kernel_match.end()] else "device function"
+        kind = (
+            "kernel" if "__global__" in solution[: cuda_kernel_match.end()] else "device function"
+        )
         comment = _extract_c_comment(solution, cuda_kernel_match.start())
         return (kind, name, _truncate_comment(comment))
 
@@ -184,6 +186,7 @@ def _extract_first_comment(solution: str, func_start: int) -> Optional[str]:
 
     # Collect consecutive comment lines (# for Python, // for C/C++, /* */ for C/C++)
     comment_lines = []
+    in_block_comment = False
     for line in body.split("\n"):
         stripped = line.strip()
         if stripped.startswith("#"):
@@ -195,14 +198,18 @@ def _extract_first_comment(solution: str, func_start: int) -> Optional[str]:
             if comment_text:
                 comment_lines.append(comment_text)
         elif stripped.startswith("/*"):
+            in_block_comment = "*/" not in stripped
             inline_match = re.match(r"/\*\s*(.*?)\s*\*/", stripped)
             if inline_match and inline_match.group(1):
                 comment_lines.append(inline_match.group(1))
-        elif stripped.startswith("*") and not stripped.startswith("*/"):
-            comment_text = stripped.lstrip("* ").strip()
-            if comment_text:
-                comment_lines.append(comment_text)
-        elif stripped and not stripped.startswith(("//", "#", "/*", "*")):
+        elif in_block_comment and stripped.startswith("*"):
+            if stripped.startswith("*/"):
+                in_block_comment = False
+            else:
+                comment_text = stripped.lstrip("* ").strip()
+                if comment_text:
+                    comment_lines.append(comment_text)
+        elif stripped and not stripped.startswith(("//", "#", "/*")):
             break
 
     return "\n".join(comment_lines) if comment_lines else None

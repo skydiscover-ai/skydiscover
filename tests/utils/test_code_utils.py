@@ -142,7 +142,6 @@ __global__ void norm_kernel(float* x, int n) {
         assert "Handles hidden=128 case specifically" in docstring
 
 
-
 # ---------------------------------------------------------------------------
 # _extract_def_info — C/C++
 # ---------------------------------------------------------------------------
@@ -198,7 +197,6 @@ class TestExtractDefInfoCCpp:
         assert name == "SharedMemLayout"
 
 
-
 # ---------------------------------------------------------------------------
 # _extract_def_info — no match
 # ---------------------------------------------------------------------------
@@ -246,7 +244,6 @@ class TestExtractFirstCommentCStyle:
         result = _extract_first_comment(code, 0)
         assert result is not None
         assert "Step 1: load data" in result
-
 
 
 # ---------------------------------------------------------------------------
