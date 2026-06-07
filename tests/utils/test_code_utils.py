@@ -58,6 +58,14 @@ class TestExtractDefInfoPython:
         result = _extract_def_info(code)
         assert result == ("function", "bare_func", None)
 
+    def test_star_unpack_not_treated_as_comment(self):
+        code = """def k():
+    *rest, last = [1, 2, 3]
+    return last
+"""
+        result = _extract_def_info(code)
+        assert result == ("function", "k", None)
+
 
 # ---------------------------------------------------------------------------
 # _extract_def_info — CUDA
