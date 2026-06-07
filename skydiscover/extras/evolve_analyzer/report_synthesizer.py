@@ -728,6 +728,30 @@ def _build_exploration_dimension(
     evidence.extend(_build_exploration_qual_evidence(qual))
 
     rec = recs[rating]
+
+    if rating <= 2:
+        escape_hints = []
+        if expl.exploit_phase_fraction > 0.4:
+            escape_hints.append(
+                "increase LLM mutation temperature to generate more diverse edits"
+            )
+        if expl.distinct_strategy_clusters <= 3:
+            escape_hints.append(
+                "force edits to under-explored EVOLVE-BLOCKs or code regions"
+            )
+        if expl.revert_frequency > 0.15:
+            escape_hints.append(
+                "add random-restart rounds that begin from a different top-k parent"
+            )
+        if not escape_hints:
+            escape_hints.append(
+                "increase LLM mutation temperature or add perturbation operators"
+            )
+            escape_hints.append(
+                "introduce random-restart rounds from diverse top-k parents"
+            )
+        rec += " Suggested actions: " + "; ".join(escape_hints) + "."
+
     if (
         search_space is not None
         and "island_id" in getattr(search_space, "bound_hit_params", [])
