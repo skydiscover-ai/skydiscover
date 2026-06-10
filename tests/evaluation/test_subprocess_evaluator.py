@@ -1,73 +1,13 @@
 """Tests for SubprocessEvaluator — process isolation and result parsing."""
 
 import asyncio
-import importlib.util
 import os
-import sys
 import tempfile
-from dataclasses import dataclass, field
-from pathlib import Path
 
 import pytest
 
-# Load SubprocessEvaluator directly to avoid pulling in the full skydiscover
-# package (which requires openai, etc. not needed for these tests).
-_eval_dir = Path(__file__).resolve().parents[2] / "skydiscover" / "evaluation"
-
-# Load evaluation_result first (dependency of subprocess_evaluator)
-_er_spec = importlib.util.spec_from_file_location(
-    "skydiscover.evaluation.evaluation_result", _eval_dir / "evaluation_result.py"
-)
-_er_mod = importlib.util.module_from_spec(_er_spec)
-sys.modules["skydiscover.evaluation.evaluation_result"] = _er_mod
-_er_spec.loader.exec_module(_er_mod)
-EvaluationResult = _er_mod.EvaluationResult
-
-# Stub modules that subprocess_evaluator imports
-_metrics_path = Path(__file__).resolve().parents[2] / "skydiscover" / "utils" / "metrics.py"
-_metrics_spec = importlib.util.spec_from_file_location("skydiscover.utils.metrics", _metrics_path)
-_metrics_mod = importlib.util.module_from_spec(_metrics_spec)
-sys.modules["skydiscover.utils.metrics"] = _metrics_mod
-_metrics_spec.loader.exec_module(_metrics_mod)
-
-_async_path = Path(__file__).resolve().parents[2] / "skydiscover" / "utils" / "async_utils.py"
-_async_spec = importlib.util.spec_from_file_location("skydiscover.utils.async_utils", _async_path)
-_async_mod = importlib.util.module_from_spec(_async_spec)
-sys.modules["skydiscover.utils.async_utils"] = _async_mod
-_async_spec.loader.exec_module(_async_mod)
-
-# Stub LLMJudge to avoid importing openai
-sys.modules["skydiscover.evaluation.llm_judge"] = type(sys)("skydiscover.evaluation.llm_judge")
-sys.modules["skydiscover.evaluation.llm_judge"].LLMJudge = None
-
-# Stub skydiscover.config with a minimal EvaluatorConfig
-_config_stub = type(sys)("skydiscover.config")
-
-
-@dataclass
-class _EvaluatorConfig:
-    evaluation_file: str = ""
-    file_suffix: str = ".py"
-    is_image_mode: bool = False
-    timeout: int = 360
-    max_retries: int = 3
-    cascade_evaluation: bool = False
-    cascade_thresholds: list = field(default_factory=lambda: [0.3, 0.6])
-    subprocess_isolation: bool = True
-
-
-_config_stub.EvaluatorConfig = _EvaluatorConfig
-sys.modules["skydiscover.config"] = _config_stub
-
-# Now load subprocess_evaluator
-_sp_spec = importlib.util.spec_from_file_location(
-    "skydiscover.evaluation.subprocess_evaluator", _eval_dir / "subprocess_evaluator.py"
-)
-_sp_mod = importlib.util.module_from_spec(_sp_spec)
-sys.modules["skydiscover.evaluation.subprocess_evaluator"] = _sp_mod
-_sp_spec.loader.exec_module(_sp_mod)
-SubprocessEvaluator = _sp_mod.SubprocessEvaluator
-EvaluatorConfig = _EvaluatorConfig
+from skydiscover.config import EvaluatorConfig
+from skydiscover.evaluation.subprocess_evaluator import SubprocessEvaluator
 
 # --- Mock evaluator scripts written to temp files ---
 

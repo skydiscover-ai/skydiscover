@@ -191,7 +191,10 @@ class SubprocessEvaluator:
             env["PYTHONPATH"] = eval_dir
 
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, "-c", self._wrapper_script, program_path,
+            sys.executable,
+            "-c",
+            self._wrapper_script,
+            program_path,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env,
@@ -220,7 +223,7 @@ class SubprocessEvaluator:
         # Find the last JSON object in the output.
         json_start = stdout.rfind("\n{")
         if json_start != -1:
-            stdout = stdout[json_start + 1:]
+            stdout = stdout[json_start + 1 :]
         elif not stdout.startswith("{"):
             raise RuntimeError(f"No JSON in subprocess output: {stdout[-500:]}")
 
