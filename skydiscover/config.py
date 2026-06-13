@@ -506,8 +506,10 @@ class GEPANativeDatabaseConfig(DatabaseConfig):
 class JitsKitConfig(DatabaseConfig):
     """Configuration for the Jitskit agentic KV-store synthesis strategy.
 
-    A faithful superset of the runtime's knobs (invariant I3): every field below
-    maps to a ``run.sh`` flag / ``SKYKV_*`` var. They ride on ``search.database``,
+    A faithful mapping of the runtime's knobs (invariant I3): every field below
+    maps to a ``run.sh`` flag / ``SKYKV_*`` var (a few rarely-used run.sh flags —
+    --delete-rate, --summary, --fast-exit — are intentionally not exposed). They
+    ride on ``search.database``,
     e.g.::
 
         search:
@@ -542,7 +544,7 @@ class JitsKitConfig(DatabaseConfig):
     feedback_level: Optional[str] = None  # minimal | rich
     audit_every: Optional[int] = None
     audit_checks_dir: Optional[str] = None
-    seed: Optional[int] = None
+    seed: Optional[str] = None  # run.sh --seed is a seed-DIR name (seeds/<name>/), not an int
     num_workers: Optional[int] = None
     parallel_eval: bool = False
     no_planner: bool = False

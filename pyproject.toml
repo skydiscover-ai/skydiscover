@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=62.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -124,6 +124,10 @@ skydiscover = [
     "search/evox/config/*.txt",
     "extras/external/defaults/*.yaml",
     "extras/monitor/dashboard.html",
+    # Vendored jitskit runtime: ship the WHOLE subtree (run.sh, .cc/.h harness, cards,
+    # prompts, traces, CMake) as data — the dir is invoked via subprocess, not imported,
+    # so it is excluded from packages.find and must come in as package-data.
+    "search/jitskit/runtime/**",
 ]
 
 [tool.setuptools.dynamic]

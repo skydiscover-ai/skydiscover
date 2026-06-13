@@ -50,9 +50,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "evaluation_file",
+        nargs="?",
+        default=None,
         help=(
             "Evaluator: path to a Python file (must define evaluate()) "
-            "or a benchmark directory containing Dockerfile + evaluate.sh"
+            "or a benchmark directory containing Dockerfile + evaluate.sh. "
+            "Optional when -c selects a benchmark that resolves one."
         ),
     )
     parser.add_argument("--config", "-c", help="Path to configuration file (YAML)", default=None)
@@ -109,7 +112,7 @@ async def main_async() -> int:
     if args.initial_program and not os.path.exists(args.initial_program):
         print(f"Error: Initial program file '{args.initial_program}' not found", file=sys.stderr)
         return 1
-    if not os.path.exists(args.evaluation_file):
+    if args.evaluation_file is not None and not os.path.exists(args.evaluation_file):
         print(f"Error: Evaluation file '{args.evaluation_file}' not found", file=sys.stderr)
         return 1
 
@@ -165,6 +168,18 @@ async def main_async() -> int:
             print(f"Agentic mode enabled (codebase: {config.agentic.codebase_root})")
         if args.search:
             print(f"Using search algorithm: {args.search}")
+
+    # Evaluator must be resolved by now (positional, or filled by a benchmark resolver).
+    if args.evaluation_file is None:
+        print(
+            "Error: no evaluator. Pass an evaluation_file positional, or a -c config "
+            "whose benchmark resolves one.",
+            file=sys.stderr,
+        )
+        return 1
+    if not os.path.exists(args.evaluation_file):
+        print(f"Error: Evaluation file '{args.evaluation_file}' not found", file=sys.stderr)
+        return 1
 
     # Run the discovery
     try:

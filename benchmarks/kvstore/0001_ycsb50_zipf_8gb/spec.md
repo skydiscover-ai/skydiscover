@@ -39,8 +39,9 @@ matched to the requirement card. The evaluator runs **6 consistency tests**; **a
 ## Scoring
 
 `combined_score` = **peak throughput (Mops/s)** across all iterations, **after** the correctness gate
-passes (else `0`, `validity: 0`). Leading indicators (cache-hit ratio, eviction rate, disk IOPS,
-p50/p99/p999 latency, memory utilization) flow into `metrics` for the dashboard.
+passes (else `0`, `validity: 0`). The wrapper surfaces `combined_score`, `validity`, and the runtime's
+`jitskit_*` summary keys (% of FASTER, validation status); the runtime's fine-grained leading
+indicators (cache-hit, eviction, IOPS, latency percentiles) stay in its own run artifacts.
 
 ## Environment tiers
 

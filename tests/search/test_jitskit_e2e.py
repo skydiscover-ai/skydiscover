@@ -30,8 +30,8 @@ run can prove: faithful passthrough (1) and correct peak selection (2).
 
 GATING
 ------
-Requires a real box: the runtime submodule checked out, the backend CLI on PATH, and
-``SKYKV_E2E=1`` set deliberately. It is green only on a machine that can actually run
+Requires a real box: the backend CLI on PATH and ``SKYKV_E2E=1`` set deliberately (the
+runtime is vendored in-tree, nothing to fetch). It is green only on a machine that can actually run
 the agent + build/benchmark the C++ harness. It never runs in normal CI.
 
     SKYKV_E2E=1 uv run pytest tests/search/test_jitskit_e2e.py -q -s
@@ -42,7 +42,7 @@ import json
 import os
 import shutil
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import pytest
 
@@ -66,22 +66,24 @@ pytestmark = pytest.mark.skipif(
     or not _TASK_CONFIG.exists()
     or (shutil.which("claude") is None and shutil.which("codex") is None),
     reason=(
-        "hardware e2e: set SKYKV_E2E=1, init the runtime submodule "
-        "(git submodule update --init --recursive), and have the backend CLI "
+        "hardware e2e: set SKYKV_E2E=1 and have the backend CLI "
         "(claude/codex) on PATH. Green only on the measurement box."
     ),
 )
 
 
-def _independent_peak(leaderboard) -> Optional[float]:
-    """Global peak Mops/s across ALL entries — recomputed independently of the
-    controller, so this is a real cross-check rather than a tautology.
+def _independent_peak(leaderboard) -> Tuple[Optional[float], bool]:
+    """Global peak Mops/s across ALL entries AND whether the peak-owning entry was
+    validated — recomputed independently of the controller.
 
-    Mirrors the runtime's BestTracker definition: the max single peak over every
-    leaderboard entry's workloads (plus any entry-level peak/best fields).
+    The controller picks the highest-peak entry and zeroes the score when that entry's
+    ``all_validation_passed`` is False (controller._add_program), so the validation flag
+    must travel with the peak — otherwise a faithful run with an unvalidated peak would
+    fail this check "for the wrong reason."
     """
     entries = leaderboard if isinstance(leaderboard, list) else [leaderboard]
     peak: Optional[float] = None
+    peak_validated = True
     for entry in entries:
         if not isinstance(entry, dict):
             continue
@@ -96,8 +98,10 @@ def _independent_peak(leaderboard) -> Optional[float]:
                 candidates.append(float(entry[key]))
         if candidates:
             entry_peak = max(candidates)
-            peak = entry_peak if peak is None else max(peak, entry_peak)
-    return peak
+            if peak is None or entry_peak > peak:
+                peak = entry_peak
+                peak_validated = bool(entry.get("all_validation_passed", True))
+    return peak, peak_validated
 
 
 def test_wrapper_reports_a_single_run_faithfully(tmp_path):
@@ -147,10 +151,12 @@ def test_wrapper_reports_a_single_run_faithfully(tmp_path):
     # (1) Byte-identical source — the wrapper passed through, did not mutate.
     assert best.solution == on_disk_impl, "reported solution differs from run's best_impl.cc"
 
-    # (2) Score == independently recomputed global peak (same iteration as the source).
-    expected_peak = _independent_peak(leaderboard)
+    # (2) Score == recomputed global peak, but zeroed if the peak entry was unvalidated
+    # (mirror controller._add_program) — else a faithful run fails for the wrong reason.
+    expected_peak, peak_validated = _independent_peak(leaderboard)
     assert expected_peak is not None, "leaderboard.json carried no peak Mops/s"
-    assert best.metrics["combined_score"] == pytest.approx(expected_peak), (
-        f"reported score {best.metrics['combined_score']} != global peak {expected_peak} "
-        "— score and source may be from different iterations (the leaderboard[0] bug)"
+    expected_score = expected_peak if peak_validated else 0.0
+    assert best.metrics["combined_score"] == pytest.approx(expected_score), (
+        f"reported score {best.metrics['combined_score']} != expected {expected_score} "
+        f"(peak {expected_peak}, validated={peak_validated})"
     )
