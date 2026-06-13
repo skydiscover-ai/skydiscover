@@ -7,12 +7,11 @@ leaderboard peak and does not call this.)
 Contract: ``evaluate(program_path) -> dict`` with at least ``combined_score`` and
 ``validity``. The correctness tests are a hard gate — any failure scores 0.
 
-Status: this evaluator needs the shared C++ harness in ``benchmarks/kvstore/_harness/``
-(``kvstore_interface.h``, ``benchmark_harness.cc``, ``consistency_harness.cc``,
-``CMakeLists.txt``), which is populated from the runtime submodule (see the family
-README — vendoring is plan §8.1). When the harness is absent, this evaluator
-returns ``validity: 0`` with a clear error rather than pretending to pass. It is
-intentionally NOT exercised in CI; run it on the build/bare-metal tier.
+Status: builds against the shared C++ harness at ``benchmarks/kvstore/_harness`` — a symlink
+to the vendored runtime's ``interface/`` (``kvstore_interface.h``, ``benchmark_harness.cc``,
+``consistency_harness.cc``, ``CMakeLists.txt``): the single source, no copy. If the harness is
+somehow absent, this evaluator returns ``validity: 0`` with a clear error rather than pretending
+to pass. It is intentionally NOT exercised in CI; run it on the build/bare-metal tier.
 """
 
 import json
@@ -52,8 +51,8 @@ def _harness_ready() -> bool:
 def evaluate(program_path: str) -> dict:
     if not _harness_ready():
         return _fail(
-            f"Shared harness missing at {_HARNESS_DIR}. Populate it from the runtime "
-            f"(git submodule / vendoring — see benchmarks/kvstore/README.md). "
+            f"Shared harness missing at {_HARNESS_DIR} (the _harness symlink should resolve "
+            f"to the vendored runtime's interface/ — see benchmarks/kvstore/README.md). "
             f"Required files: {list(_REQUIRED_HARNESS)}."
         )
 

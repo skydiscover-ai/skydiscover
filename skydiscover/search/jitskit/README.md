@@ -15,18 +15,19 @@ optimizing for. The runtime is **never edited**.
 search/jitskit/
 ├── controller.py   # config -> run.sh flags/env, launch on host, read leaderboard.json
 ├── database.py     # minimal store (mirrors claude_code/database.py)
-└── runtime/        # git submodule = the private skykv-claude project ROOT (= PROJECT_DIR)
+└── runtime/        # the jitskit runtime, VENDORED in-tree (committed, not a submodule) = PROJECT_DIR
 ```
 
 ## Setup
 
+The runtime ships **in this repo** — there is nothing to fetch or init. Just:
+
 ```bash
-git submodule update --init --recursive   # fetches runtime/ (skykv-claude)
 export ANTHROPIC_API_KEY=...
 ```
 
-For local development against an existing checkout, skip the submodule and point
-the strategy at it:
+To run against a *different* local checkout of the runtime (e.g. the private
+`skykv-claude` dev tree), point the strategy at it:
 
 ```yaml
 search:

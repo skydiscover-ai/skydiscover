@@ -95,7 +95,7 @@ class JitsKitController(DiscoveryController):
     # ------------------------------------------------------------------
 
     def _runtime_dir(self, db) -> Path:
-        """Resolve the runtime checkout (the submodule by default)."""
+        """Resolve the runtime dir (the vendored in-tree ``runtime/`` by default)."""
         configured = getattr(db, "runtime_dir", None)
         return Path(configured).expanduser() if configured else _DEFAULT_RUNTIME_DIR
 
@@ -473,9 +473,10 @@ class JitsKitController(DiscoveryController):
 
     def _add_program(self, best: Tuple[str, float, dict], iteration: int) -> None:
         solution, mops, indicators = best
-        # Derive validity from the runtime's own report — never assume it. A peak whose
-        # validation is failed/unknown must not be reported as a valid win, and its score
-        # is zeroed so score and source stay on the same (validated) iteration.
+        # Derive validity from the runtime's own report. A peak the runtime marked NOT
+        # validated gets score+validity zeroed, so an unvalidated win is never reported as
+        # valid (and score+source stay on the same iteration). If the runtime didn't report
+        # the flag at all, default to valid — preserve prior behavior, don't zero on missing data.
         valid = bool(indicators.get("jitskit_all_validation_passed", True))
         program = Program(
             id=str(uuid.uuid4()),
