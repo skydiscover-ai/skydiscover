@@ -506,9 +506,9 @@ class GEPANativeDatabaseConfig(DatabaseConfig):
 class JitsKitConfig(DatabaseConfig):
     """Configuration for the Jitskit agentic KV-store synthesis strategy.
 
-    A faithful superset of the runtime's knobs (invariant I3): every field maps
-    to a ``run.sh`` flag / ``SKYKV_*`` var.  These ride on ``search.database``
-    extras, e.g.::
+    A faithful superset of the runtime's knobs (invariant I3): every field below
+    maps to a ``run.sh`` flag / ``SKYKV_*`` var. They ride on ``search.database``,
+    e.g.::
 
         search:
           type: jitskit
@@ -519,8 +519,10 @@ class JitsKitConfig(DatabaseConfig):
             mem_budget_gb: [8]
             critique_mode: full
 
-    Unknown extra keys are also tolerated (``config.from_dict`` ``setattr``s
-    them), so new runtime flags need no schema change here.
+    Unknown extra keys are tolerated by ``config.from_dict`` (it ``setattr``s
+    them) so an unrecognized key does not crash; note, however, that a key only
+    reaches the runtime if ``JitsKitController._build_flags`` translates it, so a
+    brand-new ``run.sh`` flag still needs both a field here and a line there.
     """
 
     # Path to the vendored runtime (the skykv-claude project ROOT = PROJECT_DIR).
@@ -533,7 +535,6 @@ class JitsKitConfig(DatabaseConfig):
     workload: Optional[str] = None  # run.sh --setup (workload mix key, e.g. "50:50")
     distribution: Optional[str] = None
     value_size: Optional[int] = None
-    num_keys: Optional[int] = None
     mem_budget_gb: Optional[List[int]] = None  # list allowed (I4)
     threads: Optional[List[int]] = None
     max_turns: Optional[int] = None
