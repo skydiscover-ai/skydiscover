@@ -526,7 +526,7 @@ class JitsKitConfig(DatabaseConfig):
     """
 
     # Path to the vendored runtime (the skykv-claude project ROOT = PROJECT_DIR).
-    # None -> the bundled submodule at search/jitskit/runtime.
+    # None -> the bundled runtime/ dir at search/jitskit/runtime (vendored in-tree).
     runtime_dir: Optional[str] = None
 
     backend: str = "claude"  # claude | codex

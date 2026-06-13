@@ -138,7 +138,8 @@ def test_build_flags_translation():
     assert "--mode ltm" in joined
     assert "--iterations 50" in joined
     assert "--setup 50:50" in joined  # workload -> --setup
-    assert "--distribution zipf(0.99)" in joined
+    # theta is stripped — run.sh's --distribution takes a bare token, not zipf(0.99)
+    assert flags[flags.index("--distribution") + 1] == "zipf"
     assert "--value-size 100" in joined
     assert "--mem-budget 8,32" in joined  # CSV: run.sh converts comma->space
     assert "--critique full" in joined

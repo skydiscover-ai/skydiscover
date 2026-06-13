@@ -42,7 +42,7 @@ search:
     backend: claude
     mode: ltm # ltm = hardware tier; inmem = portable tier
     workload: "50:50" # -> run.sh --setup (REQUIRED)
-    distribution: "zipf(0.99)" # REQUIRED (or set trace_load + trace_run)
+    distribution: "zipf" # -> run.sh --distribution (theta=0.99 comes from the zipf trace); REQUIRED (or trace_load+trace_run)
     value_size: 100
     mem_budget_gb: [8] # LIST allowed (I4)
     threads: [16]
@@ -52,5 +52,4 @@ search:
 
 evaluator:
   timeout: 1800
-  cascade_evaluation: true
-  cascade_thresholds: [0.0, 0.5] # stage1 = build + correctness gate, stage2 = benchmark
+  cascade_evaluation: false # -s jitskit self-evaluates; the task evaluator is a single fail-closed stage

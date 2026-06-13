@@ -18,7 +18,7 @@ benchmarks/kvstore/
 ├── README.md
 ├── resolver.py              # maps params.task -> a checked-in task dir (path-free runs)
 ├── _harness -> ../../skydiscover/search/jitskit/runtime/interface   # symlink: the ONE harness (no copy)
-├── _baselines/results.json  # FASTER/F2/RocksDB/Redis numbers, hardware-tagged
+├── _baselines/results.json  # FASTER/F2/RocksDB/Redis reference numbers (currently null — TODO, measured on box)
 └── 0001_ycsb50_zipf_8gb/     # a task instance
     ├── spec.md              # human-facing statement (API, property, workload, budget, baseline)
     ├── config.yaml          # machine-facing spec (parses against the real SkyDiscover schema)

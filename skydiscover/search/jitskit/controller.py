@@ -117,7 +117,7 @@ class JitsKitController(DiscoveryController):
         if not (has_distribution or has_trace):
             raise ValueError(
                 "jitskit requires a workload source: set search.database.distribution "
-                "(e.g. 'zipf(0.99)') OR both trace_load and trace_run."
+                "(e.g. 'zipf') OR both trace_load and trace_run."
             )
 
     def _build_flags(self, db, max_iterations: int) -> List[str]:
@@ -138,7 +138,9 @@ class JitsKitController(DiscoveryController):
         if getattr(db, "trace_load", None) and getattr(db, "trace_run", None):
             flags += ["--trace-load", str(db.trace_load), "--trace-run", str(db.trace_run)]
         elif getattr(db, "distribution", None):
-            flags += ["--distribution", str(db.distribution)]
+            # run.sh's --distribution takes a bare token (zipf/uniform/...); a theta in
+            # e.g. "zipf(0.99)" is carried by the trace file, not the flag — strip it.
+            flags += ["--distribution", str(db.distribution).split("(", 1)[0].strip()]
 
         # Scalar pass-throughs: (attribute, flag).
         for attr, flag in [

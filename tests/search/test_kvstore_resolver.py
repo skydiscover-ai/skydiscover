@@ -25,8 +25,8 @@ def test_resolver_resolves_checked_in_task(tmp_path):
     res = _resolver().resolve({"task": _TASK}, output_dir=tmp_path)
     assert res.initial_program_path.endswith(f"{_TASK}/initial_program.cc")
     assert Path(res.initial_program_path).exists()
-    assert res.evaluator_path.endswith(f"{_TASK}/evaluator")
-    assert Path(res.evaluator_path).is_dir()
+    assert res.evaluator_path.endswith(f"{_TASK}/evaluator/evaluator.py")
+    assert Path(res.evaluator_path).is_file()
 
 
 def test_resolver_forwards_spec_as_env(tmp_path):
@@ -57,7 +57,7 @@ def test_task_config_parses_against_real_schema():
     db = cfg.search.database
     assert isinstance(db, JitsKitConfig)
     assert db.workload == "50:50"
-    assert db.distribution == "zipf(0.99)"
+    assert db.distribution == "zipf"  # the run.sh token; theta is in the trace, not the flag
     assert db.mem_budget_gb == [8]
     assert db.threads == [16]
     # the resolver + spec live under benchmark

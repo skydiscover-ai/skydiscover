@@ -45,13 +45,17 @@ class KVStoreResolver(BenchmarkResolver):
 
         task_dir = _FAMILY_DIR / task_id
         initial_program = task_dir / "initial_program.cc"
-        evaluator = task_dir / "evaluator"
+        # Return the evaluator .py file (not the dir): create_evaluator routes a .py to the
+        # host Evaluator. A bare dir only works for a Dockerfile-based ContainerizedEvaluator.
+        evaluator = task_dir / "evaluator" / "evaluator.py"
         if not initial_program.exists():
             raise FileNotFoundError(
                 f"No initial_program.cc for task {task_id!r} at {initial_program}"
             )
-        if not evaluator.is_dir():
-            raise FileNotFoundError(f"No evaluator/ for task {task_id!r} at {evaluator}")
+        if not evaluator.exists():
+            raise FileNotFoundError(
+                f"No evaluator/evaluator.py for task {task_id!r} at {evaluator}"
+            )
 
         env_vars = {
             f"SKYKV_{key.upper()}": str(config[key])
