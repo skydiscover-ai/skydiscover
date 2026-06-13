@@ -502,6 +502,56 @@ class GEPANativeDatabaseConfig(DatabaseConfig):
     random_seed: Optional[int] = 42
 
 
+@dataclass
+class JitsKitConfig(DatabaseConfig):
+    """Configuration for the Jitskit agentic KV-store synthesis strategy.
+
+    A faithful superset of the runtime's knobs (invariant I3): every field maps
+    to a ``run.sh`` flag / ``SKYKV_*`` var.  These ride on ``search.database``
+    extras, e.g.::
+
+        search:
+          type: jitskit
+          database:
+            backend: claude
+            mode: ltm
+            threads: [16]
+            mem_budget_gb: [8]
+            critique_mode: full
+
+    Unknown extra keys are also tolerated (``config.from_dict`` ``setattr``s
+    them), so new runtime flags need no schema change here.
+    """
+
+    # Path to the vendored runtime (the skykv-claude project ROOT = PROJECT_DIR).
+    # None -> the bundled submodule at search/jitskit/runtime.
+    runtime_dir: Optional[str] = None
+
+    backend: str = "claude"  # claude | codex
+    mode: str = "ltm"  # inmem | ltm
+    model: Optional[str] = None
+    workload: Optional[str] = None  # run.sh --setup (workload mix key, e.g. "50:50")
+    distribution: Optional[str] = None
+    value_size: Optional[int] = None
+    num_keys: Optional[int] = None
+    mem_budget_gb: Optional[List[int]] = None  # list allowed (I4)
+    threads: Optional[List[int]] = None
+    max_turns: Optional[int] = None
+    critique_mode: Optional[str] = None  # off | review | audit | full
+    feedback_level: Optional[str] = None  # minimal | rich
+    audit_every: Optional[int] = None
+    audit_checks_dir: Optional[str] = None
+    seed: Optional[int] = None
+    num_workers: Optional[int] = None
+    parallel_eval: bool = False
+    no_planner: bool = False
+    no_leaderboard: bool = False
+    show_baseline: bool = False
+    # Explicit trace files; bypass the runtime's hardcoded /mnt/ssd/ycsb_data.
+    trace_load: Optional[str] = None
+    trace_run: Optional[str] = None
+
+
 _DB_CONFIG_BY_TYPE: Dict[str, type] = {
     "evox": EvoxDatabaseConfig,
     "beam_search": BeamSearchDatabaseConfig,
@@ -511,6 +561,7 @@ _DB_CONFIG_BY_TYPE: Dict[str, type] = {
     "openevolve_native": OpenEvolveNativeDatabaseConfig,
     "gepa_native": GEPANativeDatabaseConfig,
     "claude_code": ClaudeCodeConfig,
+    "jitskit": JitsKitConfig,
 }
 
 

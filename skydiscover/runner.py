@@ -184,8 +184,15 @@ class Runner:
                 self._save_checkpoint(final_iteration)
 
             # Re-evaluate best program in test mode (authoritative score).
+            #
+            # Agentic strategies that own their bare-metal measurement (e.g.
+            # ``jitskit``) opt out via ``skip_test_rescore``: their reported
+            # score IS their own loop's number, and a re-measure here — possibly
+            # Dockerized, off the measurement hardware — would be weaker and
+            # non-comparable (integration invariant I1).
             best = self._get_best_program()
-            if best:
+            skip_rescore = getattr(self.discovery_controller, "skip_test_rescore", False)
+            if best and not skip_rescore:
                 try:
                     test_result = await self.discovery_controller.evaluator.evaluate_program(
                         best.solution, best.id, mode="test"

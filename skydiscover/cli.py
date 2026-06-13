@@ -32,6 +32,7 @@ _SEARCH_CHOICES = [
     "gepa",
     "gepa_native",
     "claude_code",
+    "jitskit",
 ]
 
 
