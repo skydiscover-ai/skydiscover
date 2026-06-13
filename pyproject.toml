@@ -127,6 +127,14 @@ skydiscover = [
     # Vendored jitskit runtime: ship the WHOLE subtree (run.sh, .cc/.h harness, cards,
     # prompts, traces, CMake) as data — the dir is invoked via subprocess, not imported,
     # so it is excluded from packages.find and must come in as package-data.
+    #
+    # NOTE: `**` copies from the working tree (not git), so it would also sweep in any
+    # untracked build artifacts the runtime's .gitignore excludes (e.g. a locally-compiled
+    # `traces/belady/belady_sim`, `*.o`, `build/`). Those are never tracked, so a release
+    # built from a clean checkout (`git clone` / `git archive`) is clean by construction.
+    # Build releases from a clean tree; do not `uv build` over a dev tree that has run the
+    # runtime's native builds. (setuptools `exclude-package-data` does NOT reliably remove
+    # files already matched by a `**` include, so it is not used here.)
     "search/jitskit/runtime/**",
 ]
 
