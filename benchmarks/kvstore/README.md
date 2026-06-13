@@ -23,7 +23,7 @@ benchmarks/kvstore/
     ├── spec.md              # human-facing statement (API, property, workload, budget, baseline)
     ├── config.yaml          # machine-facing spec (parses against the real SkyDiscover schema)
     ├── initial_program.cc   # trivial in-memory seed implementing IKVStore, with EVOLVE-BLOCK markers
-    └── evaluator/           # build -> 6 consistency tests (HARD GATE) -> benchmark -> combined_score
+    └── evaluator/           # non-jitskit scoring only (fail-closed placeholder; jitskit self-evaluates)
 ```
 
 `_`-prefixed dirs (`_harness`, `_baselines`) are **shared**, not tasks — the resolver and any
@@ -43,10 +43,15 @@ task-discovery skip them.
 interface`) — the exact `kvstore_interface.h`, `benchmark_harness.cc`, `consistency_harness.cc`,
 `CMakeLists.txt` that jitskit's own loop compiles. **There is no second copy**; it can never drift.
 
-The non-jitskit evaluator stages the candidate **flat** alongside these files and builds on the host
-(hence the seed's flat `#include "kvstore_interface.h"`). This path is **build-tier — verify on a box
-with the C++ toolchain**; it is not exercised in CI. `-s jitskit` does **not** use this evaluator at
-all — it reads the runtime's own `leaderboard.json`.
+`-s jitskit` does **not** use the task `evaluator/` at all — jitskit drives the runtime's own
+build → 6-test gate → benchmark and reports its `leaderboard.json` peak.
+
+The task `evaluator/` exists only to score **non-jitskit** strategies (claude_code, evolutionary).
+Scoring a KV candidate correctly means running the runtime's REAL harness (build `kvstore_bench` +
+`consistency_test`, run the gate + benchmark with real traces/threads/budget on the measurement box),
+so the proper evaluator is a thin wrapper over the runtime's eval — **not** a hand-rolled
+reimplementation. Until that wrapper is built on the box, `evaluator.py` **fails closed** (returns
+`validity: 0` with a clear message) rather than shipping a wrong score.
 
 ## Adding a task
 
