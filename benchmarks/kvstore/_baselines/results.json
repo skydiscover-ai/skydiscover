@@ -1,0 +1,28 @@
+{
+  "_comment": "Checked-in baseline throughput (peak Mops/s) for kvstore tasks, tagged by the hardware tier they were measured on. Each baseline runs at its most-favorable published config, with per-key workload matched to the task and crash durability no stronger than the task's requirement card. Values marked null are TODO: measure on the reference box and fill in (do NOT fabricate).",
+  "hardware_tiers": {
+    "gcp-n2-standard-64": {
+      "machine": "GCP n2-standard-64",
+      "cpu": "64 vCPU (2 sockets x 16 cores x 2 HT)",
+      "memory": "256 GB DDR4",
+      "storage": "NVMe SSD RAID at the scratch dir",
+      "numa": "2 NUMA nodes; benchmark pinned to node 0"
+    }
+  },
+  "tasks": {
+    "0001_ycsb50_zipf_8gb": {
+      "hardware_tier": "gcp-n2-standard-64",
+      "workload": "50:50",
+      "distribution": "zipf(0.99)",
+      "value_size": 100,
+      "mem_budget_gb": 8,
+      "threads": 16,
+      "baselines": {
+        "FASTER": { "peak_mops": null },
+        "F2": { "peak_mops": null },
+        "RocksDB": { "peak_mops": null },
+        "Redis": { "peak_mops": null }
+      }
+    }
+  }
+}

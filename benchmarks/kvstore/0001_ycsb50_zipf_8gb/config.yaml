@@ -1,0 +1,56 @@
+# kvstore task 0001 — YCSB 50:50 read/upsert, Zipf(0.99), 8 GB budget.
+#
+# Run it (path-free via the resolver):
+#   skydiscover-run -c benchmarks/kvstore/0001_ycsb50_zipf_8gb/config.yaml -s jitskit
+# Compare another strategy on the SAME task:
+#   skydiscover-run -c benchmarks/kvstore/0001_ycsb50_zipf_8gb/config.yaml -s claude_code
+
+language: cpp
+max_iterations: 50
+checkpoint_interval: 1
+
+llm:
+  models:
+    - name: claude-sonnet-4-6
+      weight: 1.0
+
+monitor:
+  enabled: true # live dashboard is config-driven (there is no --monitor flag)
+  port: 8765
+
+# The resolver maps params.task to this checked-in task dir (initial_program.cc +
+# evaluator/) so no program/evaluator paths are needed on the command line.
+benchmark:
+  enabled: true
+  name: kvstore
+  resolver: benchmarks.kvstore.resolver
+  # Keys below are not BenchmarkConfig fields, so they land in benchmark.params
+  # and are passed to the resolver (the kernelbench convention).
+  task: "0001_ycsb50_zipf_8gb"
+  # human-facing spec, forwarded to the evaluator as SKYKV_* env vars:
+  workload: "50:50"
+  distribution: "zipf(0.99)"
+  value_size: 100
+  mem_budget_gb: 8
+  baseline: FASTER
+
+# jitskit's own knobs ride here (algorithm-specific extras). For the shipped
+# Phase-1 controller these are the source of truth for the run.sh flags.
+search:
+  type: jitskit
+  database:
+    backend: claude
+    mode: ltm # ltm = hardware tier; inmem = portable tier
+    workload: "50:50" # -> run.sh --setup (REQUIRED)
+    distribution: "zipf(0.99)" # REQUIRED (or set trace_load + trace_run)
+    value_size: 100
+    mem_budget_gb: [8] # LIST allowed (I4)
+    threads: [16]
+    critique_mode: full # off | review | audit | full
+    feedback_level: rich # minimal | rich
+    audit_every: 15
+
+evaluator:
+  timeout: 1800
+  cascade_evaluation: true
+  cascade_thresholds: [0.0, 0.5] # stage1 = build + correctness gate, stage2 = benchmark

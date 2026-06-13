@@ -1,0 +1,2 @@
+# The evaluator is pure stdlib Python; the heavy lifting is cmake/make + the C++
+# harness. No third-party Python packages are required.
