@@ -1,0 +1,143 @@
+# Planning Prompt Template
+#
+# Read by bench/orchestrator.py::PromptBuilder.build_planning(). Section
+# delimiters follow the same convention as generator_prompt.txt:
+# `## SECTION_NAME` where NAME is UPPER_SNAKE_CASE.
+#
+# Python str.format() placeholders:
+#   {baseline_name}   e.g., "FASTER"
+#   {dist_desc}       e.g., "Zipfian θ=0.99"
+#   {setup_desc}      e.g., "50% Read, 50% Upsert"
+#   {value_size}      e.g., 100
+#   {budget_str}      e.g., "8 GB / 32 GB" or "unlimited"
+#   {dataset_gb}      e.g., 24.4
+#   {threads_str}     e.g., "16"
+#   {iterations}      e.g., 50
+#   {max_turns}       e.g., 50
+
+## PLANNING
+
+## Phase 0: Exploration Planning
+
+You have **{iterations} iterations** to build a KV store that beats {baseline_name}
+on the workload signature below. Before writing any code, spend this turn studying
+the problem and creating a structured exploration plan.
+
+### Workload signature
+  - Distribution: {dist_desc}
+  - Mix:          {setup_desc}
+  - Value size:   {value_size} B
+  - Mem budget:   {budget_str}   (working-set ~ {dataset_gb} GB at 250M x {value_size} B)
+  - Threads:      {threads_str}
+
+### What to read (do this first)
+  1. `cards/system_card.json` — API contract, consistency model, hardware
+  2. `cards/trace_card.json` — dataset, workloads, benchmark protocol
+  3. `cards/design_hints.json` — FASTER's 8 key design principles (SIGMOD'18)
+  4. `interface/kvstore_interface.h` — the abstract class you must implement
+  5. `interface/benchmark_harness.cc` — what the benchmark actually measures
+  6. `interface/consistency_harness.cc` — what correctness tests check
+
+### What to produce
+
+After reading the specs, write a file `planning/whiteboard.md` with:
+
+1. **Workload analysis** (1 paragraph): What makes this workload signature
+   special? What are the bottlenecks? Where does {baseline_name}'s design
+   fit well or poorly for this specific mix/distribution/budget?
+
+2. **Exploration plan** (3-5 distinct approaches): Each approach should be
+   an architecturally different idea — not a parameter tweak on the same
+   design. For each approach, include:
+   - **Name**: Short memorable label (e.g., "Epoch-free flat hash", "NUMA-split log")
+   - **Core idea**: 2-3 sentences on the key design choice
+   - **Research anchor**: Name the closest published design you know of
+     (e.g., FASTER SIGMOD'18, F2, MICA, Masstree, CLHT, ART, log-structured
+     hash indexes, LSM variants) and state what you'd change given this
+     workload's numbers. If you're unsure of a paper's name, describe the
+     technique precisely — do not invent citations.
+   - **First-principles rationale**: One sentence connecting a *quantified*
+     property of this workload (skew, budget, hot-set size, value size ×
+     count, NUMA topology, cache/memory ratio) to the structural choice.
+     Example: "θ=0.99 → top 1% keys = 90% traffic → 2.5M hot keys × {value_size}B
+     ≈ X MB, fits/doesn't fit in L3 per socket (~30MB) → per-socket hot cache
+     justified." No hand-waving rationales.
+   - **Why it might win**: What bottleneck does it attack?
+   - **Risk**: What could go wrong? (correctness, scaling, memory fit)
+   - **Iteration budget**: Which iterations to try this (e.g., "iters 1-3")
+
+3. **Iteration strategy**: How will you allocate your {iterations} iterations?
+   - Suggest spending ~2-3 iterations per approach to build + benchmark + refine
+   - Leave a few iterations at the end for polishing your best performer
+   - If an approach fails correctness on the first try, give it ONE more iteration to fix, then move on
+   - If an approach builds and passes correctness but benchmarks poorly, move on immediately
+
+4. **Learnings log** (leave empty for now): A section at the bottom titled
+   `## Learnings` where you will record observations after each iteration.
+
+### About the whiteboard
+
+`planning/whiteboard.md` is a **living document**. You will update it at the
+start of every future iteration after you see your benchmark results. Use it to:
+  - Record what worked and what didn't (with numbers)
+  - Adjust the plan based on evidence
+  - Track which approaches you've tried and what you learned
+  - Note any surprising behavior or bottlenecks you discovered
+
+### Guidelines
+
+- **You are scored on your BEST throughput across ALL iterations, not the final
+  one.** Your previous best is always preserved — you lose nothing by trying a
+  radically different architecture. Never "hold the winner" or play it safe.
+  Every iteration should attempt a meaningful change.
+
+- **Diversity over depth.** Trying 4 different architectures for 3 iterations
+  each will almost always beat spending 12 iterations micro-optimizing one design.
+  The search space for KV store designs is wide — don't get stuck in a local optimum.
+
+- **Each approach should be a fresh start.** Don't incrementally modify approach A
+  into approach B. Rewrite `kvstore_impl.cc` from scratch for each new approach.
+  Keep the best-performing implementation as your reference, but don't let inertia
+  from prior code constrain your design choices.
+
+- **{baseline_name}'s design hints are a starting point, not a ceiling.** The
+  design_hints.json describes what {baseline_name} does. You can adopt, adapt,
+  or reject any of those principles. The goal is to beat {baseline_name}, not to
+  reimplement it.
+
+- **Correctness is non-negotiable.** Every approach must pass all crash recovery
+  and consistency tests. Factor this into your risk estimates — some designs
+  (e.g., lock-free epoch-based) are harder to get correct.
+
+- **Think about the hardware.** GCP n2-standard-64: 64 vCPU (2 NUMA nodes),
+  256 GB RAM, NVMe SSDs. NUMA topology, cache line sizes, and memory bandwidth
+  matter for throughput at high thread counts.
+
+Do NOT write any implementation code in this turn. Just read, analyze, and plan.
+
+### Two artifacts to produce
+
+1. **`planning/whiteboard.md`** — the exploration plan described above.
+
+2. **`planning/design.md`** — a concrete design spec for the FIRST approach
+   you'll implement in iteration 1. This seeds iteration 1 so the generator
+   can start implementing immediately without a separate design turn. Use
+   exactly these fields:
+
+   - **Approach**: Name from whiteboard (e.g., "Epoch-free flat hash")
+   - **Key data structures**: Main structures + estimated memory footprint
+     (hash table size, buckets, page cache, log buffer, etc.)
+   - **Disk I/O strategy**: Sequential vs random, expected read/write
+     pattern during load and during the timed run
+   - **Concurrency model**: Locks / lock-free / sharded — and how many
+     shards/stripes
+   - **Memory budget plan**: What fits in memory, what spills to disk,
+     eviction policy. Target ≥ 90% budget utilization.
+   - **Checkpoint/recovery**: How `Checkpoint()` works; how recovery reads
+     state back
+   - **First-principles rationale**: One paragraph. Quantify at least one
+     workload property and connect it to the structural choice above.
+   - **Biggest risk**: What is most likely to fail — correctness, scaling,
+     memory fit, or something else?
+
+Confirm both files when done.

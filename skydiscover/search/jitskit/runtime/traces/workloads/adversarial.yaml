@@ -1,0 +1,15 @@
+# Adversarial workloads that exploit FASTER's FIFO eviction.
+#
+# Usage:
+#   python3 traces/sweep.py traces/workloads/adversarial.yaml
+
+name: adversarial
+
+traces:
+  - generator: scan
+
+  - generator: belady
+    working_set: 50000001
+
+  - generator: stride
+    working_set: 45000000

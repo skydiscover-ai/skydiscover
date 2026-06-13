@@ -5,11 +5,11 @@
 // claude_code, or an evolutionary loop) is expected to evolve the region between
 // the EVOLVE-BLOCK markers into a specialized, high-throughput design.
 //
-// It implements the full IKVStore contract from the shared harness. Build it
-// against benchmarks/kvstore/_harness/ (populated from the runtime — see the
-// family README).
+// It implements the full IKVStore contract from the shared harness. The evaluator
+// stages this file flat alongside the harness (the single source — the runtime's
+// interface/; see the family README), so the include is flat.
 
-#include "../_harness/kvstore_interface.h"
+#include "kvstore_interface.h"
 
 #include <cstring>
 #include <mutex>

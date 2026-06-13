@@ -1,0 +1,87 @@
+# Design Stage Prompt Template
+#
+# Read by bench/orchestrator.py::PromptBuilder.build_design(). Section
+# delimiters follow the same convention as generator_prompt.txt.
+#
+# Python str.format() placeholders:
+#   {iteration}       e.g., 3
+#   {total_iters}     e.g., 30
+#   {baseline_name}   e.g., "FASTER"
+#   {status_feedback}  pre-formatted feedback block from previous iteration
+#   {best_block}       best-so-far reference block (or empty)
+#   {critique_block}   reviewer critique (or empty)
+
+## DESIGN_SUBSEQUENT
+
+## Stage A: Reflect + Design (iteration {iteration}/{total_iters})
+
+Before writing any code, do two things:
+
+### 1. Reflect on previous results
+
+{status_feedback}
+{best_block}
+{critique_block}
+
+Read your whiteboard at `planning/whiteboard.md`. **Update the `## Learnings`
+section** with what you learned from the results above. Be specific:
+- What was the throughput? What % of {baseline_name}?
+- If it timed out: was the load slow? Why? (random I/O? too many allocations?)
+- If correctness failed: which test? What's the root cause?
+- If it worked: what was the bottleneck? (CPU? disk? memory? contention?)
+
+### 2. Design the next iteration
+
+Based on your learnings, decide: **refine the current approach or pivot?**
+
+**IMPORTANT: You are scored on your BEST throughput across ALL iterations, not
+your final iteration.** If your current approach plateaus, you lose nothing by
+trying a radically different architecture — your previous best is already
+locked in. Never "hold the winner" or play it safe. Every iteration should
+attempt a meaningful change. Stagnation is the worst outcome.
+
+- If the current approach is working but has plateaued for 2+ iterations:
+  **pivot to a different architecture.** Try something structurally different.
+- If the current approach is still improving: refine it. Identify the specific
+  bottleneck and target it.
+- If the current approach failed (build error, correctness failure, timeout):
+  either fix the specific bug OR pivot to the next approach from your plan.
+
+Write a design spec to `planning/design.md` with:
+
+1. **Decision**: Continue/refine or pivot? Why?
+2. **Approach**: Name from the whiteboard (or new approach if pivoting)
+3. **What to change**: If refining — what specific change and why?
+   If pivoting — what's the new architecture?
+4. **Key data structures**: Main structures with estimated memory footprint
+5. **Disk I/O strategy**: Sequential or random? Expected pattern during load/run?
+6. **Memory budget plan**: What fits in memory? Eviction policy?
+7. **First-principles rationale**: One paragraph. Quantify at least one
+   workload property (skew, hot-set size, value size × count, NUMA topology,
+   cache/memory ratio, dataset/budget ratio) and connect it to the structural
+   choice above. If you're citing a published technique (FASTER, F2, MICA,
+   Masstree, CLHT, ART, LSM variants), describe it — do not invent names.
+   Hand-waving rationales ("faster because hash table") fail this field.
+8. **Anti-hack check**: Will your implementation store ALL values as opaque
+   blobs? Will it work for ANY key distribution, not just sequential integers?
+   If you're tempted to skip storing some values — don't. That's reward hacking.
+
+Keep it short — one page max.
+
+**Do NOT write any C++ code in this stage.** Just update the whiteboard and
+write the design spec.
+
+## IMPLEMENT
+
+## Stage B: Implement your design
+
+Read your design spec at `planning/design.md`. Implement it.
+
+- Build: `cd interface/build && cmake .. -DCMAKE_BUILD_TYPE=Release && make -j$(nproc)`
+- If it doesn't compile, fix it within this stage
+- If you have turns left, run a correctness test to sanity-check
+
+Focus on getting a correct, complete implementation. The orchestrator will
+handle the full correctness suite and benchmark after your turn.
+
+**Do NOT redesign.** The design was decided in Stage A. Just implement it.

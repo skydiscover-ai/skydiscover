@@ -1,0 +1,32 @@
+{
+  "title": "Trace Card",
+
+  "dataset": {
+    "load_keys": "_PATCHED_AT_RUNTIME_",
+    "run_keys": "_PATCHED_AT_RUNTIME_",
+    "key_type": "uint64_t (8 bytes)",
+    "value_type": "byte array",
+    "value_size": "_PATCHED_AT_RUNTIME_",
+    "load_file": "_PATCHED_AT_RUNTIME_",
+    "run_file": "_PATCHED_AT_RUNTIME_"
+  },
+
+  "distribution": "_PATCHED_AT_RUNTIME_",
+
+  "workload": "_PATCHED_AT_RUNTIME_",
+
+  "available_workloads": [
+    { "id": 0, "name": "50:50",      "description": "50% reads, 50% blind updates" },
+    { "id": 1, "name": "0:100 RMW",  "description": "100% read-modify-write" },
+    { "id": 3, "name": "100:0",      "description": "100% reads" },
+    { "id": 4, "name": "0:100",      "description": "100% blind updates" },
+    { "id": 5, "name": "ts-head",    "description": "Time-series head-delete: inserts append at monotone tail, deletes only remove from head. Delete rate = KVSTORE_DELETE_RATE (default 1.0 = stationary window). Read() on a key below head MUST return false; Read() on a key in [head, tail) MUST succeed -- the harness spot-checks both after the run." }
+  ],
+
+  "benchmark_execution": {
+    "measurement_mode": "time-based",
+    "run_phase_duration_seconds": 30,
+    "load_phase": "Populate the store with all initial keys before the timed run",
+    "timed_run_phase": "Run operations for 30 seconds, measure total ops completed"
+  }
+}

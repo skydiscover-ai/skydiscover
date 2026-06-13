@@ -1,6 +1,3 @@
 [submodule "benchmarks/ale_bench/ALE-Bench"]
 	path = benchmarks/ale_bench/ALE-Bench
 	url = https://github.com/SakanaAI/ALE-Bench.git
-[submodule "skydiscover/search/jitskit/runtime"]
-	path = skydiscover/search/jitskit/runtime
-	url = git@github.com:skydiscover-ai/skykv-claude.git

@@ -1,0 +1,51 @@
+{
+  "title": "Key-Value Store System Card",
+  "source": "Chandramouli et al., FASTER: A Concurrent Key-Value Store with In-Place Updates, SIGMOD 2018",
+
+  "api": {
+    "operations": [
+      "Read: Read the value corresponding to a key.",
+      "Upsert: Replace the value corresponding to a key with a new value blindly (i.e. regardless of the existing value). Insert as new, if the key does not exist.",
+      "RMW: Update the value of a key based on the existing value and an input using update logic provided at compile-time. The user also provides an initial value for the update, which is used when a key does not exist in the store.",
+      "Delete: Delete a key from the store."
+    ],
+    "key_semantics": "Keys are opaque uint64_t values. The store must handle any key distribution -- keys may be sparse, non-sequential, or randomly distributed across the full uint64_t range.",
+    "access_pattern": "Point operations only (no range scans)"
+  },
+
+  "concurrency": "The store must support concurrent access from multiple threads and scale with increasing thread count.",
+
+  "consistency_and_recovery": {
+    "monotonicity_property": "For any two update requests r1 and r2 issued (in order) by a thread, the state after recovery includes the effects of (1) none; (2) only r1; or (3) both r1 and r2. In other words, the state after recovery cannot include the effects of r2 without also including r1.",
+    "checkpointing": "The store must support a Checkpoint() operation that persists the current state to disk. Applications can periodically obtain a fuzzy checkpoint of the store.",
+    "read_correctness": "Concurrent reads must never observe torn or corrupted values while other threads are performing updates."
+  },
+
+  "memory_constraint": {
+    "_comment": "Patched at runtime by agent-pipeline/orchestrator.py.",
+    "primary_scenario_gb": [],
+    "note": "primary_scenario_gb lists the budgets you will be benchmarked at (optimization targets). mem_budget_bytes is passed at runtime via InitExtended() and may be ANY value. ALL data-structure sizing (hash buckets, cache entries, buffer pool pages, etc.) MUST be computed from mem_budget_bytes at runtime, not hardcoded for a specific budget.",
+    "storage_path": "Directory for disk-backed storage, provided via InitExtended()",
+    "ssd_specs": "NVMe SSD at /mnt/ssd. Sequential read: ~3 GB/s. Sequential write: ~2 GB/s. Random 4KB read: ~500K IOPS. Random 4KB write: ~200K IOPS."
+  },
+
+  "hardware": {
+    "machine": "GCP n2-standard-64",
+    "cpu": "64 vCPU (2 sockets x 16 cores x 2 HT)",
+    "memory": "256 GB DDR4 (store budget may be limited via mem_budget_bytes)",
+    "storage": "NVMe SSD RAID at /mnt/ssd (2.9 TB)",
+    "numa": "2 NUMA nodes; benchmark runs on NUMA node 0"
+  },
+
+  "software_constraints": {
+    "os": "Ubuntu 22.04 Linux",
+    "compiler": "g++ C++17, -O3 -march=native",
+    "allowed_libraries": ["C++17 STL", "POSIX threads", "POSIX file I/O (open, pread, pwrite, fdatasync)", "Linux AIO or io_uring", "mmap"]
+  },
+
+  "optimization_objective": "Maximize total operations per second across all threads.",
+
+  "design_space": {
+    "note": "Fully open -- any architecture is acceptable provided it satisfies the full API (including Delete), concurrency, the monotonicity property, read correctness, and memory constraint above. Novel designs are encouraged."
+  }
+}

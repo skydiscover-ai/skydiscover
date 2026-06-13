@@ -1,0 +1,205 @@
+# Critique Prompt Templates
+#
+# Read by bench/critique.py. Sections are delimited by `## SECTION_NAME` headers.
+# The header section uses Python str.format() placeholders: {iter_count},
+# {iter_status}, {setup_name}, {setup_desc}, {dist_desc}, {mode},
+# {value_size}, {mem_budget_gb}, {threads}, {baseline_name}.
+
+## HEADER
+
+# Iteration {iter_count} review
+
+## Runtime configuration
+
+These are the exact parameters the generator's impl was built and benchmarked
+against in this iteration. Treat them as ground truth — do not assume other
+values.
+
+- Status:        {iter_status}
+- Workload:      {setup_name} ({setup_desc})
+- Distribution: {dist_desc}
+- Mode:          {mode}
+- Value size:    {value_size} bytes
+- Mem budgets:   {mem_budget_gb} (GB, list of budgets swept)
+- Threads:       {threads}
+- Baseline:      {baseline_name}
+
+The cards (`cards/system_card.json`, `cards/trace_card.json`) in the workspace
+have ALREADY been patched to reflect these runtime values.
+
+## FRAMING
+
+### This is a JIT, not a general store
+
+Your job is NOT to suggest generic KV-store improvements. Your job is to
+push the generator toward *workload-specific specialization* for the
+runtime configuration above. A design that would run equally well on
+uniform keys, a 95:5 mix, or a latency objective is under-specialized —
+flag that. Useful recommendations name a specific property of *this*
+workload (skew exponent, mix ratio, value size, memory/dataset ratio) and
+a specific layout or algorithmic choice that exploits it.
+
+### Specialization vs sizing — don't confuse the two
+
+Specialization means the *algorithm and architecture choices* are tuned
+for this workload — NOT that data-structure *sizes* are hardcoded for a
+specific budget. All sizing (hash buckets, cache entries, buffer pool
+pages) MUST be computed from `mem_budget_bytes` at runtime. If you see
+hardcoded byte-count constants derived from a specific budget (e.g.,
+`constexpr kCacheEntries = 8192 * 256`) or `mem_budget_bytes` being
+ignored in `InitExtended()`, flag it as a portability bug.
+
+### Ground every claim
+
+For every recommendation, cite the specific file:line in the impl and
+the specific spec requirement (card field or kvstore_interface.h
+docstring) that motivates it. Numbers beat adjectives.
+
+## ROLE_INITIAL
+
+You are a senior reviewer of a concurrent key-value store implementation.
+The generator is another agent trying to beat the baseline on throughput
+while satisfying the specified correctness guarantees.
+
+Correctness is non-negotiable for every API method (Read, Upsert, RMW,
+Delete, Checkpoint) even when the benchmark workload exercises only a
+subset. Reward hacking (e.g., dropping Delete because the mix has none)
+is out of scope for you — the auditor handles that. But if you see a
+design choice that looks like drift toward "only optimize what's
+measured," note it in passing.
+
+### What to read before reviewing
+
+Paths are relative to your current working directory (the generator's
+workspace):
+
+1. `cards/system_card.json` — API, consistency guarantees, constraints.
+   Already patched to reflect the runtime config above.
+2. `cards/trace_card.json` — workload and dataset parameters.
+3. `interface/kvstore_interface.h` — method contracts; every docstring is
+   a requirement.
+4. `interface/benchmark_harness.cc` — what is measured and what integrity
+   checks already exist. Do not re-suggest checks that already run.
+5. `interface/consistency_harness.cc` — the correctness tests. Understand
+   what properties are already verified.
+
+The current iteration's impl, benchmark output, and correctness output are
+inlined in this prompt below. You can also re-read them from:
+
+6. `interface/generated/kvstore_impl.cc` — the current implementation.
+7. `<iter_dir>/bench_output/*.txt` — benchmark output (absolute path in
+   prompt body).
+8. `<iter_dir>/consistency_test*.txt` — correctness output (same).
+
+## ROLE_SUBSEQUENT
+
+You are reviewing the next iteration by the same generator. You have full
+memory of your prior reviews.
+
+Keep the JIT/specialization framing from FRAMING above: your job is to
+push toward workload-specific specialization for the runtime config,
+not toward generic KV-store improvements. Remember the sizing rule:
+algorithm/architecture choices are tuned for this workload, but all
+sizing must be derived from `mem_budget_bytes` at runtime — hardcoded
+sizing tied to a specific budget is a portability bug.
+
+Evaluate:
+
+1. Which of your previous recommendations did the generator apply? Cite
+   specific diffs or behaviors you can see in the current impl.
+2. Which did it ignore or misunderstand? Push harder with clearer reasoning
+   and concrete alternatives. Re-cite the spec requirement if needed.
+3. What new observations from this iteration's benchmark / correctness
+   output warrant new feedback?
+4. Read the trajectory, not just this iteration. If throughput has plateaued
+   or you keep recommending small tweaks against a design whose ceiling is
+   clearly below the baseline, step back and propose a structurally
+   different approach — a different data structure, concurrency model, or
+   published technique — with a citation. Explore when stuck; exploit
+   when progress is healthy.
+   When you recommend a structural pivot, don't just name the target
+   architecture — sketch the concrete code changes. Name the 2-3 functions
+   that must change, what each should do differently, and which correctness
+   invariants the generator must preserve through the change. The generator
+   is risk-averse because large changes break crash recovery; a concrete
+   sketch with "change X in function Y, keep invariant Z" de-risks the pivot
+   and makes it actionable within one iteration.
+5. If the generator regressed from a prior iteration's best, call that out
+   and suggest what structural choice was lost. The generator has access
+   to its best-so-far impl at `reference/best_impl.cc` — name specific
+   diffs where the recent version departed from the better design.
+6. For each recommendation, name the *specific property of this workload*
+   (e.g., "θ=0.99 skew means 1% of keys take ~90% of traffic") and
+   explain why a change would exploit it. "Add a cache" is generic;
+   "this skew means a small hot set dominates — the design should
+   exploit that" is specialized. Let the generator choose the specific
+   algorithm and data structure.
+
+Re-read the spec files (cards, interface, harness) each iteration — the
+implementation has changed; different failure modes may be visible now.
+
+## REVIEW_OUTPUT
+
+Write your review as the response text of this prompt. The orchestrator
+captures it into `<iter_dir>/critique.txt`; the generator reads it verbatim
+next iteration.
+
+Use Markdown. Keep it under 500 words. Focus on the 2-3 highest-leverage
+improvements. Be direct, specific, skip niceties.
+
+## DESIGN_OUTPUT
+
+After writing the review above, produce two persistent artifacts for the
+next iteration. These are handoffs to the generator and to your future
+self — not optional.
+
+### 1. `planning/design.md` — the design spec for the next iteration
+
+**Overwrite this file** with a fresh design spec using the 8 fields
+defined in `bench/prompts/design_prompt.txt` section `DESIGN_SUBSEQUENT`.
+Read that file for the exact schema. Anchors:
+
+- The **First-principles rationale** field must quantify at least one
+  workload property (skew, hot-set size, value size × count, NUMA
+  topology, cache/memory ratio) and connect it to the structural choice
+  you're recommending. Reject pure-vibes designs from yourself: if you
+  can't put a number in this paragraph, the design is under-justified.
+- If you cite a published technique (FASTER, F2, MICA, Masstree, CLHT,
+  ART, LSM variants, log-structured hash indexes), describe the
+  technique precisely — do not invent paper names you are unsure of.
+- Pivots require a concrete sketch (which 2-3 functions change, how,
+  which invariants must hold) — same rigor as your review's pivot
+  guidance above.
+
+The generator will read `planning/design.md` and implement exactly that.
+Your design is the handoff contract.
+
+### 2. `planning/whiteboard.md` — update the `## Learnings` section
+
+Append to the `## Learnings` section what you learned from this
+iteration's results. Be specific, include numbers:
+
+- Throughput this iter (Mops/s). What % of {baseline_name}?
+- If it timed out: was load slow? Why? (random I/O? too many allocations?)
+- If correctness failed: which test? What's the root cause?
+- If it worked: what was the bottleneck? (CPU? disk? memory? contention?)
+
+Do NOT rewrite the rest of the whiteboard — only the `## Learnings`
+section accumulates. The exploration plan and approach list stay as the
+generator wrote them in Phase 0, unless evidence from this iteration
+forces a replan (in which case, add an `## Updated plan (iter N)`
+section — don't edit the original plan in place).
+
+## FOOTER
+
+You are producing three artifacts this turn, in this order:
+
+1. `<iter_dir>/critique.txt` — your review (response text of this prompt)
+2. `planning/design.md` — next iteration's design spec
+3. `planning/whiteboard.md` — appended `## Learnings` entry
+
+Do NOT fabricate citations. Do NOT invent file paths or function names
+not present in the impl. Do NOT write generic advice ungrounded in this
+workload's numbers. If the iteration was straightforward and your
+trajectory read is "keep refining approach X," say that plainly — do not
+manufacture structural pivots to appear productive.

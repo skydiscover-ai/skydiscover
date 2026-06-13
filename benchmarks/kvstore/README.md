@@ -17,7 +17,7 @@ skydiscover-run -c benchmarks/kvstore/0001_ycsb50_zipf_8gb/config.yaml -s claude
 benchmarks/kvstore/
 ├── README.md
 ├── resolver.py              # maps params.task -> a checked-in task dir (path-free runs)
-├── _harness/                # ONE canonical C++ harness (see "Harness" below) — populated from runtime
+├── _harness -> ../../skydiscover/search/jitskit/runtime/interface   # symlink: the ONE harness (no copy)
 ├── _baselines/results.json  # FASTER/F2/RocksDB/Redis numbers, hardware-tagged
 └── 0001_ycsb50_zipf_8gb/     # a task instance
     ├── spec.md              # human-facing statement (API, property, workload, budget, baseline)
@@ -37,22 +37,16 @@ task-discovery skip them.
 - **Knobs** live under `search.database` (a `JitsKitConfig`); the human spec lives under
   `benchmark.params`. Tier = `search.database.mode` (`ltm` hardware / `inmem` portable).
 
-## Harness (population — vendoring decision, plan §8.1)
+## Harness (single source — no copy)
 
-`_harness/` holds the ONE canonical copy of `kvstore_interface.h`, `benchmark_harness.cc`,
-`consistency_harness.cc`, `CMakeLists.txt` — deduping the runtime's forked copies (the evaluator copy
-is canonical). It is **not vendored into this repo unilaterally** (it is private C++, and how to
-vendor — submodule vs synced copy — is an open team decision). Populate it one of two ways:
+`_harness` is a **symlink** to the runtime's `interface/` (`skydiscover/search/jitskit/runtime/
+interface`) — the exact `kvstore_interface.h`, `benchmark_harness.cc`, `consistency_harness.cc`,
+`CMakeLists.txt` that jitskit's own loop compiles. **There is no second copy**; it can never drift.
 
-```bash
-# A) from the runtime submodule (recommended):
-ln -s ../../skydiscover/search/jitskit/runtime/_harness benchmarks/kvstore/_harness
-# B) a synced copy with a CI drift-check (if the team prefers a vendored copy).
-```
-
-Until `_harness/` is populated, the evaluator returns `validity: 0` with a clear error (it never
-pretends to pass), and the seed won't compile (its `#include "../_harness/kvstore_interface.h"` is
-unresolved). `-s jitskit` does not need `_harness/` — it reads the runtime's own `leaderboard.json`.
+The non-jitskit evaluator stages the candidate **flat** alongside these files and builds on the host
+(hence the seed's flat `#include "kvstore_interface.h"`). This path is **build-tier — verify on a box
+with the C++ toolchain**; it is not exercised in CI. `-s jitskit` does **not** use this evaluator at
+all — it reads the runtime's own `leaderboard.json`.
 
 ## Adding a task
 

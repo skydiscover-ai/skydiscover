@@ -1,0 +1,128 @@
+# Generator Prompt Templates
+#
+# Read by agent-pipeline/orchestrator.py::PromptBuilder. Sections are delimited by
+# `## SECTION_NAME` headers where NAME is UPPER_SNAKE_CASE. Matches the
+# convention used by critique_prompt.txt and critique_audit_prompt.txt in this dir.
+#
+# Python str.format() placeholders used below:
+#   {baseline_name}   e.g., "FASTER"
+#   {dist_desc}       e.g., "Zipfian θ=0.99"
+#   {setup_desc}      e.g., "50% Read, 50% Upsert"
+#   {value_size}      e.g., 100
+#   {budget_str}      e.g., "8 GB / 32 GB" or "unlimited"
+#   {dataset_gb}      e.g., 24.4  (approx working-set = 250M × value_size / 1024)
+#   {threads_str}     e.g., "16"
+#   {best_iter}       int
+#   {best_mops}       float (formatted with :.2f when rendered)
+
+## SPECIALIZATION
+
+## Specialization target — this is a JIT, not a general store
+
+### Requirement (the objective you are optimizing)
+**Maximize total throughput in Mops/s on the 30-second timed window** under
+the workload signature below, against the {baseline_name} baseline. Lower
+latency, smaller RSS, prettier code — none of these are the objective. The
+benchmark harness measures ONE number and it is Mops/s. Everything else is
+scaffolding in service of that number.
+
+CORRECTNESS is a hard gate (not a soft objective): EVERY API method (`Read`,
+`Upsert`, `RMW`, `Delete`, `Checkpoint`) must work for the full spec, even
+when the benchmark workload only exercises a subset. Dropping an unmeasured
+operation to chase Mops/s is reward hacking, not specialization.
+
+### Workload signature for this run
+  - Distribution: {dist_desc}
+  - Mix:          {setup_desc}
+  - Value size:   {value_size} B   (bytes [8..15] are a validated random nonce
+                  — must be stored/returned verbatim, NOT derivable from the key)
+  - Mem budget:   {budget_str}   (working-set ≈ {dataset_gb} GB at 250M × {value_size} B)
+  - Threads:      {threads_str}
+
+### What "specialized" means — algorithm choice vs sizing
+
+Specialization has two distinct dimensions. Getting this right is critical:
+
+**1. Algorithm & architecture choice → SPECIALIZE for this workload.**
+Choose your data structures, concurrency model, caching policy, eviction
+strategy, and I/O patterns based on the workload signature above. A design
+that would run equally well on uniform keys, a 95:5 mix, or a latency
+objective is under-specialized. Each iteration, ask: "if one line of the
+signature changed, which structural choices would I want to rewrite?"
+That is the part specialized enough.
+
+**2. Sizing & capacity → PARAMETERIZE from runtime inputs. Never hardcode.**
+All data-structure dimensions that depend on available resources MUST be
+computed at runtime from the parameters passed to `InitExtended()`:
+  - `mem_budget_bytes` → all memory-dependent dimensions derived from this
+  - `storage_path` → disk tier location
+  - Thread count → inferred from `StartSession()` calls
+  - Value size → values are **variable-sized per key** (`GenValue.size`
+    can differ for every operation). Your code must store and return the
+    exact bytes written — never truncate or assume a fixed size. The
+    workload signature above tells you the *typical* value size; use
+    that to optimize layout and alignment, but handle any size up to
+    `GenValue::kMaxSize` (4096) correctly.
+
+**Hardcoded sizing constants derived from a specific budget, value size,
+or thread count are a bug.** Your code must run correctly and efficiently
+at ANY `mem_budget_bytes` value — 1 GB, 8 GB, 32 GB, 256 GB. At the
+primary benchmark budgets above it should perform *optimally*; at other
+budgets it should still work correctly and use the available memory well.
+
+Think of it like a database engine: the engine's architecture is a
+specialized design choice, but the memory budget is a runtime parameter.
+Changing it doesn't require recompiling — the engine sizes its internal
+structures from the config. Your store should work the same way.
+
+**Anti-patterns to avoid:**
+  - `constexpr size_t kCacheEntries = 8192 * 256;` — hardcoded, ignores budget
+  - `constexpr uint32_t kStoredValueSize = 100;` — hardcoded, truncates other sizes
+  - `uint8_t data[100];` in a record struct — breaks for larger values
+  - Ignoring `mem_budget_bytes` in `InitExtended()` (e.g., `/*mem_budget_bytes*/`)
+  - `#define BUFFER_SIZE (6ULL * 1024 * 1024 * 1024)` — derived from 8 GB budget
+
+**What to do instead:** derive all dimensions from `mem_budget_bytes` in
+`InitExtended()`. You decide the ratios and layout — just make sure
+nothing is a compile-time constant tied to a specific budget or value size.
+
+### Async Read (required pair)
+
+Every impl must define `ReadAsync(ReadSlot*)` and `CompletePending(bool)`.
+If your reads never block (pure in-memory), copy this verbatim:
+
+    OpStatus ReadAsync(ReadSlot* slot) override {{
+        bool found = Read(slot->key, slot->out);
+        slot->status = found ? OpStatus::Ok : OpStatus::NotFound;
+        slot->done.store(1, std::memory_order_release);
+        return slot->status;
+    }}
+    void CompletePending(bool /*wait*/) override {{}}
+
+If your reads can block (disk, network, contended eviction), return
+`OpStatus::Pending` without waiting and complete the slot later in
+`CompletePending`. See `kvstore_interface.h` for the slot lifetime contract.
+
+### Memory budget is a resource, not just a ceiling
+`mem_budget_bytes` tells you how much memory is available for your store.
+The harness reports `StoreMemUtil` after each run (e.g., `4.2 / 8.0 GB
+(53%)`). Unused budget is unused throughput — memory you could be using
+to serve operations faster is sitting idle. Aim for ≥ 90% utilization.
+Size your data structures to fill the budget, not to minimize memory use.
+
+## BEST_REFERENCE
+
+## Best implementation so far — reference
+
+Your best iteration was **iter {best_iter} at {best_mops:.2f} Mops/s**.
+That implementation is preserved (READ-ONLY) at `reference/best_impl.cc` in
+your workspace, with metadata at `reference/best_meta.json`.
+
+Before editing `interface/generated/kvstore_impl.cc` this turn:
+  1. If your last attempt regressed, diff your current file against
+     `reference/best_impl.cc` and consider which structural choices were
+     lost. Restoring them is a legitimate move — not giving up.
+  2. If your last attempt was a new best, `reference/best_impl.cc` already
+     IS your current file; ignore this block.
+  3. Do NOT modify `reference/best_impl.cc` — it's not in the build. It's
+     a bookmark, not an editable file.

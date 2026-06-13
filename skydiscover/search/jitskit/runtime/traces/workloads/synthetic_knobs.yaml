@@ -1,0 +1,21 @@
+# Synthetic workload knobs: one-hit wonders, burstiness, update hotspots.
+#
+# Usage:
+#   python3 traces/sweep.py traces/workloads/synthetic_knobs.yaml
+
+name: synthetic_knobs
+
+traces:
+  - generator: one_hit
+    one_hit_ratio: 0.3
+    theta: 0.99
+
+  - generator: bursty
+    burst_size: 10
+    burst_ratio: 0.1
+    theta: 0.99
+
+  - generator: hotspot
+    hot_fraction: 0.01
+    hot_write_ratio: 0.9
+    theta: 0.99

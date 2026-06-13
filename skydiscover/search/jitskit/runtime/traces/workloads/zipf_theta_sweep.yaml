@@ -1,0 +1,17 @@
+# Sweep Zipf skew parameter (theta).
+#
+# Usage:
+#   python3 traces/sweep.py traces/workloads/zipf_theta_sweep.yaml
+#   python3 traces/sweep.py traces/workloads/zipf_theta_sweep.yaml --dry-run
+
+name: zipf_theta_sweep
+
+traces:
+  - generator: zipf
+    theta: 0.5
+
+  - generator: zipf
+    theta: 0.9
+
+  - generator: zipf
+    theta: 0.99

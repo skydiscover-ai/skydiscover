@@ -46,10 +46,10 @@ from skydiscover.search.default_discovery_controller import (
 
 logger = logging.getLogger(__name__)
 
-# The vendored runtime is a git submodule of the private ``skykv-claude`` project
-# ROOT (= the runtime's ``PROJECT_DIR``), not ``agent-pipeline/`` alone — run.sh
-# reads ``setups/``, ``interface/`` and the trace files that live one level above
-# ``agent-pipeline/``.
+# The runtime is vendored in-tree (committed, not a submodule) at ``runtime/`` — the
+# clean run-essentials of the private ``skykv-claude`` project ROOT (= the runtime's
+# ``PROJECT_DIR``). It must be the project root, not ``agent-pipeline/`` alone, because
+# run.sh reads ``setups/``, ``interface/`` and traces one level above ``agent-pipeline/``.
 _DEFAULT_RUNTIME_DIR = Path(__file__).parent / "runtime"
 _RUN_SH = "agent-pipeline/run.sh"
 
@@ -328,10 +328,9 @@ class JitsKitController(DiscoveryController):
         run_sh = runtime_dir / _RUN_SH
         if not run_sh.exists():
             raise FileNotFoundError(
-                f"Jitskit runtime not found at {run_sh}. The runtime is a git submodule "
-                f"of the private skykv-claude project root; run "
-                f"`git submodule update --init --recursive`, or set "
-                f"`search.database.runtime_dir` to a local checkout."
+                f"Jitskit runtime not found at {run_sh}. The runtime is vendored in-tree at "
+                f"skydiscover/search/jitskit/runtime/; if it is missing, set "
+                f"`search.database.runtime_dir` to a local skykv-claude checkout."
             )
 
         self._host_preflight(db)
@@ -474,11 +473,19 @@ class JitsKitController(DiscoveryController):
 
     def _add_program(self, best: Tuple[str, float, dict], iteration: int) -> None:
         solution, mops, indicators = best
+        # Derive validity from the runtime's own report — never assume it. A peak whose
+        # validation is failed/unknown must not be reported as a valid win, and its score
+        # is zeroed so score and source stay on the same (validated) iteration.
+        valid = bool(indicators.get("jitskit_all_validation_passed", True))
         program = Program(
             id=str(uuid.uuid4()),
             solution=solution,
             language="cpp",
-            metrics={"combined_score": mops, "validity": 1.0, **indicators},
+            metrics={
+                "combined_score": mops if valid else 0.0,
+                "validity": 1.0 if valid else 0.0,
+                **indicators,
+            },
             iteration_found=iteration,
             parent_id=None,
             metadata={"strategy": "jitskit"},
