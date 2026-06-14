@@ -98,6 +98,8 @@ class CheckpointManager:
         with open(os.path.join(save_path, "metadata.json"), "w") as f:
             json.dump(metadata, f)
 
+        self._write_evolution_trace(programs, best_program_id, last_iteration, save_path)
+
         logger.info(f"[CHECKPOINT] Saved database with {len(programs)} programs to {save_path}")
 
     def load(self, path: str) -> Tuple[Dict[str, Program], Optional[str], int]:
@@ -150,6 +152,50 @@ class CheckpointManager:
         logger.info(f"Loaded database with {len(programs)} programs from {path}")
 
         return programs, best_program_id, last_iteration
+
+    def _write_evolution_trace(
+        self,
+        programs: Dict[str, Program],
+        best_program_id: Optional[str],
+        last_iteration: int,
+        save_path: str,
+    ) -> None:
+        """Write evolution_trace.json — all programs in iteration order.
+
+        Produces a single file that captures the full evolution history:
+        every program the search ever generated, its score, metrics,
+        lineage (parent_id), and solution.  Useful for plotting score
+        trajectories, inspecting lineage, or replaying a run.
+        """
+        from skydiscover.utils.metrics import get_score
+
+        entries = []
+        for program in programs.values():
+            entries.append(
+                {
+                    "id": program.id,
+                    "iteration_found": program.iteration_found,
+                    "generation": program.generation,
+                    "score": get_score(program.metrics) if program.metrics else None,
+                    "metrics": program.metrics,
+                    "parent_id": program.parent_id,
+                    "timestamp": program.timestamp,
+                    "solution": program.solution,
+                }
+            )
+
+        entries.sort(key=lambda e: (e["iteration_found"], e["timestamp"]))
+
+        trace = {
+            "last_iteration": last_iteration,
+            "best_program_id": best_program_id,
+            "total_programs": len(entries),
+            "programs": entries,
+        }
+
+        trace_path = os.path.join(save_path, "evolution_trace.json")
+        with open(trace_path, "w") as f:
+            json.dump(trace, f, indent=2, cls=SafeJSONEncoder)
 
     def _save_program(
         self,
