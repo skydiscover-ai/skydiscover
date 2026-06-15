@@ -113,10 +113,17 @@ def analyze_sub_metrics(records: List[dict]) -> Optional[SubMetricAnalysis]:
 
     seed = _seed_metrics(records)
 
-    # Collect (iteration, value) pairs per metric, only for evaluated iterations.
+    # Collect (iteration, value) pairs per metric, only for valid evaluated iterations.
+    # Exclude any record with a negative combined score (sentinel, correctness
+    # failure, or any other penalty) since its sub-metrics are not meaningful.
     series: Dict[str, List[Tuple[int, float]]] = {}
     for rec in records_with_em:
-        if rec.get("child_score") is None:
+        child_score = rec.get("child_score")
+        if child_score is None:
+            continue
+        if float(child_score) < 0:
+            continue
+        if rec.get("evaluation_status") == "crash":
             continue
         iteration = rec.get("iteration", 0)
         for name, val in _flatten_metrics(rec["evaluator_metrics"]).items():

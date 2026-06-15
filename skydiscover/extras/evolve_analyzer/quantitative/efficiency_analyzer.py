@@ -4,6 +4,7 @@ of compute translated into score improvement.
 """
 from __future__ import annotations
 
+import math
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -29,16 +30,25 @@ def analyze_efficiency(records: List[dict]) -> EfficiencyMetrics:
 
     # ── Score bookkeeping ─────────────────────────────────────────────────────
     # Build best_so_far curve using child_score at each iteration.
-    scores: List[float] = [r.get("child_score", 0.0) for r in sorted_records]
+    # Sentinel/crash scores (≤ -9999) and missing scores are treated as NaN
+    # so they don't corrupt initial_score or best_so_far.
+    scores: List[float] = []
+    for r in sorted_records:
+        s = r.get("child_score")
+        if s is None or float(s) < 0:
+            scores.append(float("nan"))
+        else:
+            scores.append(float(s))
+
     best_so_far: List[float] = []
-    running_best = scores[0]
+    running_best = float("nan")
     for s in scores:
-        if s > running_best:
+        if not math.isnan(s) and (math.isnan(running_best) or s > running_best):
             running_best = s
         best_so_far.append(running_best)
 
-    initial_score: float = scores[0]
-    final_best: float = best_so_far[-1]
+    initial_score: float = next((s for s in scores if not math.isnan(s)), 0.0)
+    final_best: float = best_so_far[-1] if not math.isnan(best_so_far[-1]) else initial_score
     total_gain: float = final_best - initial_score
 
     # ── improvement_per_llm_call ──────────────────────────────────────────────
@@ -76,7 +86,11 @@ def analyze_efficiency(records: List[dict]) -> EfficiencyMetrics:
     # After that index the curve is flat → "wasted" phase.
     plateau_onset_idx: int = 0
     for idx in range(1, total_iterations):
-        if best_so_far[idx] > best_so_far[idx - 1]:
+        if (
+            not math.isnan(best_so_far[idx])
+            and not math.isnan(best_so_far[idx - 1])
+            and best_so_far[idx] > best_so_far[idx - 1]
+        ):
             plateau_onset_idx = idx
 
     # plateau_onset_idx is the last index where an improvement occurred.
@@ -106,7 +120,7 @@ def analyze_efficiency(records: List[dict]) -> EfficiencyMetrics:
             cumulative_cost = float(idx + 1)  # 1-indexed iteration proxy
 
         current_score = best_so_far[idx]
-        if current_score > frontier_best:
+        if not math.isnan(current_score) and current_score > frontier_best:
             frontier_best = current_score
             pareto_frontier.append((cumulative_cost, current_score))
 

@@ -792,7 +792,10 @@ def _parse_adaevolve_jsonl(jsonl_path: Path) -> list[dict]:
         best_metrics = best_prog.get("metrics") or {}
 
         island_list = entry.get("islands", [])
-        island_id = island_list[0].get("island_idx") if island_list else None
+        island_id = global_info.get("current_island_idx")
+        if island_id is None and island_list:
+            current = next((isl for isl in island_list if isl.get("is_current")), None)
+            island_id = current.get("island_idx") if current else island_list[0].get("island_idx")
 
         evaluator_metrics = {
             k: v for k, v in child_metrics.items()

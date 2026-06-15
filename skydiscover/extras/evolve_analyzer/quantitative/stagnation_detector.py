@@ -252,6 +252,12 @@ def detect_stagnation(
         current_streak_records = []
 
     for idx, rec in enumerate(tagged):
+        # Failed iterations (negative score) are not search stagnation — skip
+        # entirely, neither extending nor breaking a stagnation streak.
+        score = rec.get("child_score")
+        if score is not None and float(score) < 0:
+            continue
+
         progress = _has_progress(rec, min_delta)
 
         if not progress:

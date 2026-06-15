@@ -33,8 +33,32 @@ def analyze_regressions(records: List[dict]) -> RegressionMetrics:
         )
 
     sorted_records = sorted(records, key=lambda r: r.get("iteration", 0))
-    total = len(sorted_records)
-    deltas = [r.get("score_delta", 0.0) or 0.0 for r in sorted_records]
+
+    # Filter out failed iterations (negative scores, crashes) — their extreme
+    # scores create artificial regressions and hide real ones.
+    valid_records = [
+        r for r in sorted_records
+        if r.get("evaluation_status") != "crash"
+        and not (
+            r.get("child_score") is not None
+            and float(r.get("child_score", 0)) < 0
+        )
+    ]
+    total = len(valid_records)
+
+    # Recompute score_delta between adjacent *valid* records since the
+    # pre-computed deltas reference potentially-removed sentinel neighbours.
+    deltas: list = []
+    for i, r in enumerate(valid_records):
+        if i == 0:
+            deltas.append(0.0)
+        else:
+            cur = r.get("child_score")
+            prev = valid_records[i - 1].get("child_score")
+            if cur is not None and prev is not None:
+                deltas.append(float(cur) - float(prev))
+            else:
+                deltas.append(0.0)
 
     # ── regression mask ───────────────────────────────────────────────────────
     is_regression = [d < 0.0 for d in deltas]
@@ -53,10 +77,10 @@ def analyze_regressions(records: List[dict]) -> RegressionMetrics:
             else:
                 severity_distribution["severe"] += 1
 
-    # ── best-so-far curve (all evaluations, no crash filter here) ─────────────
+    # ── best-so-far curve (valid evaluations only) ─────────────────────────────
     best_so_far: List[float] = []
     running_best: Optional[float] = None
-    for rec in sorted_records:
+    for rec in valid_records:
         score = rec.get("child_score", float("-inf"))
         if score is None:
             score = float("-inf")
@@ -102,8 +126,8 @@ def analyze_regressions(records: List[dict]) -> RegressionMetrics:
                 run_length += 1
         else:
             if run_start is not None and run_length >= 3:
-                start_iter = sorted_records[run_start].get("iteration", run_start)
-                end_iter = sorted_records[run_start + run_length - 1].get(
+                start_iter = valid_records[run_start].get("iteration", run_start)
+                end_iter = valid_records[run_start + run_length - 1].get(
                     "iteration", run_start + run_length - 1
                 )
                 death_spiral_periods.append((start_iter, end_iter))
@@ -112,8 +136,8 @@ def analyze_regressions(records: List[dict]) -> RegressionMetrics:
 
     # Handle a spiral that extends to the very last record
     if run_start is not None and run_length >= 3:
-        start_iter = sorted_records[run_start].get("iteration", run_start)
-        end_iter = sorted_records[run_start + run_length - 1].get(
+        start_iter = valid_records[run_start].get("iteration", run_start)
+        end_iter = valid_records[run_start + run_length - 1].get(
             "iteration", run_start + run_length - 1
         )
         death_spiral_periods.append((start_iter, end_iter))

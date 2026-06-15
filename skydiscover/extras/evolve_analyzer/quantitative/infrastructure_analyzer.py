@@ -104,13 +104,11 @@ def analyze_infrastructure(records: List[dict]) -> Optional[InfrastructureMetric
         for i in range(first_sentinel_idx)
         if not sentinel_flags[i] and sorted_records[i].get("eval_time_seconds") is not None
     ]
-    baseline_window = pre_sentinel_non_sentinel[-_BASELINE_WINDOW:]
+    baseline_window = pre_sentinel_non_sentinel[:_BASELINE_WINDOW]
     baseline_eval_time: Optional[float] = None
     if baseline_window:
-        times = sorted(float(r["eval_time_seconds"]) for r in baseline_window)
-        # Use the 25th-percentile to avoid including degraded records in the baseline.
-        p25_idx = max(0, len(times) // 4)
-        baseline_eval_time = times[p25_idx]
+        times = [float(r["eval_time_seconds"]) for r in baseline_window]
+        baseline_eval_time = statistics.median(times)
 
     # ── Degradation window: high eval_time + real score before first sentinel ─
     degradation_window: Optional[Tuple[int, int]] = None
