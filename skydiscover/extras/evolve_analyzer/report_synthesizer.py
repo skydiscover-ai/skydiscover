@@ -1651,7 +1651,7 @@ def _build_infrastructure_dimension(
         rating = 3
         summary = (
             f"Evaluator degradation detected (eval-time spike ×{infra.eval_time_spike_ratio:.1f}) "
-            "before first sentinel. Server was slow but recovered."
+            "before first failure. Server was slow but recovered."
         )
         rec = (
             "Monitor evaluator server health. Consider adding retry logic or "
@@ -1662,31 +1662,31 @@ def _build_infrastructure_dimension(
             rating = 1
             summary = (
                 f"Critical: server crash corrupted {sf:.1%} of the run "
-                f"({infra.sentinel_count} sentinel iterations). "
+                f"({infra.sentinel_count} iterations produced invalid code or crashed). "
                 "Results after the crash are invalid."
             )
         elif sf >= 0.25:
             rating = 1
             summary = (
                 f"Server crash corrupted {sf:.1%} of the run "
-                f"({infra.sentinel_count} sentinel iterations). "
+                f"({infra.sentinel_count} iterations produced invalid code or crashed). "
                 "Analysis results are unreliable."
             )
         else:
             rating = 2
             summary = (
-                f"Server crash detected ({infra.sentinel_count} sentinel iterations, "
+                f"Server crash detected ({infra.sentinel_count} failed evaluations, "
                 f"{sf:.1%} of run). Early results may be valid."
             )
         rec = (
             "Rerun the experiment with a stable evaluator server. "
-            "Filter sentinel iterations before drawing conclusions."
+            "Filter failed iterations before drawing conclusions."
         )
     elif cause == "EVALUATOR_NOISE":
         rating = 3
         summary = (
-            f"Isolated evaluator failures detected ({infra.sentinel_count} sentinel "
-            "iterations, not a contiguous block). Likely transient noise."
+            f"{infra.sentinel_count} iterations produced invalid code (compilation errors "
+            "or runtime crashes). Isolated failures, not a contiguous block."
         )
         rec = "Add retry logic around evaluator calls to handle transient failures."
     else:
@@ -1695,10 +1695,10 @@ def _build_infrastructure_dimension(
         rec = "Investigate evaluator logs for root cause."
 
     evidence: List[str] = [
-        f"{infra.sentinel_count} sentinel iteration(s) ({sf:.1%} of run)",
+        f"{infra.sentinel_count} iteration(s) with evaluator failures ({sf:.1%} of run)",
     ]
     if infra.first_sentinel_iteration is not None:
-        evidence.append(f"First sentinel at iteration {infra.first_sentinel_iteration}")
+        evidence.append(f"First failure at iteration {infra.first_sentinel_iteration}")
     if infra.crash_onset_iteration is not None:
         evidence.append(f"Server crash onset at iteration {infra.crash_onset_iteration} (eval_time=0.0s)")
     if infra.degradation_window is not None:
@@ -1708,7 +1708,7 @@ def _build_infrastructure_dimension(
     if infra.affected_iterations:
         sample = infra.affected_iterations[:10]
         suffix = "..." if len(infra.affected_iterations) > 10 else ""
-        evidence.append(f"Sentinel iterations: {sample}{suffix}")
+        evidence.append(f"Failed iterations: {sample}{suffix}")
 
     if infra.log_evidence:
         le = infra.log_evidence
@@ -1726,6 +1726,70 @@ def _build_infrastructure_dimension(
             )
         for raw_line in (le.get("sample_error_lines") or []):
             evidence.append(f"  › {raw_line.strip()}")
+
+        # ── Meta-evolution health (evox co-evolution runs) ────────────────────
+        if le.get("meta_evo_fully_non_functional"):
+            fb = le["meta_evo_fallback_count"]
+            total = le["meta_evo_total_iterations"]
+            models = le.get("meta_evo_failed_models", [])
+            rating = max(1, rating - 2)
+            summary = (
+                f"Meta-evolution completely non-functional: all {fb}/{total}"
+                " search strategy iterations fell back to initial strategy"
+                + (f" due to LLM auth errors ({', '.join(models)})." if models else ".")
+                + (f" Additionally, {infra.sentinel_count} iterations produced invalid code."
+                   if infra.sentinel_count else "")
+            )
+            rec = (
+                "Fix meta-evolution LLM access"
+                + (f" (401 auth errors for models: {', '.join(models)})" if models else "")
+                + ". Non-functional meta-evolution is a root cause of limited exploration diversity."
+                + (" Add retry logic around evaluator calls to handle transient failures."
+                   if infra.sentinel_count else "")
+            )
+            evidence.append(
+                f"Meta-evolution: {fb}/{total} iterations fell back to initial strategy"
+            )
+            if models:
+                evidence.append(f"  › Unauthorized models: {', '.join(models)}")
+            if le.get("meta_evo_error_types"):
+                evidence.append(f"  › Error types: {', '.join(le['meta_evo_error_types'])}")
+        elif le.get("meta_evo_fallback_fraction", 0) > 0.5:
+            fb = le.get("meta_evo_fallback_count", 0)
+            total = le.get("meta_evo_total_iterations", 0)
+            frac = le["meta_evo_fallback_fraction"]
+            models = le.get("meta_evo_failed_models", [])
+            rating = max(1, rating - 1)
+            summary += f" Meta-evolution mostly non-functional ({frac:.0%} fallback rate)."
+            rec += (
+                " Investigate meta-evolution LLM failures"
+                + (f" (affected models: {', '.join(models)})" if models else "")
+                + "."
+            )
+            evidence.append(
+                f"Meta-evolution: {fb}/{total} iterations fell back ({frac:.0%})"
+            )
+            if models:
+                evidence.append(f"  › Failed models: {', '.join(models)}")
+        elif le.get("meta_evo_total_iterations"):
+            fb = le.get("meta_evo_fallback_count", 0)
+            total = le["meta_evo_total_iterations"]
+            if fb > 0:
+                evidence.append(
+                    f"Meta-evolution: {fb}/{total} iterations fell back to initial strategy"
+                )
+            else:
+                evidence.append(
+                    f"Meta-evolution: {total} strategy iterations completed successfully"
+                )
+
+        # ── Auth-denied models from log (label generation etc.) ───────────────
+        if le.get("auth_denied_models") and not le.get("meta_evo_fully_non_functional"):
+            models = le["auth_denied_models"]
+            evidence.append(f"Log: 401 auth errors for models: {', '.join(models)}")
+            lfc = le.get("label_gen_failure_count", 0)
+            if lfc:
+                evidence.append(f"  › Label generation failures: {lfc}")
 
     return DimensionReport(
         name="Infrastructure",

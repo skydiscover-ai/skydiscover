@@ -1067,3 +1067,102 @@ class TestAdaptSkydiscoverCheckpointFallback:
     def test_empty_directory_returns_nothing(self, tmp_path):
         records = list(adapt_skydiscover(str(tmp_path)))
         assert records == []
+
+
+# ===========================================================================
+# _extract_meta_evo_signals
+# ===========================================================================
+
+class TestExtractMetaEvoSignals:
+    def test_all_fallback_fully_non_functional(self, tmp_path):
+        from skydiscover.extras.evolve_analyzer.ingestion.checkpoint_adapter import (
+            _extract_meta_evo_signals,
+        )
+
+        search = tmp_path / "search"
+        for i in range(1, 4):
+            d = search / f"iteration_{i}"
+            d.mkdir(parents=True)
+            (d / "metadata.json").write_text(
+                json.dumps({"iteration": i, "is_fallback": True}), encoding="utf-8"
+            )
+            (d / "failed_attempts.json").write_text(
+                json.dumps({
+                    "iteration": i,
+                    "failed_attempts": [{
+                        "attempt_number": 1,
+                        "error": "Error code: 401 ... Tried to access gpt-5",
+                        "stage": "generation",
+                    }],
+                }),
+                encoding="utf-8",
+            )
+
+        result = _extract_meta_evo_signals(tmp_path)
+        assert result is not None
+        assert result["meta_evo_total_iterations"] == 3
+        assert result["meta_evo_fallback_count"] == 3
+        assert result["meta_evo_fallback_fraction"] == 1.0
+        assert result["meta_evo_fully_non_functional"] is True
+        assert "gpt-5" in result["meta_evo_failed_models"]
+        assert "auth_denied" in result["meta_evo_error_types"]
+
+    def test_no_search_dir_returns_none(self, tmp_path):
+        from skydiscover.extras.evolve_analyzer.ingestion.checkpoint_adapter import (
+            _extract_meta_evo_signals,
+        )
+
+        result = _extract_meta_evo_signals(tmp_path)
+        assert result is None
+
+    def test_partial_fallback(self, tmp_path):
+        from skydiscover.extras.evolve_analyzer.ingestion.checkpoint_adapter import (
+            _extract_meta_evo_signals,
+        )
+
+        search = tmp_path / "search"
+        for i in range(1, 5):
+            d = search / f"iteration_{i}"
+            d.mkdir(parents=True)
+            is_fallback = i <= 2
+            (d / "metadata.json").write_text(
+                json.dumps({"iteration": i, "is_fallback": is_fallback}), encoding="utf-8"
+            )
+            if is_fallback:
+                (d / "failed_attempts.json").write_text(
+                    json.dumps({"iteration": i, "failed_attempts": [{
+                        "attempt_number": 1,
+                        "error": "Error code: 401 ... Tried to access gpt-5",
+                        "stage": "generation",
+                    }]}),
+                    encoding="utf-8",
+                )
+            else:
+                (d / "failed_attempts.json").write_text(
+                    json.dumps({"iteration": i, "failed_attempts": []}), encoding="utf-8"
+                )
+
+        result = _extract_meta_evo_signals(tmp_path)
+        assert result is not None
+        assert result["meta_evo_fallback_count"] == 2
+        assert result["meta_evo_fallback_fraction"] == 0.5
+        assert result["meta_evo_fully_non_functional"] is False
+
+    def test_no_failures_returns_none(self, tmp_path):
+        from skydiscover.extras.evolve_analyzer.ingestion.checkpoint_adapter import (
+            _extract_meta_evo_signals,
+        )
+
+        search = tmp_path / "search"
+        for i in range(1, 3):
+            d = search / f"iteration_{i}"
+            d.mkdir(parents=True)
+            (d / "metadata.json").write_text(
+                json.dumps({"iteration": i, "is_fallback": False}), encoding="utf-8"
+            )
+            (d / "failed_attempts.json").write_text(
+                json.dumps({"iteration": i, "failed_attempts": []}), encoding="utf-8"
+            )
+
+        result = _extract_meta_evo_signals(tmp_path)
+        assert result is None

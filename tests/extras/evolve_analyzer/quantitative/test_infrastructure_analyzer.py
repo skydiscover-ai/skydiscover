@@ -73,3 +73,30 @@ def test_high_sentinel_fraction_is_critical():
     assert result.failure_cause == "INFRA_CRASH"
     assert result.sentinel_fraction >= 0.75
     assert result.rating if hasattr(result, "rating") else True  # rating is on DimensionReport not metrics
+
+
+def test_meta_evo_signals_propagated():
+    """log_evidence with meta-evolution data passes through analyze_infrastructure."""
+    records = [make_record(i, -100.0 + i, eval_time=30.0) for i in range(1, 11)]
+    records[0]["_infra_log_signals"] = {
+        "meta_evo_total_iterations": 6,
+        "meta_evo_fallback_count": 6,
+        "meta_evo_fallback_fraction": 1.0,
+        "meta_evo_fully_non_functional": True,
+        "meta_evo_failed_models": ["gpt-5", "gpt-5-mini"],
+        "meta_evo_error_types": ["auth_denied"],
+    }
+    result = analyze_infrastructure(records)
+    assert result is not None
+    assert result.log_evidence is not None
+    assert result.log_evidence["meta_evo_fully_non_functional"] is True
+    assert result.log_evidence["meta_evo_fallback_count"] == 6
+    assert "gpt-5" in result.log_evidence["meta_evo_failed_models"]
+
+
+def test_meta_evo_signals_absent_when_not_injected():
+    """Without _infra_log_signals, log_evidence is None."""
+    records = [make_record(i, -100.0 + i, eval_time=30.0) for i in range(1, 11)]
+    result = analyze_infrastructure(records)
+    assert result is not None
+    assert result.log_evidence is None

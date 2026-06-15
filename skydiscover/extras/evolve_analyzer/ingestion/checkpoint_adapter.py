@@ -169,6 +169,8 @@ _LOG_CONN_REFUSED = re.compile(r"ConnectionRefusedError.*Connect call failed \((
 _LOG_CLIENT_ERROR = re.compile(r"ERROR - Client error during request")
 _LOG_EVAL_EXTRACT_FAIL = re.compile(r"Failed to extract Go code from program")
 _LOG_EVAL_BUILD_FAIL = re.compile(r"Build failed: (.+)")
+_LOG_AUTH_401 = re.compile(r"Error code: 401.*?Tried to access ([\w./-]+)")
+_LOG_LABEL_GEN_FAILED = re.compile(r"Label generation failed:")
 
 
 def _extract_infra_log_signals(log_path: Path) -> Optional[dict]:
@@ -243,7 +245,17 @@ def _extract_infra_log_signals(log_path: Path) -> Optional[dict]:
                 crash_timestamp = ts_m.group(1) if ts_m else None
             break
 
-    if not burst_count and not crash_host:
+    # ── Pass 3: detect 401 auth errors and label generation failures ────────
+    auth_401_models: set[str] = set()
+    label_gen_failure_count = 0
+    for line in lines:
+        m = _LOG_AUTH_401.search(line)
+        if m:
+            auth_401_models.add(m.group(1))
+        if _LOG_LABEL_GEN_FAILED.search(line):
+            label_gen_failure_count += 1
+
+    if not burst_count and not crash_host and not auth_401_models:
         return None
 
     # ── Build sample_error_lines (up to 3 key log lines) ─────────────────────
@@ -263,10 +275,63 @@ def _extract_infra_log_signals(log_path: Path) -> Optional[dict]:
     if crash_host:
         result["crash_timestamp"] = crash_timestamp
         result["crash_host"] = crash_host
+    if auth_401_models:
+        result["auth_denied_models"] = sorted(auth_401_models)
+        result["label_gen_failure_count"] = label_gen_failure_count
     if sample:
         result["sample_error_lines"] = sample
 
     return result if result else None
+
+
+def _extract_meta_evo_signals(run_dir: Path) -> Optional[dict]:
+    """Scan the search/ directory for meta-evolution health signals.
+
+    Returns None if no search/ directory exists (non-evox runs).
+    """
+    search_dir = run_dir / "search"
+    if not search_dir.is_dir():
+        return None
+
+    iterations = sorted(search_dir.glob("iteration_*"))
+    if not iterations:
+        return None
+
+    total_iterations = len(iterations)
+    fallback_count = 0
+    failed_models: set[str] = set()
+    error_types: set[str] = set()
+
+    for iter_dir in iterations:
+        metadata = _read_first_json(iter_dir, "metadata.json")
+        if metadata.get("is_fallback"):
+            fallback_count += 1
+
+        failed_data = _read_first_json(iter_dir, "failed_attempts.json")
+        for attempt in failed_data.get("failed_attempts", []):
+            error = attempt.get("error", "")
+            model_match = re.search(r"Tried to access ([\w./-]+)", error)
+            if model_match:
+                failed_models.add(model_match.group(1))
+            if "401" in error or "unauthorized" in error.lower():
+                error_types.add("auth_denied")
+            elif "429" in error:
+                error_types.add("rate_limited")
+            elif "timeout" in error.lower():
+                error_types.add("timeout")
+
+    if fallback_count == 0 and not failed_models:
+        return None
+
+    fallback_fraction = fallback_count / total_iterations
+    return {
+        "meta_evo_total_iterations": total_iterations,
+        "meta_evo_fallback_count": fallback_count,
+        "meta_evo_fallback_fraction": fallback_fraction,
+        "meta_evo_fully_non_functional": fallback_fraction == 1.0,
+        "meta_evo_failed_models": sorted(failed_models),
+        "meta_evo_error_types": sorted(error_types),
+    }
 
 
 def _parse_eval_error_records(lines: list[str]) -> list[dict]:
@@ -957,6 +1022,10 @@ def adapt_skydiscover(checkpoint_dir: str) -> Iterator[dict]:
                     if seed_m and not first.get("parent_metrics"):
                         first["parent_metrics"] = seed_m
                     infra_signals = _extract_infra_log_signals(log_path)
+                    meta_evo_signals = _extract_meta_evo_signals(run_dir)
+                    if meta_evo_signals:
+                        infra_signals = infra_signals or {}
+                        infra_signals.update(meta_evo_signals)
                     if infra_signals:
                         first["_infra_log_signals"] = infra_signals
                 # Remove temp field from all records
@@ -996,6 +1065,14 @@ def adapt_skydiscover(checkpoint_dir: str) -> Iterator[dict]:
                         cs = rec.get("child_score")
                         if cs is not None:
                             prev_score = cs if prev_score is None else max(prev_score, cs)
+                # Inject infra + meta-evolution signals
+                infra_signals = _extract_infra_log_signals(log_path)
+                meta_evo_signals = _extract_meta_evo_signals(run_dir)
+                if meta_evo_signals:
+                    infra_signals = infra_signals or {}
+                    infra_signals.update(meta_evo_signals)
+                if infra_signals:
+                    log_records[0]["_infra_log_signals"] = infra_signals
                 # Attach best known code to the last record of this run
                 if best_code:
                     log_records[-1].setdefault("child_code", best_code)
