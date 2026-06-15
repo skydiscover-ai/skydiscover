@@ -429,12 +429,19 @@ def _render_score_progression(report: dict, df: Optional[pd.DataFrame]) -> None:
                                   line=dict(color="#1a73e8", width=2.5)))
 
         # Clip y-axis to the non-outlier range so sentinel scores don't collapse
-        # the visible range. Use 2nd–100th percentile of individual scores with
-        # 10% padding; keep autorange off so the range is respected.
+        # the visible range. Use IQR fences to exclude far outliers (e.g. -1e6
+        # sentinel penalties), then add 10% padding.
         finite_scores = work_df["child_score"].replace([float("inf"), float("-inf")], float("nan")).dropna()
         if len(finite_scores) > 0:
-            y_low = float(np.percentile(finite_scores, 2))
-            y_high = float(np.percentile(finite_scores, 100))
+            q1 = float(np.percentile(finite_scores, 25))
+            q3 = float(np.percentile(finite_scores, 75))
+            iqr = q3 - q1
+            lower_fence = q1 - 3 * iqr
+            non_outlier = finite_scores[finite_scores >= lower_fence]
+            if len(non_outlier) == 0:
+                non_outlier = finite_scores
+            y_low = float(non_outlier.min())
+            y_high = float(non_outlier.max())
             padding = abs(y_high - y_low) * 0.10 or abs(y_high) * 0.10 or 1.0
             y_min = y_low - padding
             y_max = y_high + padding
@@ -452,6 +459,27 @@ def _render_score_progression(report: dict, df: Optional[pd.DataFrame]) -> None:
             font=dict(color="#d93025", size=10),
             ax=40, ay=ann_ay,
         )
+
+        # Mark plateau/ceiling onset from Convergence or Ceiling dimension evidence
+        import re as _re
+        for dim in report.get("dimensions", []):
+            if dim.get("name") not in ("Convergence", "Ceiling"):
+                continue
+            for ev in dim.get("evidence", []):
+                m = _re.search(r"(?:Plateau onset|Flat trend detected from)[^\d]*(\d+)", ev)
+                if m:
+                    plateau_iter = int(m.group(1))
+                    fig.add_vline(
+                        x=plateau_iter, line_dash="dot", line_color="#9c27b0", line_width=2,
+                        annotation_text=f"Plateau @ {plateau_iter}",
+                        annotation_position="top left",
+                        annotation_font_size=10,
+                        annotation_font_color="#9c27b0",
+                    )
+                    break
+            else:
+                continue
+            break
 
         fig.update_layout(title="Score Progression — All Iterations",
                           xaxis_title="Iteration", yaxis_title="Score",

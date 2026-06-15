@@ -94,15 +94,19 @@ def analyze_ceiling(records: List[dict]) -> CeilingMetrics:
     ]
 
     # ── flat_trend_start_iteration ────────────────────────────────────────────
-    # The iteration right after the last time best_so_far actually improved.
+    # The iteration after the last *meaningful* improvement to best_so_far.
+    # An improvement is meaningful if it exceeds 0.5% of the total score range,
+    # so micro-gains (e.g. Δ=0.037 on a 137-point range) don't delay detection.
     flat_trend_start_iteration: Optional[int] = None
-    last_improvement_idx = 0
+    total_range = best_so_far[-1] - best_so_far[0]
+    meaningful_threshold = total_range * 0.005 if total_range > 0 else 0.0
+    last_meaningful_idx = 0
     for i in range(1, n):
-        if best_so_far[i] > best_so_far[i - 1]:
-            last_improvement_idx = i
-    if last_improvement_idx < n - 1:
+        if best_so_far[i] - best_so_far[i - 1] >= meaningful_threshold:
+            last_meaningful_idx = i
+    if last_meaningful_idx < n - 1:
         flat_trend_start_iteration = int(
-            sorted_records[last_improvement_idx + 1].get("iteration", last_improvement_idx + 1)
+            sorted_records[last_meaningful_idx + 1].get("iteration", last_meaningful_idx + 1)
         )
 
     # ── marginal_improvement_trend ────────────────────────────────────────────
@@ -139,17 +143,18 @@ def analyze_ceiling(records: List[dict]) -> CeilingMetrics:
             plateau_p_value = _ttest_ind_pvalue(plateau_deltas, non_plateau_deltas)
 
     # ── estimated_gain_probability ────────────────────────────────────────────
+    # Probability that a future iteration will advance the *global best*
+    # (frontier), not merely beat the parent.
     estimated_gain_probability: Optional[float] = None
     if n >= 8:
         tail_start_idx = max(0, int(n * 0.75))
-        tail_records = sorted_records[tail_start_idx:]
-        if tail_records:
-            productive_tail = sum(
-                1
-                for r in tail_records
-                if (r.get("score_delta") or 0.0) >= 0.001
-            )
-            estimated_gain_probability = productive_tail / len(tail_records)
+        frontier_advances = sum(
+            1
+            for i in range(tail_start_idx, n)
+            if best_so_far[i] > best_so_far[i - 1]
+        )
+        tail_length = n - tail_start_idx
+        estimated_gain_probability = frontier_advances / tail_length
 
     # ── early_stop_suggested_at ───────────────────────────────────────────────
     early_stop_suggested_at: Optional[int] = None
