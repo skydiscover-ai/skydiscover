@@ -234,7 +234,7 @@ def _compute_aggregate_stats(df: pd.DataFrame) -> AggregateStats:
         valid_scores = df[score_col].dropna()
         best_score = float(valid_scores.max()) if len(valid_scores) else float("nan")
         worst_score = float(valid_scores.min()) if len(valid_scores) else float("nan")
-        final_score = float(df[score_col].iloc[-1]) if len(df) else float("nan")
+        final_score = float(valid_scores.cummax().iloc[-1]) if len(valid_scores) else float("nan")
     else:
         best_score = worst_score = final_score = float("nan")
 
@@ -479,19 +479,20 @@ def _build_regression_dimension(
         algo_class = rating_context.get("algorithm_class", "")
         evidence.append(
             f"Note: regression thresholds adjusted for {algo_class} "
-            f"(expected range {thresholds[0]:.0%}–{thresholds[1]:.0%} vs "
-            f"{_DEFAULT_REGRESSION_THRESHOLDS[0]:.0%}–{_DEFAULT_REGRESSION_THRESHOLDS[1]:.0%} default)."
+            f"(good < {thresholds[1]:.0%}, fair < {thresholds[2]:.0%}, poor < {thresholds[3]:.0%} "
+            f"vs default good < {_DEFAULT_REGRESSION_THRESHOLDS[1]:.0%})."
         )
     if reg.death_spiral_periods:
         for start, end in reg.death_spiral_periods:
             evidence.append(f"Death spiral: iterations {start}–{end}")
 
+    t5, t4, t3, t2 = thresholds
     summaries = {
-        5: "Excellent — regressions are rare (< 5% of iterations).",
-        4: "Good — low regression rate (5–15%).",
-        3: "Fair — moderate regression frequency (15–30%).",
-        2: "Poor — high regression rate (30–50%) reducing search efficiency.",
-        1: "Critical — over half of iterations produce regressions.",
+        5: f"Excellent — regressions are rare (< {t5:.0%} of iterations).",
+        4: f"Good — low regression rate ({t5:.0%}–{t4:.0%}).",
+        3: f"Fair — moderate regression frequency ({t4:.0%}–{t3:.0%}).",
+        2: f"Poor — high regression rate ({t3:.0%}–{t2:.0%}) reducing search efficiency.",
+        1: f"Critical — over {t2:.0%} of iterations produce regressions.",
     }
     recs = {
         5: "Regression rate is healthy; keep current acceptance criteria.",
