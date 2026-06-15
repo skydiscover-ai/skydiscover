@@ -152,11 +152,12 @@ _LOG_ITER_GEPA_OUTCOME = re.compile(
     r"Iteration (\d+): (REJECTED|ACCEPTED) child \(child_score=([-\d.eE+]+)[^)]*parent_score=([-\d.eE+]+)\)"
 )
 _LOG_ITER_PROG_COMPLETED = re.compile(
-    r"Iteration (\d+): Program (\S+) \(parent: (\S+)\) completed in [\d.]+s"
+    r"Iteration (\d+): Program (\S+) \(parent: (\S+)\) completed in ([\d.]+)s"
 )
 _LOG_ITER_SUCCESS = re.compile(
-    r"Evaluated program (\S+)(?:\s+\[train\])?\s+in [\d.]+s: combined_score=([\d.]+)"
+    r"Evaluated program (\S+)(?:\s+\[train\])?\s+in [\d.]+s: .*?combined_score=([\d.e+-]+)"
 )
+_LOG_METRICS_LINE = re.compile(r"- INFO - Metrics: (.+)")
 _LOG_INITIAL_EVAL = re.compile(r"Adding initial program to database")
 _LOG_SEED_EVAL = re.compile(
     r"Evaluated program (\S+)(?:\s+\[train\])?\s+in [\d.]+s: (.+)"
@@ -382,13 +383,18 @@ def _parse_skydiscover_log(log_path: Path, initial_score: Optional[float]) -> li
 
     Each record has iteration, outcome ('failed'|'succeeded'), and score.
     Failed iterations keep the previous best score (no new program was added).
+
+    Handles evox co-evolution logs where solution-evolution iterations
+    ("Iteration N: Program X ... completed") are interleaved with
+    search-strategy meta-evolution failures ("Iteration N failed:").
+    When both tracks exist, completed (solution) records take precedence.
     """
     records: list[dict] = []
     current_score = initial_score
     seen_initial = False
-    # Track successful evals that occurred before an explicit "Iteration N failed"
-    # so we can assign them to the right iteration.
     pending_success: Optional[dict] = None
+    # Completed iterations (from "Iteration N: Program X ... completed" lines)
+    completed_records: dict[int, dict] = {}
 
     try:
         lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -411,7 +417,6 @@ def _parse_skydiscover_log(log_path: Path, initial_score: Optional[float]) -> li
 
         success_m = _LOG_ITER_SUCCESS.search(line)
         if success_m and seen_initial:
-            # A new program was evaluated — might be a successful iteration
             pending_success = {
                 "child_score": float(success_m.group(2)),
                 "child_program_id": success_m.group(1),
@@ -425,8 +430,6 @@ def _parse_skydiscover_log(log_path: Path, initial_score: Optional[float]) -> li
             iteration = int(failed_m.group(1))
             reason = failed_m.group(2).strip()
             if pending_success:
-                # A new program was evaluated before the failure message —
-                # this shouldn't happen in normal flow, flush it first.
                 rec = {
                     "iteration": iteration,
                     "outcome": "succeeded",
@@ -468,20 +471,40 @@ def _parse_skydiscover_log(log_path: Path, initial_score: Optional[float]) -> li
             continue
 
         prog_m = _LOG_ITER_PROG_COMPLETED.search(line)
-        if prog_m and pending_success:
+        if prog_m and seen_initial:
             prog_id = prog_m.group(2)
-            if pending_success.get("child_program_id") == prog_id:
-                rec = {
-                    "iteration": int(prog_m.group(1)),
-                    "outcome": "succeeded",
-                    "child_score": pending_success["child_score"],
-                    "child_program_id": prog_id,
-                    "parent_program_id": prog_m.group(3),
-                    "timestamp": pending_success["timestamp"],
-                }
+            iteration = int(prog_m.group(1))
+            total_time = float(prog_m.group(4))
+            rec = {
+                "iteration": iteration,
+                "outcome": "succeeded",
+                "child_program_id": prog_id,
+                "parent_program_id": prog_m.group(3),
+                "timestamp": timestamp,
+                "iteration_duration_seconds": total_time,
+            }
+            if pending_success:
+                if pending_success.get("child_program_id", "").startswith(prog_id[:8]):
+                    rec["child_score"] = pending_success["child_score"]
+                    rec["timestamp"] = pending_success.get("timestamp") or timestamp
+                else:
+                    rec["child_score"] = pending_success["child_score"]
                 pending_success = None
-                records.append(rec)
-                continue
+            completed_records[iteration] = rec
+            continue
+
+        # "Metrics: key=val, ..." line following a completed iteration
+        metrics_m = _LOG_METRICS_LINE.search(line)
+        if metrics_m and completed_records:
+            last_iter = max(completed_records)
+            last_rec = completed_records[last_iter]
+            if "child_score" not in last_rec or last_rec.get("child_score") is None:
+                parsed = _parse_log_metrics_string(metrics_m.group(1))
+                cs = parsed.get("combined_score")
+                if cs is not None:
+                    last_rec["child_score"] = float(cs)
+                    current_score = float(cs)
+            continue
 
     # Flush any trailing successful eval (last iteration succeeded, run ended)
     if pending_success:
@@ -494,6 +517,14 @@ def _parse_skydiscover_log(log_path: Path, initial_score: Optional[float]) -> li
         if pending_success["child_score"] is not None:
             rec["child_score"] = pending_success["child_score"]
         records.append(rec)
+
+    # Merge: completed_records (from "Iteration N: ... completed") take
+    # precedence over failed records (which may be from meta-evolution).
+    if completed_records:
+        failed_only = [r for r in records if r["iteration"] not in completed_records]
+        all_records = list(completed_records.values()) + failed_only
+        all_records.sort(key=lambda r: r["iteration"])
+        return all_records
 
     # Fallback: if the log only contains eval-error lines (e.g. a run where every
     # LLM output was invalid and no iteration-tracking lines were emitted),

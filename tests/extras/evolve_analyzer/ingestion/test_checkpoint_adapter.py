@@ -852,6 +852,120 @@ class TestAdaptSkydiscoverLog:
 
 
 # ===========================================================================
+# adapt_skydiscover — evox co-evolution log parsing
+# ===========================================================================
+
+class TestAdaptSkydiscoverEvoxLog:
+    """Tests for parsing evox co-evolution logs where solution-evolution
+    iterations ('Iteration N: Program X ... completed') are interleaved with
+    search-strategy meta-evolution failures ('Iteration N failed:')."""
+
+    def _make_log_run(self, tmp_path: Path, log_content: str) -> Path:
+        run_dir = tmp_path / "run"
+        run_dir.mkdir()
+        logs = run_dir / "logs"
+        logs.mkdir()
+        (logs / "run.log").write_text(log_content, encoding="utf-8")
+        return run_dir
+
+    def test_completed_iteration_parsed(self, tmp_path):
+        log = textwrap.dedent("""\
+            2024-01-01 10:00:00,000 - INFO - Adding initial program to database
+            2024-01-01 10:00:01,000 - INFO - Evaluated program abc123-def in 96.71s: speedup=0.4859, runtime=0.0023, combined_score=433.14
+            2024-01-01 10:00:02,000 - INFO - Iteration 1: Program abc123-def (parent: seed000) completed in 162.10s (llm: 40.30s, eval: 121.81s)
+            2024-01-01 10:00:02,000 - INFO - Metrics: speedup=0.4859, runtime=0.0023, combined_score=433.14
+        """)
+        run_dir = self._make_log_run(tmp_path, log)
+        records = list(adapt_skydiscover(str(run_dir)))
+        assert len(records) == 1
+        assert records[0]["iteration"] == 1
+        assert records[0]["outcome"] == "succeeded"
+        assert records[0]["child_score"] == pytest.approx(433.14)
+        assert records[0]["iteration_duration_seconds"] == pytest.approx(162.10)
+
+    def test_combined_score_not_first_metric(self, tmp_path):
+        """Regression test: combined_score preceded by other metrics."""
+        log = textwrap.dedent("""\
+            2024-01-01 10:00:00,000 - INFO - Adding initial program to database
+            2024-01-01 10:00:01,000 - INFO - Evaluated program prog1 in 5s: speedup=0.5, runtime=0.002, combined_score=474.07, data_throughput=0.001
+        """)
+        run_dir = self._make_log_run(tmp_path, log)
+        records = list(adapt_skydiscover(str(run_dir)))
+        assert len(records) == 1
+        assert records[0]["child_score"] == pytest.approx(474.07)
+
+    def test_completed_overrides_failed_same_iteration(self, tmp_path):
+        """In evox co-evolution, a solution 'Iteration 1: completed' should
+        take precedence over a meta-evolution 'Iteration 1 failed:'."""
+        log = textwrap.dedent("""\
+            2024-01-01 10:00:00,000 - INFO - Adding initial program to database
+            2024-01-01 10:01:00,000 - INFO - Evaluated program prog1 in 90s: speedup=0.52, combined_score=465.0
+            2024-01-01 10:01:01,000 - INFO - Iteration 1: Program prog1 (parent: seed1) completed in 130s (llm: 40s, eval: 90s)
+            2024-01-01 10:02:00,000 - WARNING - Iteration 1 failed: LLM generation failed: Error code: 401
+            2024-01-01 10:03:00,000 - INFO - Evaluated program prog2 in 80s: speedup=0.53, combined_score=470.0
+            2024-01-01 10:03:01,000 - INFO - Iteration 2: Program prog2 (parent: prog1) completed in 110s (llm: 30s, eval: 80s)
+            2024-01-01 10:04:00,000 - WARNING - Iteration 2 failed: LLM generation failed: Error code: 401
+        """)
+        run_dir = self._make_log_run(tmp_path, log)
+        records = list(adapt_skydiscover(str(run_dir)))
+        assert len(records) == 2
+        assert all(r["outcome"] == "succeeded" for r in records)
+        assert records[0]["iteration"] == 1
+        assert records[0]["child_score"] == pytest.approx(465.0)
+        assert records[1]["iteration"] == 2
+        assert records[1]["child_score"] == pytest.approx(470.0)
+
+    def test_failed_preserved_when_no_completed_for_that_iteration(self, tmp_path):
+        """Failed records are kept when no completed record exists for same iteration."""
+        log = textwrap.dedent("""\
+            2024-01-01 10:00:00,000 - INFO - Adding initial program to database
+            2024-01-01 10:01:00,000 - INFO - Evaluated program prog1 in 90s: combined_score=465.0
+            2024-01-01 10:01:01,000 - INFO - Iteration 1: Program prog1 (parent: seed1) completed in 130s (llm: 40s, eval: 90s)
+            2024-01-01 10:02:00,000 - WARNING - Iteration 5 failed: timeout
+        """)
+        run_dir = self._make_log_run(tmp_path, log)
+        records = list(adapt_skydiscover(str(run_dir)))
+        assert len(records) == 2
+        assert records[0]["iteration"] == 1
+        assert records[0]["outcome"] == "succeeded"
+        assert records[1]["iteration"] == 5
+        assert records[1]["outcome"] == "failed"
+
+    def test_metrics_line_fallback_for_score(self, tmp_path):
+        """When the Evaluated line doesn't contain combined_score, the Metrics
+        line should provide it."""
+        log = textwrap.dedent("""\
+            2024-01-01 10:00:00,000 - INFO - Adding initial program to database
+            2024-01-01 10:01:00,000 - INFO - Evaluated program prog1 in 90s: some_metric=42.0
+            2024-01-01 10:01:01,000 - INFO - Iteration 1: Program prog1 (parent: seed1) completed in 130s (llm: 40s, eval: 90s)
+            2024-01-01 10:01:01,000 - INFO - Metrics: some_metric=42.0, combined_score=500.5
+        """)
+        run_dir = self._make_log_run(tmp_path, log)
+        records = list(adapt_skydiscover(str(run_dir)))
+        assert len(records) == 1
+        assert records[0]["child_score"] == pytest.approx(500.5)
+
+    def test_many_completed_iterations_sorted(self, tmp_path):
+        """Multiple completed iterations are returned sorted by iteration number."""
+        lines = ["2024-01-01 10:00:00,000 - INFO - Adding initial program to database"]
+        for i in range(1, 6):
+            score = 400 + i * 10
+            lines.append(
+                f"2024-01-01 10:0{i}:00,000 - INFO - Evaluated program p{i} in 90s: combined_score={score}"
+            )
+            lines.append(
+                f"2024-01-01 10:0{i}:01,000 - INFO - Iteration {i}: Program p{i} (parent: p{i-1}) completed in 100s (llm: 10s, eval: 90s)"
+            )
+        log = "\n".join(lines) + "\n"
+        run_dir = self._make_log_run(tmp_path, log)
+        records = list(adapt_skydiscover(str(run_dir)))
+        assert len(records) == 5
+        assert [r["iteration"] for r in records] == [1, 2, 3, 4, 5]
+        assert records[0]["child_score"] == pytest.approx(410.0)
+        assert records[4]["child_score"] == pytest.approx(450.0)
+
+
+# ===========================================================================
 # adapt_skydiscover — checkpoint fallback
 # ===========================================================================
 
