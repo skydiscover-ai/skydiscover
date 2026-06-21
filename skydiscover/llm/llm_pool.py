@@ -60,6 +60,18 @@ class LLMPool:
         model = self._sample_model()
         return await model.generate(system_message, messages, **kwargs)
 
+    async def check_availability(self, timeout: float = 15.0) -> bool:
+        """Probe the first model with a minimal request to check connectivity."""
+        try:
+            model = self.models[0]
+            await asyncio.wait_for(
+                model.generate("", [{"role": "user", "content": "ping"}], max_tokens=1),
+                timeout=timeout,
+            )
+            return True
+        except Exception:
+            return False
+
     async def generate_all(
         self, system_message: str, messages: List[Dict[str, Any]], **kwargs
     ) -> List[LLMResponse]:
