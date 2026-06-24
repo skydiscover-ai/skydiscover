@@ -245,7 +245,7 @@ async def run(
                                     m.system_message = new_prompt
                             feedback_reader.set_current_prompt(new_prompt)
                             if feedback:
-                                logger.info(
+                                logger.debug(
                                     f"Human feedback injected into OpenEvolve ({len(feedback)} chars, mode={feedback_reader.mode})"
                                 )
                     except Exception:

@@ -116,7 +116,7 @@ class AgenticGenerator:
 
             if not tool_calls:
                 if text_content:
-                    logger.info(
+                    logger.debug(
                         "Agent produced text at step %d (%d files read)", step, len(files_read)
                     )
                     return text_content
@@ -140,7 +140,7 @@ class AgenticGenerator:
                     )
                     continue
 
-                logger.info(
+                logger.debug(
                     "Step %d: tool=%s args=%s",
                     step,
                     name,
@@ -211,7 +211,7 @@ class AgenticGenerator:
         except Exception as exc:
             if "unsupported" not in str(exc).lower() and "not found" not in str(exc).lower():
                 raise
-            logger.info("Chat Completions unsupported for agentic; falling back to Responses API")
+            logger.debug("Chat Completions unsupported for agentic; falling back to Responses API")
             model._use_responses_api = True
             return await self._call_llm_responses(model, system_message, conversation)
 

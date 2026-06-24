@@ -335,7 +335,7 @@ class ProgramDatabase(ABC):
             score_str = format_metrics(best_program.metrics)
         else:
             score_str = "N/A"
-        logger.info(
+        logger.debug(
             f"Database has {len(self.programs)} programs, best program score is {score_str}"
         )
 

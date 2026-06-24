@@ -50,7 +50,7 @@ class EvoxContextBuilder(DefaultContextBuilder):
         summary_llm_config = config.llm.guide_models
         self.summary_llm: LLMPool = LLMPool(summary_llm_config)
         if summary_llm_config:
-            logger.info(
+            logger.debug(
                 f"Initialized guide LLM inside EvoxContextBuilder: {summary_llm_config[0].name}"
             )
 

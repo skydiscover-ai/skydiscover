@@ -63,13 +63,13 @@ def start_monitor(
             feedback_mode = getattr(config, "human_feedback_mode", "append")
             feedback_reader = HumanFeedbackReader(feedback_path, mode=feedback_mode)
             monitor_server.set_feedback_reader(feedback_reader)
-            logger.info("Human feedback enabled — file: %s", feedback_path)
+            logger.debug("Human feedback enabled — file: %s", feedback_path)
         except Exception as exc:
             logger.warning("Failed to set up human feedback: %s", exc)
 
         url = f"http://localhost:{monitor_server.port}/"
         print(f"\n  Live monitor: {url}\n", flush=True)
-        logger.info("Live monitor: %s", url)
+        logger.debug("Live monitor: %s", url)
 
     except Exception as exc:
         logger.warning("Failed to start monitor: %s", exc)

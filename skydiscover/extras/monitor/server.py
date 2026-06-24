@@ -140,7 +140,7 @@ class MonitorServer:
         self._thread.start()
         # Wait until TCP port is actually bound (up to 5s)
         self._ready_event.wait(timeout=5)
-        logger.info(f"Monitor server started → http://localhost:{self.port}/")
+        logger.debug(f"Monitor server started → http://localhost:{self.port}/")
 
     def stop(self) -> None:
         """Signal the server to stop and wait for the thread to finish."""
@@ -206,7 +206,7 @@ class MonitorServer:
                 "Click 'Refresh Summary' to generate an AI summary of the top programs."
             )
 
-        logger.info(
+        logger.debug(
             f"AI summary configured: model={model}, top_k={top_k}, "
             f"interval={interval or 'manual'}, api_key={'set' if self._summary_api_key else 'MISSING'}"
         )
@@ -428,7 +428,7 @@ class MonitorServer:
                     "human_feedback_mode": self._feedback_reader.mode,
                 }
                 await self._broadcast(json.dumps(ack))
-                logger.info(f"Human feedback set from dashboard ({len(text)} chars)")
+                logger.debug(f"Human feedback set from dashboard ({len(text)} chars)")
             else:
                 await self._ws_send(
                     writer,
@@ -451,7 +451,7 @@ class MonitorServer:
                     "human_feedback_mode": self._feedback_reader.mode,
                 }
                 await self._broadcast(json.dumps(ack))
-                logger.info("Human feedback cleared from dashboard")
+                logger.debug("Human feedback cleared from dashboard")
         elif t == "request_feedback_state":
             await self._ws_send(
                 writer,
@@ -471,7 +471,7 @@ class MonitorServer:
                     "human_feedback_mode": mode,
                 }
                 await self._broadcast(json.dumps(ack))
-                logger.info(f"Human feedback mode set to: {mode}")
+                logger.debug(f"Human feedback mode set to: {mode}")
         elif t == "request_system_prompt":
             prompt_text = ""
             if self._feedback_reader:
@@ -798,10 +798,10 @@ class MonitorServer:
             top_programs = self._get_top_k_programs()
             if not top_programs:
                 self._summary_text = "No scored programs yet. Run some iterations first."
-                logger.info("AI summary skipped: no scored programs")
+                logger.debug("AI summary skipped: no scored programs")
             else:
                 prompt_data = self._build_summary_prompt(top_programs)
-                logger.info(
+                logger.debug(
                     f"AI summary: calling {self._summary_model} with {len(top_programs)} "
                     f"top programs, api_base={self._summary_api_base}"
                 )
@@ -814,7 +814,7 @@ class MonitorServer:
                     prompt_data,
                 )
                 self._summary_text = result or "AI returned empty response."
-                logger.info(f"AI summary generated ({len(self._summary_text)} chars)")
+                logger.debug(f"AI summary generated ({len(self._summary_text)} chars)")
         except Exception as e:
             logger.warning(f"AI summary generation failed: {e}", exc_info=True)
             self._summary_text = f"Summary generation failed: {e}"

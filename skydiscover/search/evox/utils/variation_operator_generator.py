@@ -288,7 +288,7 @@ def get_available_packages(problem_dir=None) -> list:
                             continue
                         packages.append(line)
                     if packages:
-                        logger.info(f"Read {len(packages)} packages from {requirements_path}")
+                        logger.debug(f"Read {len(packages)} packages from {requirements_path}")
                         return packages
                 except Exception as e:
                     logger.warning(f"Could not read {requirements_path} ({e})")
@@ -311,7 +311,7 @@ def get_available_packages(problem_dir=None) -> list:
                     continue
                 packages.append(line)
             if packages:
-                logger.info(f"Read {len(packages)} packages from {requirements_path}")
+                logger.debug(f"Read {len(packages)} packages from {requirements_path}")
                 return packages
         except Exception as e:
             logger.warning(f"Could not read requirements.txt ({e}), trying pyproject.toml")

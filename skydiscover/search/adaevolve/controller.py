@@ -77,7 +77,7 @@ class AdaEvolveController(DiscoveryController):
         # This ensures correct behavior after checkpoint load
         if self.database.use_paradigm_breakthrough:
             model_names = ", ".join(m.name for m in self.guide_llms.models_cfg)
-            logger.info(f"Paradigm LLM: using guide_models [{model_names}]")
+            logger.debug(f"Paradigm LLM: using guide_models [{model_names}]")
 
             self.paradigm_generator = ParadigmGenerator(
                 llm_pool=self.guide_llms,
@@ -99,7 +99,7 @@ class AdaEvolveController(DiscoveryController):
         self._last_sampling_mode: Optional[str] = None
         self._last_sampling_intensity: Optional[float] = None
 
-        logger.info(
+        logger.debug(
             f"AdaEvolveController initialized "
             f"(language={self.config.language}, "
             f"paradigm_breakthrough={self.database.use_paradigm_breakthrough})"
@@ -141,7 +141,7 @@ class AdaEvolveController(DiscoveryController):
             output_dir, f"adaevolve_iteration_stats_{timestamp}.jsonl"
         )
 
-        logger.info(
+        logger.debug(
             f"AdaEvolve iteration stats will be logged to: {self._iteration_stats_log_path}"
         )
 
@@ -261,7 +261,7 @@ class AdaEvolveController(DiscoveryController):
 
         # Log final summary and stats file location
         if self._iteration_stats_log_path:
-            logger.info(f"AdaEvolve iteration stats saved to: {self._iteration_stats_log_path}")
+            logger.debug(f"AdaEvolve iteration stats saved to: {self._iteration_stats_log_path}")
 
         return self.database.get_best_program()
 
@@ -295,7 +295,7 @@ class AdaEvolveController(DiscoveryController):
                     metadata={"seeded_to_island": i},
                 )
                 self.database.add(copy, iteration=0, target_island=i)
-                logger.info(f"Seeded island {i}")
+                logger.debug(f"Seeded island {i}")
 
     async def _run_iteration(self, iteration: int, checkpoint_callback) -> None:
         """Execute one evolution iteration."""
@@ -345,7 +345,7 @@ class AdaEvolveController(DiscoveryController):
         if self.database.has_active_paradigm():
             return  # Already have paradigms to use
 
-        logger.info("Global paradigm stagnation detected, generating breakthrough ideas...")
+        logger.debug("Global paradigm stagnation detected, generating breakthrough ideas...")
 
         # Get current best program for context
         best_program = self.database.get_best_program()
@@ -372,7 +372,7 @@ class AdaEvolveController(DiscoveryController):
 
         if paradigms:
             self.database.set_paradigms(paradigms)
-            logger.info(f"Generated {len(paradigms)} breakthrough paradigms")
+            logger.debug(f"Generated {len(paradigms)} breakthrough paradigms")
         else:
             logger.warning("Failed to generate paradigms")
 
@@ -440,7 +440,7 @@ class AdaEvolveController(DiscoveryController):
                 f"{k}={v:.4f}" if isinstance(v, float) else f"{k}={v}"
                 for k, v in child.metrics.items()
             )
-            logger.info(f"Metrics: {metrics_str}")
+            logger.debug(f"Metrics: {metrics_str}")
 
         # Check for new best
         if self.database.is_multiobjective_enabled():
@@ -454,7 +454,7 @@ class AdaEvolveController(DiscoveryController):
 
         # Checkpoint callback
         if iteration > 0 and iteration % self.config.checkpoint_interval == 0:
-            logger.info(f"Checkpoint interval reached at iteration {iteration}")
+            logger.debug(f"Checkpoint interval reached at iteration {iteration}")
             self.database.log_status()
             if checkpoint_callback:
                 checkpoint_callback(iteration)

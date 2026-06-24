@@ -109,7 +109,7 @@ class CoEvolutionController(DiscoveryController):
 
         if self._switch_interval is None:
             self._switch_interval = max(1, int(max_iterations * self.DEFAULT_SWITCH_RATIO))
-            logger.info(f"Switch if {self._switch_interval} iterations of stagnation detected")
+            logger.debug(f"Switch if {self._switch_interval} iterations of stagnation detected")
 
         self.start_db_stats = self.database.get_statistics(
             improvement_threshold=self.DEFAULT_IMPROVEMENT_THRESHOLD
@@ -152,7 +152,7 @@ class CoEvolutionController(DiscoveryController):
 
                 # Co-evolve search strategy if needed (skip on final iteration)
                 if iteration < self.total_solution_iterations and self._should_evolve_search():
-                    logger.info(
+                    logger.debug(
                         f"Stagnation detected -> evolving search strategy (solution_iter={completed_solution_iter})"
                     )
                     await self._evolve_search(completed_solution_iter)
@@ -281,7 +281,7 @@ class CoEvolutionController(DiscoveryController):
 
             self._diverge_label = DEFAULT_DIVERGE_TEMPLATE
             self._refine_label = DEFAULT_REFINE_TEMPLATE
-            logger.info(
+            logger.debug(
                 "Using default variation operators (auto_generate_variation_operators=false)"
             )
             self._assign_labels_to_db(self.database)
@@ -296,14 +296,14 @@ class CoEvolutionController(DiscoveryController):
             problem_dir = Path(self.evaluation_file).parent if self.evaluation_file else None
             label_llms = self.search_controller.guide_llms
             model_names = ", ".join(m.name for m in label_llms.models_cfg)
-            logger.info(f"Label generation: using guide_model = [{model_names}]")
+            logger.debug(f"Label generation: using guide_model = [{model_names}]")
             self._diverge_label, self._refine_label = await generate_variation_operators(
                 system_message,
                 evaluator_code,
                 problem_dir=problem_dir,
                 llm_pool=label_llms,
             )
-            logger.info(
+            logger.debug(
                 f"Generated variation operator labels ({len(self._diverge_label)}/{len(self._refine_label)} chars)"
             )
         except Exception as e:
@@ -425,7 +425,7 @@ class CoEvolutionController(DiscoveryController):
             self.database = new_db
             if self.evaluator.llm_judge:
                 self.evaluator.llm_judge.database = new_db
-            logger.info(
+            logger.debug(
                 f"Switched to search algorithm {search_program_id} ({migrated_count} programs migrated)"
             )
 
@@ -568,7 +568,7 @@ class CoEvolutionController(DiscoveryController):
 
         is_new_best = self._best_search_score is not None and score > self._best_search_score
         if is_new_best:
-            logger.info(
+            logger.debug(
                 f"New best search score: {score:.6f} (+{score - self._best_search_score:.6f})"
             )
         if is_new_best or self._best_search_score is None:
@@ -576,16 +576,16 @@ class CoEvolutionController(DiscoveryController):
         return is_new_best
 
     def _log_coevolution_setup(self, db_cfg) -> None:
-        logger.info("=" * 70)
-        logger.info("[EVOX CO-EVOLUTION SETUP]")
-        logger.info("-" * 70)
-        logger.info(f"  [SOLUTION EVOLUTION]")
-        logger.info(f"    Initial search strategy file : {db_cfg.database_file_path}")
-        logger.info(f"    Solution database class      : {self.database.__class__.__name__}")
-        logger.info(f"  [META EVOLUTION OF SEARCH STRATEGY]")
-        logger.info(
+        logger.debug("=" * 70)
+        logger.debug("[EVOX CO-EVOLUTION SETUP]")
+        logger.debug("-" * 70)
+        logger.debug(f"  [SOLUTION EVOLUTION]")
+        logger.debug(f"    Initial search strategy file : {db_cfg.database_file_path}")
+        logger.debug(f"    Solution database class      : {self.database.__class__.__name__}")
+        logger.debug(f"  [META EVOLUTION OF SEARCH STRATEGY]")
+        logger.debug(
             f"    Search strategy database class: {self.search_controller.database.__class__.__name__}"
         )
-        logger.info(f"    Search strategy evaluator     : {db_cfg.evaluation_file}")
-        logger.info(f"    Search strategy config        : {db_cfg.config_path}")
-        logger.info("=" * 70)
+        logger.debug(f"    Search strategy evaluator     : {db_cfg.evaluation_file}")
+        logger.debug(f"    Search strategy config        : {db_cfg.config_path}")
+        logger.debug("=" * 70)

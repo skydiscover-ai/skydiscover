@@ -194,14 +194,14 @@ class ParadigmGenerator:
                     )
                     last_error = "Parse failure"
                     if attempt < MAX_RETRIES - 1:
-                        logger.info(f"Retrying paradigm generation in {backoff:.1f}s...")
+                        logger.debug(f"Retrying paradigm generation in {backoff:.1f}s...")
                         await asyncio.sleep(backoff)
                         backoff *= BACKOFF_MULTIPLIER
                     continue
 
-                logger.info(f"Generated {len(paradigms)} paradigms:")
+                logger.debug(f"Generated {len(paradigms)} paradigms:")
                 for i, p in enumerate(paradigms):
-                    logger.info(
+                    logger.debug(
                         f"  [{i+1}] {p.get('idea', 'N/A')} (approach: {p.get('approach_type', 'N/A')})"
                     )
                 return paradigms
@@ -213,7 +213,7 @@ class ParadigmGenerator:
                 )
 
                 if attempt < MAX_RETRIES - 1:
-                    logger.info(f"Retrying in {backoff:.1f}s...")
+                    logger.debug(f"Retrying in {backoff:.1f}s...")
                     await asyncio.sleep(backoff)
                     backoff *= BACKOFF_MULTIPLIER
 

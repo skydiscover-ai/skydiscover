@@ -60,7 +60,7 @@ class DefaultContextBuilder(ContextBuilder):
         """
         self.system_template_override = system_template
         self.user_template_override = user_template
-        logger.info(f"Templates set: system={system_template}, user={user_template}")
+        logger.debug(f"Templates set: system={system_template}, user={user_template}")
 
     # ------------------------------------------------------------------
     # Main Prompt Builder

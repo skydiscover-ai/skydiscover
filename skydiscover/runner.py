@@ -80,7 +80,7 @@ class Runner:
         # Initialize the discovery controller
         self.discovery_controller: Optional[DiscoveryController] = None
 
-        logger.info(f"Runner ready: search={self.name}, program={self.initial_program_path}")
+        logger.debug(f"Runner ready: search={self.name}, program={self.initial_program_path}")
 
     @property
     def initial_score(self) -> Optional[float]:
@@ -235,7 +235,7 @@ class Runner:
     # ------------------------------------------------------------------
 
     async def _add_initial_program(self, start_iteration: int) -> None:
-        logger.info("Adding initial program to database")
+        logger.debug("Adding initial program to database")
         program_id = str(uuid.uuid4())
 
         initial_image_path = None
@@ -251,7 +251,7 @@ class Runner:
                     program_id=program_id,
                 )
                 initial_image_path = result.image_path
-                logger.info(f"Initial image: {initial_image_path}")
+                logger.debug(f"Initial image: {initial_image_path}")
             except Exception as e:
                 logger.warning(f"Failed to generate initial image: {e}")
 
@@ -307,7 +307,7 @@ class Runner:
 
             url = f"http://localhost:{server.port}/"
             print(f"\n  Live monitor: {url}\n", flush=True)
-            logger.info(f"Live monitor: {url}")
+            logger.debug(f"Live monitor: {url}")
             return server
         except Exception as e:
             logger.warning(f"Failed to start monitor: {e}")
@@ -327,7 +327,7 @@ class Runner:
             self.discovery_controller.feedback_reader = reader
             if monitor_server:
                 monitor_server.set_feedback_reader(reader)
-            logger.info(f"Human feedback: {path}")
+            logger.debug(f"Human feedback: {path}")
         except Exception as e:
             logger.warning(f"Failed to set up human feedback: {e}")
 
@@ -355,7 +355,7 @@ class Runner:
                 )
             except Exception:
                 logger.debug("Monitor callback failed for program %s", prog.id, exc_info=True)
-        logger.info(f"Pushed {len(self.database.programs)} existing program(s) to monitor")
+        logger.debug(f"Pushed {len(self.database.programs)} existing program(s) to monitor")
 
     def _install_signal_handlers(self) -> None:
         def on_signal(signum, frame):
@@ -425,7 +425,7 @@ class Runner:
                 )
             logger.info(f"Checkpoint {iteration}: best={format_metrics(best.metrics)}")
 
-        logger.info(f"Checkpoint saved to {checkpoint_path}")
+        logger.debug(f"Checkpoint saved to {checkpoint_path}")
 
     def _load_checkpoint(self, checkpoint_path: str) -> None:
         if not os.path.exists(checkpoint_path):
@@ -475,4 +475,4 @@ class Runner:
 
                 shutil.copy2(img, os.path.join(best_dir, "best_image" + os.path.splitext(img)[1]))
 
-        logger.info(f"Best program saved to {best_dir}")
+        logger.debug(f"Best program saved to {best_dir}")

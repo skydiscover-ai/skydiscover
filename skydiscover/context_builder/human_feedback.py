@@ -54,7 +54,7 @@ class HumanFeedbackReader:
             os.makedirs(os.path.dirname(self.path), exist_ok=True)
             with open(self.path, "w") as f:
                 f.write(_INITIAL_TEMPLATE)
-            logger.info(f"Created human feedback file: {self.path}")
+            logger.debug(f"Created human feedback file: {self.path}")
 
     def read(self) -> str:
         """
@@ -79,9 +79,9 @@ class HumanFeedbackReader:
 
         if content != self._last_content:
             if content:
-                logger.info(f"Human feedback updated ({len(content)} chars)")
+                logger.debug(f"Human feedback updated ({len(content)} chars)")
             elif self._last_content:
-                logger.info("Human feedback cleared")
+                logger.debug("Human feedback cleared")
             self._last_content = content
 
         return content
@@ -99,7 +99,7 @@ class HumanFeedbackReader:
             logger.warning(f"Invalid human feedback mode '{mode}', ignoring")
             return
         self.mode = mode
-        logger.info(f"Human feedback mode set to: {mode}")
+        logger.debug(f"Human feedback mode set to: {mode}")
 
     def apply_feedback(self, prompt: dict) -> dict:
         """Apply current feedback to a prompt dict.
@@ -135,7 +135,7 @@ class HumanFeedbackReader:
             "mode": mode,
         }
         self._history.append(entry)
-        logger.info(
+        logger.debug(
             f"Human feedback logged: iteration={iteration}, mode={mode}, "
             f"chars={len(feedback_text)}"
         )

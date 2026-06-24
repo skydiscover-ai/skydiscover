@@ -44,13 +44,20 @@ class _ConsoleFilter(logging.Filter):
 
 
 def setup_search_logging(log_level: str, log_dir: str, name: str) -> None:
-    """Configure root logger with a timestamped file handler and a console handler."""
+    """Configure root logger with a timestamped file handler and a console handler.
+
+    The file handler always captures DEBUG+, while the console handler
+    respects *log_level* so the terminal stays clean by default.
+    """
     os.makedirs(log_dir, exist_ok=True)
     root = logging.getLogger()
-    root.setLevel(getattr(logging, log_level))
+    root.setLevel(logging.DEBUG)
+
+    console_level = getattr(logging, log_level)
 
     log_file = os.path.join(log_dir, f"{name}_{time.strftime('%Y%m%d_%H%M%S')}.log")
     fh = logging.FileHandler(log_file)
+    fh.setLevel(logging.DEBUG)
     fh.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
     root.addHandler(fh)
 
@@ -59,8 +66,9 @@ def setup_search_logging(log_level: str, log_dir: str, name: str) -> None:
         for h in root.handlers
     ):
         ch = logging.StreamHandler()
+        ch.setLevel(console_level)
         ch.setFormatter(_ConsoleFormatter())
         ch.addFilter(_ConsoleFilter())
         root.addHandler(ch)
 
-    logging.getLogger(__name__).info(f"Logging to {log_file}")
+    logging.getLogger(__name__).debug(f"Logging to {log_file}")

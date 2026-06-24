@@ -43,7 +43,7 @@ class LLMPool:
                 logger._logged_pools = set()
             if pool_key not in logger._logged_pools:
                 parts = ", ".join(f"{c.name}={w:.2f}" for c, w in zip(models_cfg, self.weights))
-                logger.info(f"Pool weights: {parts}")
+                logger.debug(f"Pool weights: {parts}")
                 logger._logged_pools.add(pool_key)
 
     def _sample_model(self):

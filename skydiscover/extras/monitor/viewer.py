@@ -230,13 +230,13 @@ def main() -> None:
         print(f"Error: no checkpoint data found in '{args.path}'")
         sys.exit(1)
 
-    logger.info(f"Loading from: {ckpt_dir}")
+    logger.debug(f"Loading from: {ckpt_dir}")
     prog_list, best_id, last_iter = load_programs(ckpt_dir)
     if not prog_list:
         print(f"Error: no programs found in '{ckpt_dir}'")
         sys.exit(1)
 
-    logger.info(f"Loaded {len(prog_list)} programs (best={best_id}, last_iter={last_iter})")
+    logger.debug(f"Loaded {len(prog_list)} programs (best={best_id}, last_iter={last_iter})")
 
     all_progs = {p["id"]: p for p in prog_list}
     monitor_programs = [_to_monitor_format(p, all_progs) for p in prog_list]

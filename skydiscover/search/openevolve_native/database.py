@@ -154,7 +154,7 @@ class OpenEvolveNativeDatabase(ProgramDatabase):
         if random_seed is not None:
             random.seed(random_seed)
 
-        logger.info(
+        logger.debug(
             "OpenEvolveNativeDatabase: %d islands, pop=%d, archive=%d, "
             "features=%s, bins=%d, migration_interval=%d, migration_rate=%.2f",
             self.num_islands,
@@ -662,7 +662,7 @@ class OpenEvolveNativeDatabase(ProgramDatabase):
             old_id = self.best_program_id
             self.best_program_id = program.id
             if "combined_score" in program.metrics and "combined_score" in current_best.metrics:
-                logger.info(
+                logger.debug(
                     "New best program %s replaces %s (%.4f -> %.4f)",
                     program.id,
                     old_id,
@@ -716,7 +716,7 @@ class OpenEvolveNativeDatabase(ProgramDatabase):
             self.archive.discard(pid)
 
         self._cleanup_stale_island_bests()
-        logger.info(
+        logger.debug(
             "Population limit: removed %d, now %d",
             len(to_remove),
             len(self.programs),
@@ -750,7 +750,7 @@ class OpenEvolveNativeDatabase(ProgramDatabase):
     def _migrate_programs(self) -> None:
         if self.num_islands < 2:
             return
-        logger.info("Performing migration between islands")
+        logger.debug("Performing migration between islands")
 
         for i, island in enumerate(self.islands):
             if not island:
@@ -805,7 +805,7 @@ class OpenEvolveNativeDatabase(ProgramDatabase):
                     )
 
         self.last_migration_generation = max(self.island_generations)
-        logger.info(
+        logger.debug(
             "Migration completed at generation %d",
             self.last_migration_generation,
         )
@@ -951,7 +951,7 @@ class OpenEvolveNativeDatabase(ProgramDatabase):
                 best = avg = 0.0
             cells = len(self.island_feature_maps[i]) if i < len(self.island_feature_maps) else 0
             gen = self.island_generations[i] if i < len(self.island_generations) else 0
-            logger.info(
+            logger.debug(
                 "Island %d: %d programs, %d cells, gen=%d, best=%.4f, avg=%.4f%s",
                 i,
                 len(progs),
