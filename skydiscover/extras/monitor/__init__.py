@@ -45,11 +45,26 @@ def start_monitor(
         monitor_server.start()
         monitor_callback = create_external_callback(monitor_server, time.time())
 
-        if config.monitor.summary_model:
+        summary_model = config.monitor.summary_model
+        summary_api_base = config.monitor.summary_api_base
+        summary_api_key = config.monitor.summary_api_key
+
+        if not summary_model and config.llm.models:
+            first = config.llm.models[0]
+            summary_model = first.name
+            summary_api_base = summary_api_base or first.api_base
+            summary_api_key = summary_api_key or first.api_key
+
+        if not summary_model:
+            logger.warning(
+                "Summary feature disabled: no summary model configured "
+                "and no model available from the main LLM configuration."
+            )
+        else:
             monitor_server.configure_summary(
-                model=config.monitor.summary_model,
-                api_key=config.monitor.summary_api_key or "",
-                api_base=config.monitor.summary_api_base,
+                model=summary_model,
+                api_key=summary_api_key or "",
+                api_base=summary_api_base or "",
                 top_k=config.monitor.summary_top_k,
                 interval=config.monitor.summary_interval,
             )

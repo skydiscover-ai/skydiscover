@@ -118,7 +118,7 @@ class MonitorServer:
         # AI summary state
         self._summary_model: str = ""
         self._summary_api_key: str = ""
-        self._summary_api_base: str = "https://api.openai.com/v1"
+        self._summary_api_base: str = ""
         self._summary_top_k: int = 3
         self._summary_interval: int = 0  # 0 = manual only
         self._summary_text: str = ""
@@ -178,23 +178,27 @@ class MonitorServer:
 
     def configure_summary(
         self,
-        model: str = "gpt-5-mini",
+        model: str = "",
         api_key: str = "",
-        api_base: str = "https://api.openai.com/v1",
+        api_base: str = "",
         top_k: int = 3,
         interval: int = 0,
     ) -> None:
         """Configure the AI summary generator.
 
         Args:
-            model: OpenAI model name (default gpt-5-mini).
+            model: LLM model name for summary generation.
             api_key: API key. Falls back to OPENAI_API_KEY env var.
             api_base: API base URL.
             top_k: Number of top programs to include in summary prompt.
             interval: Auto-generate every N new programs (0 = manual only).
         """
         self._summary_model = model
-        self._summary_api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
+        if not api_key and model:
+            from skydiscover.config import _parse_model_spec, _resolve_api_key_from_env
+            _, _, _, env_vars = _parse_model_spec(model)
+            api_key = _resolve_api_key_from_env(env_vars) or ""
+        self._summary_api_key = api_key
         self._summary_api_base = api_base.rstrip("/")
         self._summary_top_k = top_k
         self._summary_interval = interval

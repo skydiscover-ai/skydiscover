@@ -56,7 +56,7 @@ def _parse_model_spec(model_str: str) -> tuple:
     Supports:
       - ``provider/model``  (e.g. ``gemini/gemini-3-pro``)
       - bare names with known prefix (e.g. ``gemini-3-pro`` → gemini)
-      - unknown bare names default to ``openai``
+      - unknown bare names return ``(None, model_str, None, [])`` with a warning
     """
     if "/" in model_str:
         provider, _, model_name = model_str.partition("/")
@@ -70,20 +70,25 @@ def _parse_model_spec(model_str: str) -> tuple:
             api_base, env_vars = _PROVIDERS[provider]
             return provider, model_str, api_base, env_vars
 
-    api_base, env_vars = _PROVIDERS["openai"]
-    return "openai", model_str, api_base, env_vars
+    logger.warning(
+        "Unknown model '%s': no provider matched. "
+        "Use 'provider/model' format (e.g. 'openai/my-model') or set api_base explicitly.",
+        model_str,
+    )
+    return None, model_str, None, []
 
 
 def _resolve_api_key_from_env(env_vars: Optional[List[str]] = None) -> Optional[str]:
-    """Return the first API key found in *env_vars*, falling back to ``OPENAI_API_KEY``.
+    """Return the first API key found in *env_vars*.
 
     *env_vars* typically comes from ``_parse_model_spec()``.
+    Only returns a key if it matches the provider's own env vars.
     """
     for var in env_vars or []:
         key = os.environ.get(var)
         if key:
             return key
-    return os.environ.get("OPENAI_API_KEY")
+    return None
 
 
 def _expand_env_vars(text: str) -> str:
@@ -152,7 +157,7 @@ class LLMConfig(LLMModelConfig):
     """Configuration for LLM models"""
 
     # API configuration
-    api_base: str = _PROVIDERS["openai"][0]
+    api_base: Optional[str] = None
 
     # Generation parameters
     system_message: Optional[str] = "system_message"
@@ -189,22 +194,11 @@ class LLMConfig(LLMModelConfig):
             self.guide_models = self.models.copy()
 
         # Resolve per-model api_base, api_key, and bare name from provider prefix
-        # Check if user explicitly set api_base at the LLMConfig level
-        # (i.e. it differs from the hardcoded default).  When a custom api_base
-        # is provided, we should NOT override it with the provider default so
-        # that update_model_params() below can propagate the user's value.
-        user_set_api_base = self.api_base.rstrip("/") != _PROVIDERS["openai"][0].rstrip("/")
+        user_set_api_base = self.api_base is not None
         for model in self.models + self.evaluator_models + self.guide_models:
             if model.name and model.api_base is None:
                 provider, bare_name, provider_base, env_vars = _parse_model_spec(model.name)
-                # Skip provider URL only for unrecognized bare names that fell
-                # through to the OpenAI default — never for an explicitly-prefixed
-                # provider (e.g. "anthropic/claude-3-sonnet") or a known bare prefix.
-                is_fallback = provider == "openai" and not (
-                    model.name.startswith("openai/")
-                    or any(model.name.startswith(p) for p in _BARE_PREFIX_MAP)
-                )
-                if provider_base and not (user_set_api_base and is_fallback):
+                if provider_base and not (user_set_api_base and provider == "openai"):
                     model.api_base = provider_base
                 if model.api_key is None:
                     model.api_key = _resolve_api_key_from_env(env_vars)
@@ -545,9 +539,9 @@ class MonitorConfig:
     max_solution_length: int = 10000
 
     # AI summary settings
-    summary_model: str = "gpt-5-mini"
-    summary_api_key: Optional[str] = None  # Falls back to OPENAI_API_KEY
-    summary_api_base: str = _PROVIDERS["openai"][0]
+    summary_model: Optional[str] = None
+    summary_api_key: Optional[str] = None
+    summary_api_base: Optional[str] = None
     summary_top_k: int = 3
     summary_interval: int = 0  # Auto-generate every N programs (0 = manual)
 

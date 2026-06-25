@@ -214,13 +214,12 @@ def main() -> None:
     parser.add_argument(
         "--summary-model",
         default="",
-        help="LLM model for per-program summaries (default: gpt-5-mini). "
-        "Requires OPENAI_API_KEY env var.",
+        help="LLM model for per-program summaries (e.g. 'openai/gpt-5-mini', 'gemini/gemini-3-pro').",
     )
     parser.add_argument(
         "--summary-api-base",
-        default="https://api.openai.com/v1",
-        help="API base URL for summary generation (default: https://api.openai.com/v1)",
+        default="",
+        help="API base URL for summary generation.",
     )
     args = parser.parse_args()
 
@@ -248,8 +247,6 @@ def main() -> None:
 
     # Configure per-program & global summary
     summary_model = args.summary_model
-    if not summary_model and os.environ.get("OPENAI_API_KEY"):
-        summary_model = "gpt-5-mini"
     if summary_model:
         server.configure_summary(model=summary_model, api_base=args.summary_api_base, interval=0)
 

@@ -54,8 +54,12 @@ def _map_config(config: Config, iterations: Optional[int], output_dir: str):
             os.environ.get("OPENAI_API_BASE")
             or os.environ.get("OPENAI_BASE_URL")
             or getattr(config.llm, "api_base", None)
-            or "https://api.openai.com/v1"
         )
+        if not resolved_api_base:
+            raise ValueError(
+                "OpenEvolve backend: no api_base resolved. "
+                "Set OPENAI_BASE_URL or configure llm.api_base in your config."
+            )
         oe.llm.api_base = resolved_api_base
         oe.llm.models = [
             OEModel(

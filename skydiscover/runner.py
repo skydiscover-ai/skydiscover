@@ -332,13 +332,31 @@ class Runner:
             logger.warning(f"Failed to set up human feedback: {e}")
 
     def _setup_monitor_summary(self, monitor_server) -> None:
-        if not (monitor_server and self.config.monitor.summary_model):
+        if not monitor_server:
             return
+
+        summary_model = self.config.monitor.summary_model
+        summary_api_base = self.config.monitor.summary_api_base
+        summary_api_key = self.config.monitor.summary_api_key
+
+        if not summary_model and self.config.llm.models:
+            first = self.config.llm.models[0]
+            summary_model = first.name
+            summary_api_base = summary_api_base or first.api_base
+            summary_api_key = summary_api_key or first.api_key
+
+        if not summary_model:
+            logger.warning(
+                "Summary feature disabled: no summary model configured "
+                "and no model available from the main LLM configuration."
+            )
+            return
+
         try:
             monitor_server.configure_summary(
-                model=self.config.monitor.summary_model,
-                api_key=self.config.monitor.summary_api_key or "",
-                api_base=self.config.monitor.summary_api_base,
+                model=summary_model,
+                api_key=summary_api_key or "",
+                api_base=summary_api_base or "",
                 top_k=self.config.monitor.summary_top_k,
                 interval=self.config.monitor.summary_interval,
             )

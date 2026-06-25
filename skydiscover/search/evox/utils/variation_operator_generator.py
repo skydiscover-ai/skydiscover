@@ -513,7 +513,7 @@ async def generate_variation_operators(
 # ------------------------------------------------------------------
 # CLI
 # ------------------------------------------------------------------
-DEFAULT_CLI_MODEL = "gpt-5-mini"
+DEFAULT_CLI_MODEL = None
 DEFAULT_CLI_MAX_TOKENS = 8000
 DEFAULT_CLI_TIMEOUT = 300
 
@@ -538,6 +538,12 @@ def main():
         action="store_true",
         default=False,
         help="Include initial_program.py as additional context for variation operator generation",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=DEFAULT_CLI_MODEL,
+        help="Model name to use (e.g. 'gpt-5-mini', 'gemini/gemini-3-pro'). Required.",
     )
     args = parser.parse_args()
 
@@ -572,13 +578,25 @@ def main():
             print(f"Warning: --provide-initial set but {initial_program_path} not found, skipping")
 
     # Build LLMPool for CLI usage
-    from skydiscover.config import LLMModelConfig
+    from skydiscover.config import LLMModelConfig, _parse_model_spec, _resolve_api_key_from_env
     from skydiscover.llm.llm_pool import LLMPool
 
+    cli_model = args.model
+    if not cli_model:
+        print("Error: --model is required (e.g. --model gpt-5-mini)")
+        return 1
+
+    _provider, _bare_name, provider_base, env_vars = _parse_model_spec(cli_model)
+    if not provider_base:
+        print(
+            f"Error: could not resolve api_base for model '{cli_model}'. "
+            "Use a known model prefix or 'provider/model' format (e.g. 'openai/my-model')."
+        )
+        return 1
     model_cfg = LLMModelConfig(
-        name=DEFAULT_CLI_MODEL,
-        api_base="https://api.openai.com/v1",
-        api_key=os.environ.get("OPENAI_API_KEY", ""),
+        name=cli_model,
+        api_base=provider_base,
+        api_key=_resolve_api_key_from_env(env_vars) or "",
         max_tokens=DEFAULT_CLI_MAX_TOKENS,
         timeout=DEFAULT_CLI_TIMEOUT,
         retries=3,
