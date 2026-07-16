@@ -16,12 +16,13 @@ _REGISTRY: Dict[str, Callable[..., Awaitable]] = {}
 
 # All backend names we know about, even if the package is not installed.
 # Used to give a helpful ImportError instead of "unknown search type".
-KNOWN_EXTERNAL = {"openevolve", "shinkaevolve", "gepa"}
+KNOWN_EXTERNAL = {"openevolve", "shinkaevolve", "gepa", "alphaevolve"}
 
 # search_type -> actual pip package name (when they differ)
 _PACKAGE_NAMES = {
     "shinkaevolve": "shinka",
     "gepa": "gepa[full]",
+    "alphaevolve": "alpha-evolve",
 }
 
 
@@ -34,6 +35,7 @@ _BACKENDS = [
     ("openevolve", "skydiscover.extras.external.openevolve_backend", "run"),
     ("shinkaevolve", "skydiscover.extras.external.shinkaevolve_backend", "run"),
     ("gepa", "skydiscover.extras.external.gepa_backend", "run"),
+    ("alphaevolve", "skydiscover.extras.external.alphaevolve_backend", "run"),
 ]
 
 

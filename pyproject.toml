@@ -45,6 +45,7 @@ external = [
     "openevolve",
     "gepa[full]",
     "litellm>=1.81",  # gepa[full] needs litellm, but uv override-dependencies strips the [full] extra
+    "alpha-evolve",
 ]
 dev = [
     "pytest>=7.0.0",
@@ -80,6 +81,7 @@ override-dependencies = ["httpx>=0.28.1", "gepa>=0.0.26"]
 [tool.uv.sources]
 openevolve = { git = "https://github.com/algorithmicsuperintelligence/openevolve.git", branch = "main" }
 gepa = { git = "https://github.com/gepa-ai/gepa.git", branch = "main" }
+alpha-evolve = { git = "https://github.com/Google-Cloud-AI/alphaevolve-on-googlecloud.git", branch = "main" }
 
 [tool.black]
 line-length = 100
