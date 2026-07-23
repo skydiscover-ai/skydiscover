@@ -7,6 +7,8 @@ import re
 from pathlib import Path
 from typing import List, Optional, Set, Tuple
 
+_MAX_COMMENT_LINES = 5
+
 
 def apply_diff(original_solution: str, diff_text: str) -> str:
     """
@@ -84,31 +86,77 @@ def parse_full_rewrite(llm_response: str, language: str = "python") -> Optional[
     return llm_response
 
 
+def _truncate_comment(comment: Optional[str]) -> Optional[str]:
+    """Limit a multi-line comment string to _MAX_COMMENT_LINES lines."""
+    if not comment:
+        return comment
+    lines = comment.split("\n")
+    return "\n".join(lines[:_MAX_COMMENT_LINES])
+
+
 def _extract_def_info(solution: str) -> Optional[Tuple[str, str, Optional[str]]]:
     """
     Extract function/class name and docstring (or first comment as fallback) from solution block.
 
+    Supports Python (def/class), C/C++/CUDA (__global__, __device__, __host__,
+    void/int/float/etc function signatures, struct/class).
+
     Returns:
-        Tuple of (kind, name, docstring_first_line) or None if not found
+        Tuple of (kind, name, comment) or None if not found.
+        The comment is truncated to _MAX_COMMENT_LINES lines.
     """
-    # Look for function definition
+    # --- Python ---
     func_match = re.search(r"^\s*def\s+(\w+)\s*\(", solution, re.MULTILINE)
     if func_match:
         name = func_match.group(1)
-        # Try to extract docstring, fallback to first comment
-        docstring = _extract_docstring(solution, func_match.end())
-        if not docstring:
-            docstring = _extract_first_comment(solution, func_match.start())
-        return ("function", name, docstring)
+        comment = _extract_docstring(solution, func_match.end())
+        if not comment:
+            comment = _extract_first_comment(solution, func_match.start())
+        return ("function", name, _truncate_comment(comment))
 
-    # Look for class definition
     class_match = re.search(r"^\s*class\s+(\w+)", solution, re.MULTILINE)
     if class_match:
         name = class_match.group(1)
-        docstring = _extract_docstring(solution, class_match.end())
-        if not docstring:
-            docstring = _extract_first_comment(solution, class_match.start())
-        return ("class", name, docstring)
+        comment = _extract_docstring(solution, class_match.end())
+        if not comment:
+            comment = _extract_first_comment(solution, class_match.start())
+        return ("class", name, _truncate_comment(comment))
+
+    # --- C/C++/CUDA ---
+    cuda_kernel_match = re.search(
+        r"^\s*(?:__global__|__device__|__host__(?:\s+__device__)?)\s+"
+        r"(?:__launch_bounds__\([^)]*\)\s*)?"
+        r"(?:\w+\s+)*?"
+        r"(?:__launch_bounds__\([^)]*\)\s*)?"
+        r"(\w+)\s*\(",
+        solution,
+        re.MULTILINE,
+    )
+    if cuda_kernel_match:
+        name = cuda_kernel_match.group(1)
+        kind = (
+            "kernel" if "__global__" in solution[: cuda_kernel_match.end()] else "device function"
+        )
+        comment = _extract_c_comment(solution, cuda_kernel_match.start())
+        return (kind, name, _truncate_comment(comment))
+
+    c_func_match = re.search(
+        r"^\s*(?:static\s+|inline\s+|__inline__\s+|const\s+)*"
+        r"(?:void|int|float|double|half|bool|char|unsigned|long|size_t|auto|\w+_t)"
+        r"(?:\s*\*+\s*|\s+)(\w+)\s*\(",
+        solution,
+        re.MULTILINE,
+    )
+    if c_func_match:
+        name = c_func_match.group(1)
+        comment = _extract_c_comment(solution, c_func_match.start())
+        return ("function", name, _truncate_comment(comment))
+
+    cpp_class_match = re.search(r"^\s*(?:struct|class)\s+(\w+)", solution, re.MULTILINE)
+    if cpp_class_match:
+        name = cpp_class_match.group(1)
+        comment = _extract_c_comment(solution, cpp_class_match.start())
+        return ("struct", name, _truncate_comment(comment))
 
     return None
 
@@ -117,34 +165,91 @@ def _extract_first_comment(solution: str, func_start: int) -> Optional[str]:
     """
     Extract consecutive comment lines inside a function/class body.
     Used as fallback when no docstring is available.
-    Returns up to 5 lines of comments joined together.
+    Supports Python (#) and C/C++ (//, /* */) comment styles.
+    Returns all consecutive comment lines joined together (truncation
+    is applied by the caller via _MAX_COMMENT_LINES).
     """
     remaining = solution[func_start:]
+    # Python: look for colon-newline to find body start
     colon_match = re.search(r"(?:\)|[^:]+):\s*\n", remaining)
-    if not colon_match:
-        return None
+    if colon_match:
+        body_start = colon_match.end()
+    else:
+        # C/C++: look for opening brace to find body start
+        brace_match = re.search(r"\{\s*\n", remaining)
+        if brace_match:
+            body_start = brace_match.end()
+        else:
+            return None
 
-    # Get the body after the colon
-    body_start = colon_match.end()
     body = remaining[body_start:]
 
-    # Collect consecutive comment lines
+    # Collect consecutive comment lines (# for Python, // for C/C++, /* */ for C/C++)
     comment_lines = []
-    lines = body.split("\n")
-    for line in lines[:10]:  # Check first 10 lines for comments
+    in_block_comment = False
+    for line in body.split("\n"):
         stripped = line.strip()
         if stripped.startswith("#"):
-            # Remove the # and leading space
             comment_text = stripped[1:].strip()
             if comment_text:
                 comment_lines.append(comment_text)
-            if len(comment_lines) >= 5:  # Max 5 lines
-                break
-        elif stripped and not stripped.startswith("#"):
-            # Hit actual code, stop collecting
+        elif stripped.startswith("//"):
+            comment_text = stripped[2:].strip()
+            if comment_text:
+                comment_lines.append(comment_text)
+        elif stripped.startswith("/*"):
+            in_block_comment = "*/" not in stripped
+            inline_match = re.match(r"/\*\s*(.*?)\s*\*/", stripped)
+            if inline_match and inline_match.group(1):
+                comment_lines.append(inline_match.group(1))
+        elif in_block_comment and stripped.startswith("*"):
+            if stripped.startswith("*/"):
+                in_block_comment = False
+            else:
+                comment_text = stripped.lstrip("* ").strip()
+                if comment_text:
+                    comment_lines.append(comment_text)
+        elif stripped and not stripped.startswith(("//", "#", "/*")):
             break
 
     return "\n".join(comment_lines) if comment_lines else None
+
+
+def _extract_c_comment(solution: str, func_start: int) -> Optional[str]:
+    """
+    Extract the comment block (/* ... */ or // lines) immediately preceding
+    a C/C++/CUDA function definition. Returns all meaningful lines
+    (truncation is applied by the caller via _MAX_COMMENT_LINES).
+    """
+    preceding = solution[:func_start].rstrip()
+
+    # Check for block comment ending just before the function
+    block_match = re.search(r"/\*\*(.*?)\*/\s*$", preceding, re.DOTALL)
+    if not block_match:
+        block_match = re.search(r"/\*(.*?)\*/\s*$", preceding, re.DOTALL)
+    if block_match:
+        content = block_match.group(1).strip()
+        lines = [l.strip().lstrip("* ").strip() for l in content.split("\n")]
+        meaningful = [l for l in lines if l]
+        return "\n".join(meaningful) if meaningful else None
+
+    # Check for consecutive // comment lines immediately before
+    preceding_lines = preceding.split("\n")
+    comment_lines = []
+    for line in reversed(preceding_lines):
+        stripped = line.strip()
+        if stripped.startswith("//"):
+            comment_lines.append(stripped[2:].strip())
+        elif stripped == "":
+            continue
+        else:
+            break
+    if comment_lines:
+        comment_lines.reverse()
+        return "\n".join(comment_lines)
+
+    # Fallback: look for comments inside the function body
+    return _extract_first_comment(solution, func_start)
 
 
 def _extract_docstring(solution: str, start_pos: int) -> Optional[str]:

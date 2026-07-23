@@ -375,11 +375,16 @@ SkyDiscover is inspired by [AlphaEvolve](https://deepmind.google/discover/blog/a
 ## ✍️ Citation
 
 ```bibtex
-@misc{skydiscover2026,
-  title = {SkyDiscover: A Flexible Framework for AI-Driven Scientific and Algorithmic Discovery},
-  author = {Liu, Shu and Cemri, Mert and Agarwal, Shubham and Krentsel, Alexander and Naren, Ashwin and Mang, Qiuyang and Li, Zhifei and Gupta, Akshat and Maheswaran, Monishwaran and Cheng, Audrey and Pan, Melissa and Boneh, Ethan and Ramchandran, Kannan and Sen, Koushik and Dimakis, Alexandros G. and Zaharia, Matei and Stoica, Ion},
-  year = {2026},
-  url = {https://skydiscover-ai.github.io/blog.html}
+@inproceedings{liu2026skydiscover,
+  author    = {Liu, Shu and Cemri, Mert and Agarwal, Shubham and Krentsel, Alexander and Naren, Ashwin and Mang, Qiuyang and Li, Zhifei and Gupta, Akshat and Maheswaran, Monishwaran and Cheng, Audrey and Pan, Melissa and Boneh, Ethan and Ramchandran, Kannan and Sen, Koushik and Zaharia, Matei and Dimakis, Alexandros G. and Stoica, Ion},
+  title     = {SkyDiscover: A Flexible, Adaptive Framework for AI-Driven Scientific and Algorithmic Discovery},
+  booktitle = {Proceedings of the ACM Conference on AI and Agentic Systems},
+  series    = {CAIS '26},
+  year      = {2026},
+  pages     = {1223--1227},
+  publisher = {Association for Computing Machinery},
+  doi       = {10.1145/3786335.3813221},
+  url       = {https://doi.org/10.1145/3786335.3813221}
 }
 ```
 
