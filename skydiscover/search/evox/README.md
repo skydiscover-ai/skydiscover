@@ -84,6 +84,19 @@ search:
   type: "evox"
   database:
     auto_generate_variation_operators: true
+    # Opt-in multiobjective (same knobs as AdaEvolve / issue #42):
+    # pareto_objectives: ["accuracy", "latency"]
+    # higher_is_better: {accuracy: true, latency: false}
+    # fitness_key: accuracy
 ```
 
 Ablation flag: `auto_generate_variation_operators` — set to `false` to use default templates for variation operator instead of LLM-generated ones.
+
+### Multiobjective mode
+
+When `pareto_objectives` is configured, the solution database:
+
+- Maintains a lazy-cached global Pareto front
+- Samples parents preferentially from the front
+- Uses `compute_proxy_score` / `fitness_key` only for representative-best and search-window scoring
+- Leaves scalar behaviour unchanged when the list is empty

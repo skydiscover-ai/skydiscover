@@ -355,11 +355,23 @@ class EvolveDatabaseConfig(DatabaseConfig):
 
 @dataclass
 class EvoxDatabaseConfig(EvolveDatabaseConfig):
-    """Evox (co-evolution) database config with built-in defaults."""
+    """Evox (co-evolution) database config with built-in defaults.
+
+    Multiobjective fields mirror AdaEvolve (#39 / issue #42): when
+    ``pareto_objectives`` is non-empty, the solution database maintains a
+    Pareto front and uses a scalar proxy only for tie-breaking / search
+    scoring. Leave empty for scalar ``combined_score`` behaviour.
+    """
 
     evaluation_file: Optional[str] = None
     config_path: Optional[str] = None
     auto_generate_variation_operators: bool = True
+
+    # Metric direction / multiobjective (opt-in)
+    higher_is_better: Dict[str, bool] = field(default_factory=dict)
+    fitness_key: Optional[str] = None
+    pareto_objectives: List[str] = field(default_factory=list)
+    pareto_objectives_weight: float = 0.0
 
     _evox_config_dir = Path(__file__).parent / "search" / "evox" / "config"
     _evox_database_dir = Path(__file__).parent / "search" / "evox" / "database"

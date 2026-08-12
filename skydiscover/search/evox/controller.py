@@ -493,11 +493,13 @@ class CoEvolutionController(DiscoveryController):
         return migrated
 
     def _get_best_score(self) -> float:
-        """Get the current best solution score (combined_score metric)."""
+        """Get the current best solution score (proxy / combined_score)."""
 
         best = self.database.get_best_program()
 
         if best and best.metrics:
+            if getattr(self.database, "is_multiobjective_enabled", lambda: False)():
+                return float(self.database._proxy_score(best))
             score = best.metrics.get("combined_score")
             return float(score) if isinstance(score, (int, float)) else 0.0
         return getattr(self.database, "initial_program_score", None) or 0.0

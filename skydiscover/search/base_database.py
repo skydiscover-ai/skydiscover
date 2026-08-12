@@ -15,7 +15,8 @@ from dataclasses import asdict, dataclass, field, fields
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from skydiscover.config import DatabaseConfig
-from skydiscover.utils.metrics import format_metrics, get_score
+from skydiscover.utils.metrics import compute_proxy_score, format_metrics, get_score
+from skydiscover.utils.pareto import nondominated_items, objective_vector
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,10 @@ class ProgramDatabase(ABC):
 
         # Best program tracking
         self.best_program_id: Optional[str] = None
+
+        # Lazy Pareto-front cache (invalidated on add when multiobjective)
+        self._pareto_front_cache: Optional[List[Program]] = None
+        self._pareto_front_cache_valid: bool = False
 
         # Prompt log
         self.prompts_by_program: Optional[Dict[str, Dict[str, Dict[str, str]]]] = None
@@ -207,6 +212,61 @@ class ProgramDatabase(ABC):
     # Best program tracking
     # ------------------------------------------------------------------
 
+    def is_multiobjective_enabled(self) -> bool:
+        """Return True when explicit Pareto objectives are configured."""
+        return bool(getattr(self.config, "pareto_objectives", None) or [])
+
+    def _proxy_score(self, program: Program) -> float:
+        """Scalar proxy for ranking / tie-breaking (shared with AdaEvolve)."""
+        metrics = program.metrics or {}
+        return compute_proxy_score(
+            metrics,
+            fitness_key=getattr(self.config, "fitness_key", None),
+            pareto_objectives=(
+                list(getattr(self.config, "pareto_objectives", []) or [])
+                if self.is_multiobjective_enabled()
+                else None
+            ),
+            higher_is_better=getattr(self.config, "higher_is_better", None) or {},
+        )
+
+    def _invalidate_pareto_cache(self) -> None:
+        self._pareto_front_cache_valid = False
+        self._pareto_front_cache = None
+
+    def get_pareto_front(self) -> List[Program]:
+        """Return the global non-dominated front (lazy-cached).
+
+        When multiobjective is disabled, falls back to ``[best]`` or ``[]``.
+        """
+        if not self.programs:
+            return []
+        if not self.is_multiobjective_enabled():
+            best = self.get_best_program()
+            return [best] if best is not None else []
+
+        if self._pareto_front_cache_valid and self._pareto_front_cache is not None:
+            return list(self._pareto_front_cache)
+
+        programs = list(self.programs.values())
+        objectives = list(getattr(self.config, "pareto_objectives", []) or [])
+        hib = getattr(self.config, "higher_is_better", None) or {}
+        vectors = []
+        eligible = []
+        for program in programs:
+            vec = objective_vector(program.metrics or {}, objectives, hib)
+            if vec is None:
+                continue
+            eligible.append(program)
+            vectors.append(vec)
+
+        front = nondominated_items(eligible, vectors) if eligible else []
+        # Stable tie-break by proxy score for a deterministic representative order.
+        front.sort(key=self._proxy_score, reverse=True)
+        self._pareto_front_cache = front
+        self._pareto_front_cache_valid = True
+        return list(front)
+
     def _is_better(self, program1: Program, program2: Program) -> bool:
         """Determine if program1 has better fitness than program2."""
         if not program1.metrics and not program2.metrics:
@@ -216,10 +276,23 @@ class ProgramDatabase(ABC):
             return True
         if not program1.metrics and program2.metrics:
             return False
+        if self.is_multiobjective_enabled():
+            return self._proxy_score(program1) > self._proxy_score(program2)
         return get_score(program1.metrics) > get_score(program2.metrics)
 
     def _update_best_program(self, program: Program) -> None:
         """Update the best program tracking after a new program is added."""
+        self._invalidate_pareto_cache()
+
+        if self.is_multiobjective_enabled():
+            # Representative best = highest proxy score on the Pareto front.
+            front = self.get_pareto_front()
+            if front:
+                self.best_program_id = front[0].id
+            elif self.best_program_id is None:
+                self.best_program_id = program.id
+            return
+
         if self.best_program_id is None:
             self.best_program_id = program.id
             logger.debug(f"Set initial best program to {program.id}")
@@ -240,6 +313,13 @@ class ProgramDatabase(ABC):
         if not self.programs:
             return None
 
+        if metric is None and self.is_multiobjective_enabled():
+            front = self.get_pareto_front()
+            if front:
+                self.best_program_id = front[0].id
+                return front[0]
+            return None
+
         if metric is None and self.best_program_id:
             if self.best_program_id in self.programs:
                 return self.programs[self.best_program_id]
@@ -253,6 +333,12 @@ class ProgramDatabase(ABC):
             sorted_programs = sorted(
                 [p for p in self.programs.values() if metric in p.metrics],
                 key=lambda p: p.metrics[metric],
+                reverse=True,
+            )
+        elif self.is_multiobjective_enabled():
+            sorted_programs = sorted(
+                self.programs.values(),
+                key=self._proxy_score,
                 reverse=True,
             )
         else:
@@ -280,12 +366,24 @@ class ProgramDatabase(ABC):
                 key=lambda p: p.metrics[metric],
                 reverse=True,
             )
-        else:
-            sorted_programs = sorted(
-                self.programs.values(),
-                key=lambda p: get_score(p.metrics),
+            return sorted_programs[:n]
+
+        if self.is_multiobjective_enabled():
+            # Prefer Pareto members first, then fill with proxy-ranked remainder.
+            front = self.get_pareto_front()
+            front_ids = {p.id for p in front}
+            remainder = sorted(
+                [p for p in self.programs.values() if p.id not in front_ids],
+                key=self._proxy_score,
                 reverse=True,
             )
+            return (front + remainder)[:n]
+
+        sorted_programs = sorted(
+            self.programs.values(),
+            key=lambda p: get_score(p.metrics),
+            reverse=True,
+        )
 
         return sorted_programs[:n]
 
