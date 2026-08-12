@@ -5,38 +5,60 @@
 </h1>
 
 
- <p align="center"> A Flexible Framework for AI-Driven Scientific and Algorithmic Discovery</p>
+ <p align="center">A Framework for AI-Driven System Synthesis and Scientific Discovery</p>
   <p align="center">
   <a href="https://skydiscover-ai.github.io/blog.html"><img src="https://img.shields.io/badge/blog-SkyDiscover-orange?style=flat-square" alt="Blog" /></a>
+ <a href="https://arxiv.org/abs/2605.23109"><img src="https://img.shields.io/badge/paper-IDS-blueviolet?style=flat-square" alt="IDS Paper" /></a>
+  <a href="https://arxiv.org/abs/2605.24096"><img src="https://img.shields.io/badge/paper-Just--in--Time%20Systems-yellow?style=flat-square" alt="Jitski Paper" /></a>
   <a href="https://arxiv.org/abs/2602.20133"><img src="https://img.shields.io/badge/paper-AdaEvolve-red?style=flat-square" alt="AdaEvolve Paper" /></a>
   <a href="https://arxiv.org/abs/2602.23413"><img src="https://img.shields.io/badge/paper-EvoX-lightblue?style=flat-square" alt="EvoX Paper" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-green?style=flat-square" /></a>
   </p>
 
+SkyDiscover is an open source project from UC Berkeley providing state-of-the-art tooling for scientific discovery and end-to-end system synthesis.
+
+SkyDiscover provides tools for two broad classes of tasks:
+ 1. **Optimization**: given an evaluator and problem description, apply evolutionary techniques to incrementally discover better solutions.
+ 2. **Synthesis**: starting from a formal specification or text description of a system, full end-to-end synthesis of compliant and highly-performant systems. 
+
+See the getting started page for quickstart guides for each.
+
+> 🚧 This project is under active development.
 
 
-   <p align="center">
+## SkyDiscover Optimize
+
+<p align="center">
   <img src="assets/architecture.png" width="720" alt="SkyDiscover architecture"><br>
 </p>
 
+**SkyDiscover Optimize** is a modular framework for AI-driven scientific and algorithmic discovery, providing a unified interface for implementing, running, and fairly comparing discovery algorithms across 200+ optimization tasks.
 
-**SkyDiscover** is a modular framework for AI-driven scientific and algorithmic discovery, providing a unified interface for implementing, running, and fairly comparing discovery algorithms across 200+ optimization tasks.
+We ship with two SOTA adaptive optimization algorithms built by the SkyDiscover team, [AdaEvolve](https://arxiv.org/abs/2602.20133) and [EvoX](https://arxiv.org/abs/2602.23413). SkyDiscover Optimize also supports OpenEvolve, ShinkaEvolve and GEPA to quickly benchmark these algorithms using their own source code. 
 
-SkyDiscover introduces two new adaptive optimization algorithms:
+SkyDiscover Optimize natively supports [Harbor](https://harborframework.com/)-format benchmarks, so you can run external benchmark suites out of the box, including [AlgoTune](https://github.com/oripress/AlgoTune), [EvoEval](https://github.com/evo-eval/evoeval), [HumanEvalFix](https://github.com/bigcode-project/octopack), [BigCodeBench](https://github.com/bigcode-project/bigcodebench), [LiveCodeBench](https://livecodebench.github.io/), [USACO](https://usaco.org/), [CRUSTBench](https://github.com/AInfinity/CRUSTBench), and [CodePDE](https://github.com/).
 
-- **[AdaEvolve](https://arxiv.org/abs/2602.20133)**, which dynamically adjusts its optimization behavior based on observed progress.
-- **[EvoX](https://arxiv.org/abs/2602.23413)**, which dynamically evolves the optimization (evolution) strategy itself using LLMs on the fly.
+Get started with our [quick start guide here](link-to-quickstart).
 
-SkyDiscover also supports using OpenEvolve, ShinkaEvolve and GEPA to quickly benchmark these algorithms using their own source code. SkyDiscover also hosts native versions of OpenEvolve and GEPA under `openevolve_native` and `gepa_native` algorithms using the modular interface.
+## SkyDiscover Synthesize
 
-SkyDiscover natively supports [Harbor](https://harborframework.com/)-format benchmarks, so you can run external benchmark suites out of the box, including [AlgoTune](https://github.com/oripress/AlgoTune), [EvoEval](https://github.com/evo-eval/evoeval), [HumanEvalFix](https://github.com/bigcode-project/octopack), [BigCodeBench](https://github.com/bigcode-project/bigcodebench), [LiveCodeBench](https://livecodebench.github.io/), [USACO](https://usaco.org/), [CRUSTBench](https://github.com/AInfinity/CRUSTBench), and [CodePDE](https://github.com/).
-> 🚧 This project is under active development.
+![Test-Driven Synthesis](assets/test_driven_synthesis.png)
 
----
+**SkyDiscover Synthesize** is a set of tooling that enables full, end-to-end synthesis of compliant and highly-performant systems, such as LLM inference systems, model routing, or key-value stores. 
 
-## 🏆 Benchmark Performance
+Our synthesis tooling is built on two published techniques introduced by the SkyDiscover team:
+1. [Inductive-Deductive Synthesis](https://arxiv.org/abs/2605.23109): when a formal specification in Rocq for the target system is provided, Synthesize jointly generates implementation and corresponding proofs in stages, optimizing for performance in the process.
+2. [Test-Driven Synthesis](https://arxiv.org/abs/2605.24096): when the system is described by natural language and tests, Synthesize iterates on implementations with a collection of planning, coding, critiquing, and auditing agents.
 
-Across ~200 optimization benchmarks, AdaEvolve and EvoX achieve the strongest open-source results: matching or exceeding AlphaEvolve and human SOTA, and outperforming OpenEvolve, GEPA, and ShinkaEvolve under identical generation budgets.
+SkyDiscover Synthesize is provided as a Claude Code and Codex-compatible skill, and has been used to produce a wide range of systems. 
+
+See the [Quick Start guide here](link-to-quick-s).
+
+<!-- ![Inductive Deductive Synthesis](image.png) -->
+
+## Optimization Results
+
+SkyDiscover Optimize has been used across industry including Google, Uber, and more; the algorithms released by the SkyDiscover team, AdaEvolve and EvoX, achieve the strongest open-source results across ~200 optimization benchmarks: matching or exceeding AlphaEvolve and human SOTA, and outperforming OpenEvolve, GEPA, and ShinkaEvolve under identical generation budgets.
 
 - **Frontier-CS (172 problems)**: ~34% median score improvement over OpenEvolve, GEPA, and ShinkaEvolve  
 - **Math + Systems Optimization (14 tasks evaluated)**: Matches or exceeds AlphaEvolve and human-designed SOTA on 6/6 systems and 6/8 math tasks
@@ -102,7 +124,7 @@ See [Dependency extras](#dependency-extras) for install commands per benchmark.
 
 </details>
 
-## 🚀 Quick Start
+## 🚀 Optimization Quick Start
 
 **Prerequisites:** Python >= 3.10, [uv](https://docs.astral.sh/uv/)
 
@@ -390,4 +412,4 @@ SkyDiscover is inspired by [AlphaEvolve](https://deepmind.google/discover/blog/a
 
 ## 📬 Contact Us
 For questions or feedback, reach out to us:
-[lshu@berkeley.edu](mailto:lshu@berkeley.edu) · [mert_cemri@berkeley.edu](mailto:mert_cemri@berkeley.edu) · [shubham3@berkeley.edu](mailto:shubham3@berkeley.edu)
+[lshu@berkeley.edu](mailto:lshu@berkeley.edu) · [akrentsel@berkeley.edu](mailto:akrentsel@berkeley.edu) · [mert_cemri@berkeley.edu](mailto:mert_cemri@berkeley.edu) · [shubham3@berkeley.edu](mailto:shubham3@berkeley.edu)
