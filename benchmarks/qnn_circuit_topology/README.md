@@ -42,6 +42,16 @@ uv run skydiscover-run \
 - `combined_score`: same as accuracy (primary)
 - Invalid topologies / runtime errors → score `0`
 
+## Measured smoke results (no LLM)
+
+| Method | Iterations | Test accuracy |
+|--------|------------|---------------|
+| Baseline `initial_program.py` | 0 | ~0.70 |
+| Local mutation search (`local_search_smoke.py`) | 12 | **0.833** |
+| Strong hand-written topology | — | ~0.917 |
+
+LLM-guided SkyDiscover search (`best_of_n` / `adaevolve`) should be run for the final reported number.
+
 ## Design notes
 
 - Feature map: angle-encode 2D inputs as `RY(x0)`, `RY(x1)` on two qubits before the ansatz.
