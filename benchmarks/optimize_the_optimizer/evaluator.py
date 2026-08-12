@@ -27,6 +27,8 @@ def _load_controller(program_path: str):
     if spec is None or spec.loader is None:
         raise ImportError(f"cannot load {program_path}")
     module = importlib.util.module_from_spec(spec)
+    # dataclasses (3.14+) look up cls.__module__ in sys.modules during decoration.
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     if not hasattr(module, "SearchController"):
         raise AttributeError("program must define SearchController")
