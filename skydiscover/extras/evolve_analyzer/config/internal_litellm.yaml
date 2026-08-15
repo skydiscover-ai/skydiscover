@@ -1,0 +1,86 @@
+# ── Internal LiteLLM proxy configuration ─────────────────────────────────────
+#
+# Use this config when your LLM is served through an organisation-hosted
+# LiteLLM proxy (https://github.com/BerriAI/litellm).
+#
+# Usage:
+#   export LITELLM_API_KEY="sk-..."   # your org's LiteLLM virtual key
+#
+#   run-evolve-analysis postmortem \
+#       --source jsonl \
+#       --path my_run.jsonl \
+#       --config config/internal_litellm.yaml \
+#       --output-dir output/
+#
+# How it works:
+#   Setting base_url switches the client to EndpointClient, which uses the
+#   OpenAI SDK pointed at your proxy's OpenAI-compatible /v1 endpoint.
+#   All org-level access controls, audit logging, and cost attribution that
+#   your LiteLLM instance enforces apply automatically.
+# ─────────────────────────────────────────────────────────────────────────────
+
+llm:
+  provider: "openai"                              # LiteLLM proxy speaks the OpenAI protocol
+  model: "gemini-2.5-flash"                       # Default model alias on your proxy —
+                                                  # check available aliases with your LiteLLM admin
+  base_url: "https://ete-litellm.ai-models.vpc-int.res.ibm.com/v1"  # ← replace with your proxy URL
+  api_key_env: "LITELLM_API_KEY"                 # env var holding your org's virtual key
+  temperature: 0.0
+  max_tokens: 4096
+
+  # Per-step model overrides ───────────────────────────────────────────────────
+  # Low-frequency, high-value judge steps use a stronger model alias.
+  # High-frequency steps (C: mutation_quality, D: semantic_compliance) keep the
+  # cheap default above to avoid cost runaway.
+  overrides:
+    stagnation_root_cause:  { model: "gemini-2.5-pro" }  # Judge A — fires once per stagnation period
+    artifact_clustering:    { model: "gemini-2.5-pro" }  # Judge B — fires once per batch of failures
+    exploration_structure:  { model: "gemini-2.5-pro" }  # Judge E — fires once per run
+    meta_quality:           { model: "gemini-2.5-pro" }  # Judge F — fires once per run
+
+  max_cost_usd: 10.0                             # hard budget cap — judge steps stop gracefully
+                                                  # if exceeded; quantitative analysis always runs
+
+# ── Ingestion ────────────────────────────────────────────────────────────────
+ingestion:
+  source: "jsonl"                                # jsonl | skydiscover | shinkaevolve | openevolve
+
+# ── Analysis parameters ──────────────────────────────────────────────────────
+stagnation:
+  threshold: 10
+  min_delta: 0.001
+
+convergence:
+  window: 10
+
+search_space:
+  top_k: 10
+
+evaluator:
+  score_variance_threshold: 0.1
+
+# ── Compliance checks (deterministic — zero LLM cost) ────────────────────────
+compliance:
+  check_evolve_block: true
+  check_format: true
+  check_signature: true
+  check_semantic: true
+
+# ── LLM judge steps ──────────────────────────────────────────────────────────
+judges:
+  stagnation_root_cause: true
+  artifact_clustering: true
+  mutation_quality: true
+  semantic_compliance: true
+  exploration_structure: true
+  meta_quality: true
+
+  async_dispatch: false
+  sample_rate: 0.2           # fraction of iterations submitted to high-frequency judges C and D
+  artifact_batch_size: 20
+
+# ── Historical / comparative analysis ────────────────────────────────────────
+historical:
+  db_path: null              # set to e.g. ~/.evolve_analyzer/history.db to enable
+  min_experiments: 5
+  pattern_promotion_threshold: 3

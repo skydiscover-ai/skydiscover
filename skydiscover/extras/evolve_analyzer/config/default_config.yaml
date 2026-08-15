@@ -1,0 +1,109 @@
+# ── LLM backend ─────────────────────────────────────────────────────────────
+llm:
+  provider: "openai"
+  model: "gpt-4o-mini"
+  base_url: null
+  api_key_env: "EVOLVE_ANALYZER_API_KEY"
+  temperature: 0.0
+  max_tokens: 4096
+
+  overrides:
+    stagnation_root_cause:   { model: "gpt-4o" }
+    artifact_clustering:     { model: "gpt-4o" }
+    exploration_structure:   { model: "gpt-4o" }
+    meta_quality:            { model: "gpt-4o" }
+
+  max_cost_usd: 5.0
+
+# ── Ingestion ────────────────────────────────────────────────────────────────
+ingestion:
+  source: "jsonl"
+
+# ── Analysis parameters ──────────────────────────────────────────────────────
+stagnation:
+  threshold: 10
+  min_delta: 0.001
+
+convergence:
+  window: 10
+
+search_space:
+  top_k: 10
+
+evaluator:
+  score_variance_threshold: 0.1
+
+# ── Compliance checks ────────────────────────────────────────────────────────
+compliance:
+  check_evolve_block: true
+  check_format: true
+  check_signature: true
+  check_semantic: true
+
+# ── LLM judge steps ──────────────────────────────────────────────────────────
+judges:
+  stagnation_root_cause: true
+  artifact_clustering: true
+  mutation_quality: true
+  semantic_compliance: true
+  exploration_structure: true
+  meta_quality: true
+
+  async_dispatch: false
+  sample_rate: 0.2
+  artifact_batch_size: 20
+
+# ── Historical / comparative analysis ────────────────────────────────────────
+historical:
+  db_path: null
+  min_experiments: 5
+  pattern_promotion_threshold: 3
+
+# ── Algorithm-class-specific rating thresholds ───────────────────────────────
+# Each class overrides the default rating cut-points for dimensions whose
+# healthy operating range differs by algorithm type.
+#
+# regression_frequency_thresholds: [t5, t4, t3, t2]
+#   lower_is_better; freq < tN → rating N, freq >= t2 → rating 1
+#
+# exploration_sdi_thresholds: [t5, t4, t3, t2]
+#   higher_is_better; sdi > t5 → 5, sdi >= t4 → 4, ..., sdi < t2 → 1
+#
+algorithm_classes:
+  population_evolutionary:
+    # High regression rate is expected and healthy (population selection pressure)
+    regression_frequency_thresholds: [0.15, 0.30, 0.50, 0.70]
+    # High diversity is the norm; use the same bar as the default
+    exploration_sdi_thresholds: [0.70, 0.50, 0.30, 0.10]
+    convergence_thresholds:
+      # Population search distributes improvement across many parallel lines; finding
+      # the best in the latter 40% of the run is already excellent (vs 20% for default).
+      time_to_best_thresholds: [0.60, 0.40]   # [t5, t4]: ttbf >= t → rating
+      # Population convergence is gentler; plateau in first 15% is critical (vs 20%).
+      plateau_fraction_thresholds: [0.15, 0.30, 0.55]  # [t1, t2, t3]: fraction <= t → rating
+  serial_refinement:
+    # Each step should improve; even 10% regression rate is a concern
+    regression_frequency_thresholds: [0.03, 0.10, 0.20, 0.35]
+    # Single-chain search naturally has lower diversity; relax the thresholds
+    exploration_sdi_thresholds: [0.40, 0.25, 0.10, 0.05]
+    convergence_thresholds:
+      # Serial refinement must keep improving throughout; same strict bar as default.
+      time_to_best_thresholds: [0.80, 0.60]
+      plateau_fraction_thresholds: [0.20, 0.40, 0.60]
+  bayesian_optimization:
+    # BO is exploitation-heavy; moderate regression rate is acceptable
+    regression_frequency_thresholds: [0.05, 0.15, 0.30, 0.50]
+    # BO explores less structurally; moderate diversity expected
+    exploration_sdi_thresholds: [0.50, 0.30, 0.15, 0.05]
+    convergence_thresholds:
+      # BO is designed to converge efficiently; finding best in last 30% is excellent.
+      time_to_best_thresholds: [0.70, 0.50]
+      # BO plateaus can indicate surrogate model over-exploitation; use default bars.
+      plateau_fraction_thresholds: [0.20, 0.40, 0.60]
+
+# ── In-flight mode (Phase 2 — not active in Phase 1) ────────────────────────
+inflight:
+  poll_interval_seconds: 15
+  sort_buffer_size: 20
+  state_file: ".evolve_analyzer_state.json"
+  completion_timeout_seconds: 120

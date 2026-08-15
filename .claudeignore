@@ -1,0 +1,11 @@
+.venv/
+.git/
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.evolve_cache/
+uv.lock
+.DS_Store
+.env

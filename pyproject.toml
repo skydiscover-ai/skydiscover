@@ -73,6 +73,15 @@ prompt-optimization = [
     "diskcache>=5.6.3",
     "ujson>=5.11.0",
 ]
+evolve-analyzer = [
+    "pandas",
+    "scipy>=1.7.0",
+    "streamlit>=1.20.0",
+    "plotly>=5.0.0",
+    "litellm>=1.81",
+    "diskcache>=5.6.0",
+    "click>=8.0.0",
+]
 
 [tool.uv]
 override-dependencies = ["httpx>=0.28.1", "gepa>=0.0.26"]
@@ -100,6 +109,8 @@ disallow_incomplete_defs = true
 [project.scripts]
 skydiscover-run = "skydiscover.cli:main"
 skydiscover-viewer = "skydiscover.extras.monitor.viewer:main"
+run-evolve-analysis = "skydiscover.extras.evolve_analyzer.cli:cli"
+dashboard-evolve-analysis = "skydiscover.extras.evolve_analyzer.cli:dashboard_main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -119,6 +130,7 @@ skydiscover = [
     "search/evox/config/*.txt",
     "extras/external/defaults/*.yaml",
     "extras/monitor/dashboard.html",
+    "extras/evolve_analyzer/config/*.yaml",
 ]
 
 [tool.setuptools.dynamic]
