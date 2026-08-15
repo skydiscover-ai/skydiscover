@@ -4901,6 +4901,7 @@ dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "openai" },
+    { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "tqdm" },
 ]
@@ -5008,7 +5009,7 @@ requires-dist = [
     { name = "pystemmer", marker = "extra == 'prompt-optimization'", specifier = ">=2.2.0.3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0" },
-    { name = "python-dotenv", marker = "extra == 'frontier-cs'", specifier = ">=1.2.1" },
+    { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "pywavelets", marker = "extra == 'math'" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "requests", marker = "extra == 'dev'", specifier = ">=2.28.0" },

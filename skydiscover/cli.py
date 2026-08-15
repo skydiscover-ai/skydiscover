@@ -9,6 +9,8 @@ import sys
 import traceback
 from typing import Optional
 
+from dotenv import load_dotenv
+
 from skydiscover import Runner
 from skydiscover.benchmarks.resolution import resolve_benchmark_problem
 from skydiscover.config import _parse_model_spec, apply_overrides, load_config
@@ -19,6 +21,8 @@ except RuntimeError:
     pass
 
 logger = logging.getLogger(__name__)
+
+load_dotenv()
 
 _SEARCH_CHOICES = [
     "evox",
