@@ -623,6 +623,11 @@ class Config:
     # Runtime-only: system prompt override (set by apply_overrides, read by external backends)
     system_prompt_override: Optional[str] = None
 
+    # Backend-specific section for the AlphaEvolve external backend
+    # (project_id, engine_id, location, ...). Read by
+    # skydiscover/extras/external/alphaevolve_backend.py.
+    alphaevolve: Dict[str, Any] = field(default_factory=dict)
+
     @classmethod
     def from_yaml(cls, path: Union[str, Path]) -> Config:
         """Load configuration from a YAML file"""

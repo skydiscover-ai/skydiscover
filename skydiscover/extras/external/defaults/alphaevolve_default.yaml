@@ -1,9 +1,10 @@
 # Tuned defaults for the AlphaEvolve backend.
 # Applied when no user config (-c) overrides these values.
 #
-# Required fields (project_id, engine_id) must be provided by the user
-# via their own config file or environment. They are commented out here
-# to avoid committing real GCP credentials.
+# Required fields (project_id, engine_id) must be provided by the user via an
+# `alphaevolve:` section in their own config file (-c) or via the
+# ALPHAEVOLVE_* environment variables, which take precedence. They are
+# commented out here to avoid committing real GCP credentials.
 
 alphaevolve:
   # ---- Required GCP settings ------------------------------------------------
@@ -31,8 +32,13 @@ alphaevolve:
   # Number of concurrent sampling workers that poll for new candidates.
   num_samplers: 1
 
-  # Number of concurrent evaluation workers. Set higher for fast evaluators.
-  # When > 1, evaluators run in parallel threads.
+  # Number of concurrent evaluation workers.
+  # 1 (the default) runs the evaluator inline on the event loop, which blocks
+  # sampling while an evaluation is in flight. That is fine for fast
+  # evaluators, and required by evaluators that use signal.alarm (main thread
+  # only). Use more than 1 for slow evaluators such as compile/benchmark
+  # loops, where inline evaluation can starve the samplers and let candidate
+  # lock tokens expire.
   num_evaluators: 1
 
   # ---- Experiment settings ---------------------------------------------------
