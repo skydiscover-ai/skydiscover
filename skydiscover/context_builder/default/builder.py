@@ -254,8 +254,7 @@ class DefaultContextBuilder(ContextBuilder):
 
         if self._is_multiobjective_enabled():
             improvement_areas.append(
-                "Focus on Pareto trade-offs across: "
-                + ", ".join(self._objective_descriptions())
+                "Focus on Pareto trade-offs across: " + ", ".join(self._objective_descriptions())
             )
             for objective in getattr(self._db_config(), "pareto_objectives", None) or []:
                 if objective in metrics and isinstance(metrics[objective], (int, float)):
