@@ -141,9 +141,7 @@ def _validate_gcp_credentials() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _build_initial_program(
-    program_path: str, file_suffix: str = ".py"
-) -> dict:
+def _build_initial_program(program_path: str) -> dict:
     """Build an AlphaEvolve initial-program payload from a local file.
 
     * Raises ``ValueError`` with a clear message when the file is
@@ -156,13 +154,10 @@ def _build_initial_program(
     """
     if not program_path:
         raise ValueError(
-            "Initial program file is required for the AlphaEvolve backend "
-            "but was not provided."
+            "Initial program file is required for the AlphaEvolve backend but was not provided."
         )
     if not os.path.exists(program_path):
-        raise ValueError(
-            f"Initial program file not found at path: {program_path}"
-        )
+        raise ValueError(f"Initial program file not found at path: {program_path}")
 
     with open(program_path, "r") as fh:
         content = fh.read()
@@ -185,11 +180,7 @@ def _build_initial_program(
                 }
             ]
         },
-        "evaluation": {
-            "scores": {
-                "scores": [{"metric": "combined_score", "score": 0.0}]
-            }
-        },
+        "evaluation": {"scores": {"scores": [{"metric": "combined_score", "score": 0.0}]}},
     }
 
 
@@ -199,11 +190,11 @@ def _build_initial_program(
 
 
 def _get_alphaevolve_config(config_obj: Config) -> dict:
-    """Merge AlphaEvolve defaults with environment variable overrides.
+    """Resolve the AlphaEvolve config section.
 
-    Load defaults from ``alphaevolve_default.yaml``, overlay environment
-    variables (``ALPHAEVOLVE_PROJECT_ID``, ``ALPHAEVOLVE_ENGINE_ID``, ...),
-    and optionally merge a ``config_obj.alphaevolve`` dict if present.
+    Precedence (lowest to highest): ``alphaevolve_default.yaml`` <
+    the ``alphaevolve:`` section of the user config < environment
+    variables (``ALPHAEVOLVE_PROJECT_ID``, ``ALPHAEVOLVE_ENGINE_ID``, ...).
 
     Raises ``ValueError`` when required fields (``project_id``,
     ``engine_id``) are still missing after merging.
@@ -212,6 +203,11 @@ def _get_alphaevolve_config(config_obj: Config) -> dict:
 
     raw = load_defaults("alphaevolve_default.yaml")
     ae: dict = raw.get("alphaevolve", {}) if raw else {}
+
+    # User config (-c config.yaml) overrides the shipped defaults.
+    obj_ae = getattr(config_obj, "alphaevolve", None)
+    if isinstance(obj_ae, dict):
+        ae.update(obj_ae)
 
     _env_map = {
         "ALPHAEVOLVE_PROJECT_ID": "project_id",
@@ -229,11 +225,6 @@ def _get_alphaevolve_config(config_obj: Config) -> dict:
         val = os.environ.get(env_var)
         if val is not None:
             ae[config_key] = int(val) if config_key in _int_keys else val
-
-    # Future-proofing: merge from Config object if present
-    obj_ae = getattr(config_obj, "alphaevolve", None)
-    if isinstance(obj_ae, dict):
-        ae.update(obj_ae)
 
     logger.debug("AlphaEvolve config resolved: %s", ae)
 
@@ -299,16 +290,20 @@ def _ae_scores_to_metrics(evaluation: dict) -> dict:
 def _make_alphaevolve_evaluator(
     evaluator_path: str,
     monitor_callback: Optional[Callable] = None,
+    file_suffix: str = ".py",
+    language: str = "python",
 ) -> Callable[[dict], dict]:
     """Wrap a skydiscover file-based evaluator for the AlphaEvolve SDK.
 
     The returned closure accepts an AlphaEvolve program dict
     (``{content: {files: [...]}, ...}``) and returns an evaluation dict
     in the pre-wrapped ``{scores: {scores: [...]}, insights: {}}`` format.
+
+    ``file_suffix`` is the extension used for the temporary candidate file
+    handed to the user's ``evaluate(path)``. It matters for non-Python runs,
+    where evaluators dispatch on the extension.
     """
-    spec = importlib.util.spec_from_file_location(
-        "_skydiscover_eval", evaluator_path
-    )
+    spec = importlib.util.spec_from_file_location("_skydiscover_eval", evaluator_path)
     if spec is None or spec.loader is None:
         raise ValueError(f"Could not load evaluator spec from {evaluator_path}")
     eval_module = importlib.util.module_from_spec(spec)
@@ -320,8 +315,6 @@ def _make_alphaevolve_evaluator(
     spec.loader.exec_module(eval_module)
     user_evaluate = eval_module.evaluate
 
-    # Detect file suffix from the evaluator path directory or default
-    file_suffix = ".py"
     eval_counter = [0]
 
     def ae_evaluator(program: dict) -> dict:
@@ -341,19 +334,23 @@ def _make_alphaevolve_evaluator(
 
         code = files[0].get("content", "")
 
-        tmp = tempfile.NamedTemporaryFile(
-            mode="w",
-            suffix=file_suffix,
-            prefix="ae_candidate_",
-            delete=False,
-            encoding="utf-8",
-        )
-        try:
-            tmp.write(code)
-            tmp.flush()
-            tmp.close()
+        # Prefer the extension AlphaEvolve used for the candidate file, so a
+        # C++/CUDA candidate reaches the evaluator as e.g. ".cu" and not ".py".
+        suffix = os.path.splitext(files[0].get("path", ""))[1] or file_suffix
 
-            metrics = user_evaluate(tmp.name)
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                suffix=suffix,
+                prefix="ae_candidate_",
+                delete=False,
+                encoding="utf-8",
+            ) as tmp:
+                tmp_path = tmp.name
+                tmp.write(code)
+
+            metrics = user_evaluate(tmp_path)
 
             # Normalize metrics to dict
             if metrics is None:
@@ -374,7 +371,7 @@ def _make_alphaevolve_evaluator(
                     prog = Program(
                         id=str(uuid.uuid4()),
                         solution=code,
-                        language="python",
+                        language=language,
                         metrics=dict(metrics),
                         iteration_found=eval_counter[0],
                         generation=eval_counter[0],
@@ -393,10 +390,11 @@ def _make_alphaevolve_evaluator(
                 "insights": {"error": str(e)},
             }
         finally:
-            try:
-                os.unlink(tmp.name)
-            except OSError:
-                pass
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
 
     return ae_evaluator
 
@@ -406,9 +404,7 @@ def _make_alphaevolve_evaluator(
 # ---------------------------------------------------------------------------
 
 
-def _build_experiment_config(
-    config_obj: Config, ae_config: dict, iterations: int
-) -> dict:
+def _build_experiment_config(config_obj: Config, ae_config: dict, iterations: int) -> dict:
     """Build an AlphaEvolve experiment config from skydiscover Config.
 
     Auto-derives sensible defaults from skydiscover's config and allows
@@ -423,11 +419,15 @@ def _build_experiment_config(
         ),
         "run_settings": {
             "max_programs": ae_config.get("max_programs", iterations),
-            "concurrency": ae_config.get(
-                "concurrency", ae_config.get("num_evaluators", 1)
-            ),
+            "concurrency": ae_config.get("concurrency", ae_config.get("num_evaluators", 1)),
         },
     }
+
+    # Tell AlphaEvolve which language it is evolving (defaults to skydiscover's
+    # `language:` setting) so generated candidates are in the right language.
+    language = getattr(config_obj, "language", None)
+    if language:
+        exp_config["program_language"] = language
 
     # Allow override of optional keys from ae_config
     for key in ("program_language", "generation_settings"):
@@ -442,17 +442,15 @@ def _build_experiment_config(
 # ---------------------------------------------------------------------------
 
 
-def _extract_best_program(
-    experiment: Any, metric_name: str = "combined_score"
-) -> Tuple[str, dict]:
+def _extract_best_program(experiment: Any, metric_name: str = "combined_score") -> Tuple[str, dict]:
     """Extract the best program and its metrics from a completed experiment.
 
-    Queries the API for programs sorted by score descending and returns
-    the top result's code and metrics.
+    Asks the API for programs sorted by score descending, then picks the
+    best one on *metric_name* locally. The AlphaEvolve examples do the same,
+    because the server-side ordering is not guaranteed to match the metric
+    this run optimises.
     """
-    response = experiment.list_programs(
-        params={"order_by": "score desc"}
-    )
+    response = experiment.list_programs(params={"order_by": "score desc"})
     if not response or "alphaEvolvePrograms" not in response:
         return ("", {})
 
@@ -460,13 +458,12 @@ def _extract_best_program(
     if not programs:
         return ("", {})
 
-    best = programs[0]
+    scored = [(_ae_scores_to_metrics(p.get("evaluation", {})), p) for p in programs]
+    metrics, best = max(scored, key=lambda pair: pair[0].get(metric_name, float("-inf")))
 
     files = best.get("content", {}).get("files", [])
     code = files[0].get("content", "") if files else ""
 
-    # Extract metrics
-    metrics = _ae_scores_to_metrics(best.get("evaluation", {}))
     return (code, metrics)
 
 
@@ -509,7 +506,8 @@ async def run(
     # 2. Validate prerequisites
     _validate_gcp_credentials()
     file_suffix = getattr(config_obj, "file_suffix", ".py") or ".py"
-    initial_program = _build_initial_program(program_path, file_suffix)
+    language = getattr(config_obj, "language", None) or "python"
+    initial_program = _build_initial_program(program_path)
 
     # 3. Build client
     client = AlphaEvolveClient(
@@ -521,9 +519,7 @@ async def run(
     )
 
     # 4. Build evaluator adapter
-    evaluator = _make_alphaevolve_evaluator(
-        evaluator_path, monitor_callback
-    )
+    evaluator = _make_alphaevolve_evaluator(evaluator_path, monitor_callback, file_suffix, language)
 
     # 5. Create experiment
     num_evaluators = ae_config.get("num_evaluators", 1)
@@ -556,13 +552,12 @@ async def run(
         failure_rate = failed / generated
         if failure_rate >= 0.25 and generated >= 4:
             logger.warning(
-                "HIGH SUBMISSION FAILURE RATE: %d/%d programs were generated "
-                "but only %d were successfully evaluated (%.0f%% failure "
-                "rate). Common causes: evaluator too slow (lock-token "
-                "expiry), auth errors, or API rate limits.",
+                "HIGH SUBMISSION FAILURE RATE: %d of %d generated programs "
+                "(%.0f%%) were never evaluated successfully. Common causes: "
+                "evaluator too slow (lock-token expiry), auth errors, or API "
+                "rate limits.",
+                failed,
                 generated,
-                generated,
-                evaluated,
                 failure_rate * 100,
             )
 
@@ -574,7 +569,7 @@ async def run(
     best_program = Program(
         id=str(uuid.uuid4()),
         solution=best_code,
-        language=getattr(config_obj, "language", None) or "python",
+        language=language,
         metrics=metrics,
         iteration_found=0,
     )

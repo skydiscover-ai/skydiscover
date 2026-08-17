@@ -86,6 +86,51 @@ class TestGetAlphaevolveConfig:
     @patch(
         _LOAD_DEFAULTS,
         return_value={
+            "alphaevolve": {"project_id": "default-p", "engine_id": "default-e"}
+        },
+    )
+    @patch.dict(
+        os.environ,
+        {"ALPHAEVOLVE_PROJECT_ID": "from-env"},
+        clear=True,
+    )
+    def test_env_beats_config_section(self, mock_defaults: MagicMock) -> None:
+        config_obj = MagicMock()
+        config_obj.alphaevolve = {
+            "project_id": "from-obj",
+            "engine_id": "from-obj",
+        }
+
+        result = _get_alphaevolve_config(config_obj)
+
+        # Env is the ad-hoc override, the config file supplies the rest.
+        assert result["project_id"] == "from-env"
+        assert result["engine_id"] == "from-obj"
+
+    @patch(
+        _LOAD_DEFAULTS,
+        return_value={"alphaevolve": {"location": "global"}},
+    )
+    @patch.dict(os.environ, {}, clear=True)
+    def test_section_from_yaml_config_is_used(
+        self, mock_defaults: MagicMock
+    ) -> None:
+        """A user's `alphaevolve:` YAML section must survive Config parsing."""
+        from skydiscover.config import Config
+
+        config_obj = Config.from_dict(
+            {"alphaevolve": {"project_id": "yaml-p", "engine_id": "yaml-e"}}
+        )
+
+        result = _get_alphaevolve_config(config_obj)
+
+        assert result["project_id"] == "yaml-p"
+        assert result["engine_id"] == "yaml-e"
+        assert result["location"] == "global"
+
+    @patch(
+        _LOAD_DEFAULTS,
+        return_value={
             "alphaevolve": {"project_id": "p", "engine_id": "e"}
         },
     )
