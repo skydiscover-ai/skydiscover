@@ -20,7 +20,9 @@
             "description": "End line (1-indexed). Omit for end of file."
           }
         },
-        "required": ["path"]
+        "required": [
+          "path"
+        ]
       }
     }
   },
@@ -41,7 +43,190 @@
             "description": "Glob to filter files (default: '*.py')."
           }
         },
-        "required": ["pattern"]
+        "required": [
+          "pattern"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "web_search",
+      "description": "Search the web for current information and return cited results.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 2
+          },
+          "allowed_domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional allowlist of domains or URLs. Subdomains match."
+          },
+          "blocked_domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional blocklist of domains or URLs. Subdomains match."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "research_papers",
+      "description": "Discover ML research papers, analyze citations, search paper contents, and find linked resources.\n\nCombines HuggingFace Hub, arXiv, and Semantic Scholar. Use for exploring research areas, finding datasets for a task, tracing citation chains, or implementing a paper's approach.\n\nTypical flows:\n  search \u2192 read_paper \u2192 find_all_resources \u2192 hf_inspect_dataset\n  search \u2192 paper_details \u2192 citation_graph \u2192 read_paper (trace influence)\n  snippet_search \u2192 paper_details \u2192 read_paper (find specific claims)\n\nOperations:\n- trending: Get trending daily papers, optionally filter by topic keyword\n- search: Search papers. Uses HF by default (ML-tuned). Add date_from/min_citations/categories to use Semantic Scholar with filters\n- paper_details: Metadata, abstract, AI summary, github link\n- read_paper: Read paper contents \u2014 without section: abstract + TOC; with section: full text\n- citation_graph: Get references and citations for a paper with influence flags and citation intents\n- snippet_search: Semantic search over full-text passages from 12M+ papers\n- recommend: Find similar papers (single paper or positive/negative examples)\n- find_datasets: Find datasets linked to a paper\n- find_models: Find models linked to a paper\n- find_collections: Find collections that include a paper\n- find_all_resources: Parallel fetch of datasets + models + collections for a paper",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "trending",
+              "search",
+              "paper_details",
+              "read_paper",
+              "citation_graph",
+              "snippet_search",
+              "recommend",
+              "find_datasets",
+              "find_models",
+              "find_collections",
+              "find_all_resources"
+            ],
+            "description": "Operation to execute."
+          },
+          "query": {
+            "type": "string",
+            "description": "Search query. Required for: search, snippet_search. Optional for: trending (filters by keyword). Supports boolean syntax for Semantic Scholar: '\"exact phrase\" term1 | term2'."
+          },
+          "arxiv_id": {
+            "type": "string",
+            "description": "ArXiv paper ID (e.g. '2305.18290'). Required for: paper_details, read_paper, citation_graph, find_datasets, find_models, find_collections, find_all_resources. Optional for: recommend (single-paper recs). Get IDs from search results first."
+          },
+          "section": {
+            "type": "string",
+            "description": "Section name or number to read (e.g. '3', 'Experiments', '4.2'). Optional for: read_paper. Without this, returns abstract + TOC."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "citations",
+              "references",
+              "both"
+            ],
+            "description": "Direction for citation_graph. Default: both."
+          },
+          "date": {
+            "type": "string",
+            "description": "Date in YYYY-MM-DD format. Optional for: trending (defaults to recent papers)."
+          },
+          "date_from": {
+            "type": "string",
+            "description": "Start date (YYYY-MM-DD). Triggers Semantic Scholar search. For: search, snippet_search."
+          },
+          "date_to": {
+            "type": "string",
+            "description": "End date (YYYY-MM-DD). Triggers Semantic Scholar search. For: search, snippet_search."
+          },
+          "categories": {
+            "type": "string",
+            "description": "Field of study filter (e.g. 'Computer Science'). Triggers Semantic Scholar search."
+          },
+          "min_citations": {
+            "type": "integer",
+            "description": "Minimum citation count filter. Triggers Semantic Scholar search."
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "citationCount",
+              "publicationDate"
+            ],
+            "description": "Sort order for Semantic Scholar search. Default: relevance."
+          },
+          "positive_ids": {
+            "type": "string",
+            "description": "Comma-separated arxiv IDs for multi-paper recommendations. For: recommend."
+          },
+          "negative_ids": {
+            "type": "string",
+            "description": "Comma-separated arxiv IDs as negative examples. For: recommend."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "downloads",
+              "likes",
+              "trending"
+            ],
+            "description": "Sort order for find_datasets and find_models. Default: downloads."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum results to return (default: 10, max: 50)."
+          }
+        },
+        "required": [
+          "operation"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "fetch_webpage",
+      "description": "Fetch a webpage by URL, convert it to plain text, and save it as a local file so you can read it with read_file.\n\nTypical flow:\n  1. web_search → get URLs\n  2. fetch_webpage(url=...) → get saved_path\n  3. read_file(path=saved_path) → read content\n\nThe saved file is plain text (HTML tags stripped), stored under reference/web_<slug>.txt inside the codebase root. Returns the relative path to use with read_file.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The full URL to fetch (must start with http:// or https://)."
+          }
+        },
+        "required": ["url"],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "run_command",
+      "description": "Execute a read-only shell command inside the codebase root directory and return its stdout/stderr output.\n\nUse this to inspect and analyse data files, run existing scripts, count lines, pretty-print JSON/CSV, profile code, etc.\n\nRestrictions:\n- Only a fixed allowlist of executables is permitted (python, python3, cat, head, tail, wc, grep, rg, find, ls, awk, sed, jq, sort, uniq, etc.).\n- Shell operators (|, &, ;, >, <) are NOT allowed — pipe output by saving to a file first or use awk/python inline.\n- Destructive commands (rm, mv, cp, pip, curl, wget, etc.) are blocked.\n- The working directory is always the codebase root.\n- Maximum runtime: 120 seconds (default 30).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The command to run (e.g. 'python analyse.py', 'head -n 20 data/results.csv', 'wc -l src/*.py')."
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Optional wall-clock timeout in seconds (1–120, default 30)."
+          },
+          "unsafe": {
+            "type": "boolean",
+            "description": "If true, run the command through the system shell for full commandline capabilities (pipes, redirects, compound commands). Disabled by default."
+          }
+        },
+        "required": ["command"],
+        "additionalProperties": false
       }
     }
   }

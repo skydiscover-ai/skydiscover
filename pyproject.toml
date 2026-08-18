@@ -15,6 +15,9 @@ dependencies = [
     "tqdm>=4.64.0",
     "numpy>=1.22.0",
     "python-dotenv>=1.2.1",
+    "beautifulsoup4>=4.12.0",
+    "httpx>=0.27.0",
+    "requests>=2.31.0",
 ]
 
 [project.optional-dependencies]
@@ -117,6 +120,7 @@ include = ["skydiscover*"]
 [tool.setuptools.package-data]
 skydiscover = [
     "context_builder/*/templates/*.txt",
+    "llm/tool_schemas/*.json",
     "search/evox/config/*.yaml",
     "search/evox/config/*.txt",
     "extras/external/defaults/*.yaml",
