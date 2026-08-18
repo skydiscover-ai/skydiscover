@@ -54,6 +54,7 @@ uv run skydiscover-run benchmarks/math/circle_packing/initial_program.py \
 | [`ale_bench/`](ale_bench/) | Algorithms | 10 | Algorithmic contest problems (C++, ALE-Bench) |
 | [`image_gen/`](image_gen/) | Creative | 1 | AI image generation evolution |
 | [`prompt_optimization/`](prompt_optimization/) | Prompts | 1 | Evolve natural-language prompts, not code (HotPotQA) |
+| [`post_nas_mlp/`](post_nas_mlp/) | NAS | 1 | Evolve MLP topologies (Post-NAS wedge, issue #2) |
 
 Each benchmark directory has its own README with setup and run instructions.
 
