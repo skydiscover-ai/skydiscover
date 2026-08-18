@@ -196,6 +196,7 @@ class MonitorServer:
         self._summary_model = model
         if not api_key and model:
             from skydiscover.config import _parse_model_spec, _resolve_api_key_from_env
+
             _, _, _, env_vars = _parse_model_spec(model)
             api_key = _resolve_api_key_from_env(env_vars) or ""
         self._summary_api_key = api_key

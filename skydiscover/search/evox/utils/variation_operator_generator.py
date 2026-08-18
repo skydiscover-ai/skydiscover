@@ -593,8 +593,11 @@ def main():
             "Use a known model prefix or 'provider/model' format (e.g. 'openai/my-model')."
         )
         return 1
+    # Strip the provider prefix so the API receives the bare model name
+    # (mirrors LLMConfig.__post_init__).
+    model_name = _bare_name if ("/" in cli_model and _provider != "openai") else cli_model
     model_cfg = LLMModelConfig(
-        name=cli_model,
+        name=model_name,
         api_base=provider_base,
         api_key=_resolve_api_key_from_env(env_vars) or "",
         max_tokens=DEFAULT_CLI_MAX_TOKENS,
@@ -605,7 +608,7 @@ def main():
     llm = LLMPool([model_cfg])
 
     # Generate variation operator labels
-    print(f"Generating variation operators with model={DEFAULT_CLI_MODEL}...")
+    print(f"Generating variation operators with model={cli_model}...")
     diverge_operator, refine_operator = asyncio.run(
         generate_variation_operators(
             system_message=system_message,
