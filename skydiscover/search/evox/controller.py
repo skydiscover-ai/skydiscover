@@ -348,11 +348,6 @@ class CoEvolutionController(DiscoveryController):
             self._assign_labels_to_db(self.database)
             return
 
-        if not self._guide_llm_available:
-            logger.info("Skipping label generation (guide LLM unavailable at startup)")
-            self._assign_labels_to_db(self.database)
-            return
-
         db_cfg = self.config.search.database
         if not getattr(db_cfg, "auto_generate_variation_operators", True):
             from skydiscover.search.evox.utils.template import (
@@ -365,6 +360,11 @@ class CoEvolutionController(DiscoveryController):
             logger.info(
                 "Using default variation operators (auto_generate_variation_operators=false)"
             )
+            self._assign_labels_to_db(self.database)
+            return
+
+        if not self._guide_llm_available:
+            logger.info("Skipping label generation (guide LLM unavailable at startup)")
             self._assign_labels_to_db(self.database)
             return
 
