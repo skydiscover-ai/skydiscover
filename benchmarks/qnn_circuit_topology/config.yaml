@@ -20,12 +20,13 @@ prompt:
     Rules:
     - Evolve only the gate topology (list of gate dicts). Parameters are fit by the evaluator.
     - Allowed gates: RX/RY/RZ (with qubit 0|1), H (qubit 0|1), CNOT(control, target) with control != target.
-    - Prefer compact circuits (<= 16 gates). Deeper is not always better on this toy task.
+    - Validator cap is 24 gates; prefer compact circuits (<= 16). Deeper is not always better on this toy task.
+    - Fitting is vectorized; timeout is 600s so a valid 24-gate circuit is not scored 0 for runtime.
     - Useful motifs: data re-uploading (interleave RY on both qubits), entangling CNOT, alternating rotation axes.
     - Keep the EVOLVE-BLOCK markers intact.
 
 evaluator:
-  timeout: 120
+  timeout: 600
   cascade_evaluation: false
 
 monitor:

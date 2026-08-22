@@ -41,6 +41,8 @@ uv run skydiscover-run \
 - `accuracy`: held-out classification accuracy in `[0, 1]`
 - `combined_score`: same as accuracy (primary)
 - Invalid topologies / runtime errors → score `0`
+- Validator cap: **24 gates**. Prefer compact circuits (`<= 16`); deeper is not always better.
+- Evaluator timeout is **600s**. The fit is batched/vectorized (cached static gates + parameter-shift) so a 24-gate circuit finishes in seconds, not minutes. CI still runs the 5-gate baseline.
 
 ## Measured smoke results (no LLM)
 

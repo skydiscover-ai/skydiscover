@@ -13,7 +13,8 @@ def build_topology():
       - {"gate": "H", "qubit": 0|1}
       - {"gate": "CNOT", "control": 0|1, "target": 0|1}  # control != target
 
-    Keep the circuit reasonably short (<= 16 gates) so parameter fitting stays fast.
+    Keep the circuit within the evaluator cap (24 gates). Compact ansatze
+    (<= 16 gates) usually fit better on this toy task.
     """
     return [
         {"gate": "RY", "qubit": 0},

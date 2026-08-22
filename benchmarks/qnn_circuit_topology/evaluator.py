@@ -13,12 +13,15 @@ import numpy as np
 
 N_QUBITS = 2
 DIM = 1 << N_QUBITS
+MAX_GATES = 24
 TRAIN_SIZE = 120
 TEST_SIZE = 60
-STEPS = 80
+STEPS = 50
 LR = 0.15
-RESTARTS = 3
+RESTARTS = 2
+BATCH = 48
 SEED = 0
+_PARAM_SHIFT = 0.5 * math.pi
 
 
 def _ry(theta: float) -> np.ndarray:
@@ -62,11 +65,22 @@ def _cnot(control: int, target: int) -> np.ndarray:
     return u
 
 
+_ROT = {"RX": _rx, "RY": _ry, "RZ": _rz}
+_H_MAT = _h()
+_H_EMBED = tuple(_embed_1q(_H_MAT, q) for q in range(N_QUBITS))
+_CNOT_CACHE = {
+    (0, 1): _cnot(0, 1),
+    (1, 0): _cnot(1, 0),
+}
+# ⟨Z on qubit 0⟩ with q0 as LSB.
+_Z0 = np.array([1.0 if (i & 1) == 0 else -1.0 for i in range(DIM)], dtype=np.float64)
+
+
 def _validate_topology(topology: list[dict[str, Any]]) -> None:
     if not isinstance(topology, list) or not topology:
         raise ValueError("topology must be a non-empty list of gate dicts")
-    if len(topology) > 24:
-        raise ValueError("topology too long (>24 gates); keep circuits compact")
+    if len(topology) > MAX_GATES:
+        raise ValueError(f"topology too long (>{MAX_GATES} gates); keep circuits compact")
     for g in topology:
         if not isinstance(g, dict) or "gate" not in g:
             raise ValueError(f"invalid gate entry: {g}")
@@ -87,36 +101,59 @@ def _n_params(topology: list[dict[str, Any]]) -> int:
     return sum(1 for g in topology if str(g["gate"]).upper() in {"RX", "RY", "RZ"})
 
 
-def _apply_circuit(x: np.ndarray, topology: list[dict[str, Any]], params: np.ndarray) -> np.ndarray:
-    state = np.zeros(DIM, dtype=np.complex128)
-    state[0] = 1.0
-    # Angle feature map
-    state = _embed_1q(_ry(float(x[0])), 0) @ state
-    state = _embed_1q(_ry(float(x[1])), 1) @ state
-    p_idx = 0
+def _compile(topology: list[dict[str, Any]]) -> list[tuple]:
+    """Cache static 4x4 gate matrices; parameterized rotations stay symbolic."""
+    layers: list[tuple] = []
     for g in topology:
         name = str(g["gate"]).upper()
         if name == "H":
-            state = _embed_1q(_h(), int(g["qubit"])) @ state
+            layers.append(("static", _H_EMBED[int(g["qubit"])]))
         elif name == "CNOT":
-            state = _cnot(int(g["control"]), int(g["target"])) @ state
+            layers.append(("static", _CNOT_CACHE[(int(g["control"]), int(g["target"]))]))
         else:
-            theta = float(params[p_idx])
+            layers.append(("param", name, int(g["qubit"])))
+    return layers
+
+
+def _encode_features(x: np.ndarray) -> np.ndarray:
+    """Angle-encode 2D inputs as RY(x0)⊗RY(x1) on |00>, vector of shape (N, DIM)."""
+    n = x.shape[0]
+    states = np.zeros((n, DIM), dtype=np.complex128)
+    states[:, 0] = 1.0
+    for i in range(n):
+        states[i] = _embed_1q(_ry(float(x[i, 0])), 0) @ states[i]
+        states[i] = _embed_1q(_ry(float(x[i, 1])), 1) @ states[i]
+    return states
+
+
+def _apply_compiled(states: np.ndarray, compiled: list[tuple], params: np.ndarray) -> np.ndarray:
+    """Apply compiled ansatz to a batch of encoded states, shape (B, DIM)."""
+    out = states
+    p_idx = 0
+    for layer in compiled:
+        if layer[0] == "static":
+            u = layer[1]
+        else:
+            _, name, qubit = layer
+            u = _embed_1q(_ROT[name](float(params[p_idx])), qubit)
             p_idx += 1
-            mat = {"RX": _rx, "RY": _ry, "RZ": _rz}[name](theta)
-            state = _embed_1q(mat, int(g["qubit"])) @ state
-    return state
+        out = out @ u.T
+    return out
+
+
+def _expectation_z0_batch(states: np.ndarray) -> np.ndarray:
+    probs = np.abs(states) ** 2
+    return probs.real @ _Z0
+
+
+def _apply_circuit(x: np.ndarray, topology: list[dict[str, Any]], params: np.ndarray) -> np.ndarray:
+    compiled = _compile(topology)
+    encoded = _encode_features(np.asarray(x, dtype=np.float64).reshape(1, 2))
+    return _apply_compiled(encoded, compiled, params)[0]
 
 
 def _expectation_z0(state: np.ndarray) -> float:
-    # ⟨Z⊗I⟩
-    probs = np.abs(state) ** 2
-    # basis |q1 q0> with q0 as LSB in our indexing
-    ez = 0.0
-    for i, p in enumerate(probs):
-        z0 = 1.0 if ((i >> 0) & 1) == 0 else -1.0
-        ez += float(p.real) * z0
-    return ez
+    return float(_expectation_z0_batch(np.asarray(state, dtype=np.complex128).reshape(1, -1))[0])
 
 
 def _make_dataset(n: int, rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
@@ -130,12 +167,22 @@ def _make_dataset(n: int, rng: np.random.Generator) -> tuple[np.ndarray, np.ndar
     return x, y
 
 
+def _accuracy_encoded(
+    encoded: np.ndarray,
+    y: np.ndarray,
+    compiled: list[tuple],
+    params: np.ndarray,
+) -> float:
+    z = _expectation_z0_batch(_apply_compiled(encoded, compiled, params))
+    preds = np.where(z >= 0.0, 1.0, -1.0)
+    return float(np.mean(preds == y))
+
+
 def _predict(x: np.ndarray, topology: list[dict[str, Any]], params: np.ndarray) -> np.ndarray:
-    preds = []
-    for row in x:
-        state = _apply_circuit(row, topology, params)
-        preds.append(1.0 if _expectation_z0(state) >= 0 else -1.0)
-    return np.asarray(preds)
+    compiled = _compile(topology)
+    encoded = _encode_features(np.asarray(x, dtype=np.float64))
+    z = _expectation_z0_batch(_apply_compiled(encoded, compiled, params))
+    return np.where(z >= 0.0, 1.0, -1.0)
 
 
 def _accuracy(x: np.ndarray, y: np.ndarray, topology: list[dict[str, Any]], params: np.ndarray) -> float:
@@ -144,42 +191,44 @@ def _accuracy(x: np.ndarray, y: np.ndarray, topology: list[dict[str, Any]], para
 
 
 def _fit_once(
-    topology: list[dict[str, Any]],
-    x: np.ndarray,
+    compiled: list[tuple],
+    encoded: np.ndarray,
     y: np.ndarray,
+    n_params: int,
     rng: np.random.Generator,
 ) -> np.ndarray:
-    n_params = _n_params(topology)
     if n_params == 0:
         return np.zeros(0)
     params = rng.normal(0, 0.4, size=n_params)
-    eps = 1e-3
     for _ in range(STEPS):
-        grads = np.zeros_like(params)
-        idx = rng.choice(len(x), size=min(48, len(x)), replace=False)
+        idx = rng.choice(len(encoded), size=min(BATCH, len(encoded)), replace=False)
+        enc_b = encoded[idx]
+        y_b = y[idx]
+        z = _expectation_z0_batch(_apply_compiled(enc_b, compiled, params))
+        active = (1.0 - y_b * z) > 0.0
+        grads = np.zeros(n_params, dtype=np.float64)
         for j in range(n_params):
             plus = params.copy()
             minus = params.copy()
-            plus[j] += eps
-            minus[j] -= eps
-            loss_p = 0.0
-            loss_m = 0.0
-            for i in idx:
-                zp = _expectation_z0(_apply_circuit(x[i], topology, plus))
-                zm = _expectation_z0(_apply_circuit(x[i], topology, minus))
-                loss_p += max(0.0, 1.0 - y[i] * zp)
-                loss_m += max(0.0, 1.0 - y[i] * zm)
-            grads[j] = (loss_p - loss_m) / (2 * eps)
+            plus[j] += _PARAM_SHIFT
+            minus[j] -= _PARAM_SHIFT
+            zp = _expectation_z0_batch(_apply_compiled(enc_b, compiled, plus))
+            zm = _expectation_z0_batch(_apply_compiled(enc_b, compiled, minus))
+            dz = 0.5 * (zp - zm)
+            grads[j] = float(np.sum((-y_b * dz) * active))
         params -= LR * grads
     return params
 
 
 def _fit(topology: list[dict[str, Any]], x: np.ndarray, y: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    compiled = _compile(topology)
+    encoded = _encode_features(x)
+    n_params = _n_params(topology)
     best_params = None
     best_acc = -1.0
     for _ in range(RESTARTS):
-        params = _fit_once(topology, x, y, rng)
-        acc = _accuracy(x, y, topology, params)
+        params = _fit_once(compiled, encoded, y, n_params, rng)
+        acc = _accuracy_encoded(encoded, y, compiled, params)
         if acc > best_acc:
             best_acc = acc
             best_params = params
