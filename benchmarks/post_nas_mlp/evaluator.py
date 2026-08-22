@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import importlib.util
 import math
 import os
@@ -167,25 +168,36 @@ def _backward(
     return grads
 
 
-def _train_eval(arch: list[dict[str, Any]], seed: int = SEED) -> dict[str, float]:
+def _train_eval(
+    arch: list[dict[str, Any]],
+    seed: int = SEED,
+    *,
+    # Bind helpers at definition time so rebinding evaluator globals after
+    # candidate exec cannot redirect training.
+    make_dataset=_make_dataset,
+    init_params=_init_params,
+    forward=_forward,
+    softmax_ce=_softmax_ce,
+    backward=_backward,
+) -> dict[str, float]:
     rng = np.random.default_rng(seed)
-    x_train, y_train = _make_dataset(TRAIN_N, rng)
-    x_test, y_test = _make_dataset(TEST_N, rng)
-    params = _init_params(arch, rng)
+    x_train, y_train = make_dataset(TRAIN_N, rng)
+    x_test, y_test = make_dataset(TEST_N, rng)
+    params = init_params(arch, rng)
 
     for step in range(STEPS):
         idx = rng.choice(TRAIN_N, size=BATCH, replace=False)
         xb, yb = x_train[idx], y_train[idx]
-        logits, cache = _forward(xb, params, train=True, rng=rng)
-        _loss, grad = _softmax_ce(logits, yb)
-        grads = _backward(params, cache, grad)
+        logits, cache = forward(xb, params, train=True, rng=rng)
+        _loss, grad = softmax_ce(logits, yb)
+        grads = backward(params, cache, grad)
         for i, (kind, payload) in enumerate(params):
             if kind == "linear" and grads[i] is not None:
                 w, b = payload
                 gw, gb = grads[i]
                 params[i] = ("linear", (w - LR * gw, b - LR * gb))
 
-    logits, _ = _forward(x_test, params, train=False, rng=rng)
+    logits, _ = forward(x_test, params, train=False, rng=rng)
     pred = np.argmax(logits, axis=1)
     acc = float((pred == y_test).mean())
     # Complexity penalty: fewer params preferred as secondary objective.
@@ -209,31 +221,38 @@ def _load_builder(program_path: str):
     return module.build_architecture
 
 
-def evaluate(program_path: str) -> dict[str, Any]:
-    t0 = time.time()
-    try:
-        builder = _load_builder(program_path)
-        arch = builder(INPUT_DIM, NUM_CLASSES)
-        _validate(arch)
-        metrics = _train_eval(arch)
-        # Reward accuracy; lightly prefer compact nets.
-        combined = 0.85 * metrics["accuracy"] + 0.15 * max(0.0, 1.0 - metrics["complexity"])
-        return {
-            "combined_score": float(combined),
-            "accuracy": float(metrics["accuracy"]),
-            "n_params": float(metrics["n_params"]),
-            "complexity": float(metrics["complexity"]),
-            "n_layers": float(len(arch)),
-            "latency_s": float(time.time() - t0),
-        }
-    except Exception as exc:  # noqa: BLE001
-        return {
-            "combined_score": 0.0,
-            "accuracy": 0.0,
-            "error": f"{type(exc).__name__}: {exc}",
-            "traceback": traceback.format_exc(),
-            "latency_s": float(time.time() - t0),
-        }
+def _make_evaluate(validate_fn, train_eval_fn, input_dim: int, num_classes: int):
+    """Close over trusted helpers so sys.modules rebinds cannot hijack scoring."""
+
+    def evaluate(program_path: str) -> dict[str, Any]:
+        t0 = time.time()
+        try:
+            builder = _load_builder(program_path)
+            arch = copy.deepcopy(builder(input_dim, num_classes))
+            validate_fn(arch)
+            metrics = train_eval_fn(arch)
+            combined = 0.85 * metrics["accuracy"] + 0.15 * max(0.0, 1.0 - metrics["complexity"])
+            return {
+                "combined_score": float(combined),
+                "accuracy": float(metrics["accuracy"]),
+                "n_params": float(metrics["n_params"]),
+                "complexity": float(metrics["complexity"]),
+                "n_layers": float(len(arch)),
+                "latency_s": float(time.time() - t0),
+            }
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "combined_score": 0.0,
+                "accuracy": 0.0,
+                "error": f"{type(exc).__name__}: {exc}",
+                "traceback": traceback.format_exc(),
+                "latency_s": float(time.time() - t0),
+            }
+
+    return evaluate
+
+
+evaluate = _make_evaluate(_validate, _train_eval, INPUT_DIM, NUM_CLASSES)
 
 
 if __name__ == "__main__":
