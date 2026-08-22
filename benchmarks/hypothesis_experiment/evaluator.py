@@ -7,22 +7,56 @@ import os
 import sys
 import time
 import traceback
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Iterator
 
 import numpy as np
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-if _HERE not in sys.path:
-    sys.path.insert(0, _HERE)
 
-from world import (  # noqa: E402
-    N_FEATURES,
-    QUERY_BUDGET,
-    TEST_N,
-    true_function,
-    oracle_observe,
-    sample_inputs,
-)
+# Undisclosed evaluation entropy. Candidate code never sees this generator, and
+# the held-out test RNG is spawned independently so snapshotting the RNG handed
+# to design_experiments cannot reconstruct x_test.
+_EVAL_ENTROPY = 0xA5C1D15C07E57
+
+
+def _hidden_world() -> dict[str, Any]:
+    """Load world.py into a private dict — never registered as sys.modules['world']."""
+    path = os.path.join(_HERE, "world.py")
+    ns: dict[str, Any] = {"__name__": "_skydiscover_hidden_world", "__file__": path}
+    with open(path, encoding="utf-8") as f:
+        exec(compile(f.read(), path, "exec"), ns)
+    return ns
+
+
+def _independent_rngs() -> tuple[np.random.Generator, np.random.Generator, np.random.Generator]:
+    """Return (candidate, oracle-noise, test) generators that do not share state."""
+    master = np.random.default_rng(_EVAL_ENTROPY)
+    spawn = getattr(master, "spawn", None)
+    if callable(spawn):
+        cand_rng, noise_rng, test_rng = spawn(3)
+        return cand_rng, noise_rng, test_rng
+    ss = np.random.SeedSequence(_EVAL_ENTROPY)
+    cand_ss, noise_ss, test_ss = ss.spawn(3)
+    return (
+        np.random.default_rng(cand_ss),
+        np.random.default_rng(noise_ss),
+        np.random.default_rng(test_ss),
+    )
+
+
+@contextmanager
+def _sandbox_candidate_imports() -> Iterator[None]:
+    """Keep the evaluator dir (and `world`) unreachable while candidate code runs."""
+    saved_path = list(sys.path)
+    here = os.path.abspath(_HERE)
+    sys.path[:] = [p for p in sys.path if os.path.abspath(p) != here]
+    sys.modules.pop("world", None)
+    try:
+        yield
+    finally:
+        sys.modules.pop("world", None)
+        sys.path[:] = saved_path
 
 
 def _load(program_path: str):
@@ -51,32 +85,41 @@ def _r2(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 def evaluate(program_path: str) -> dict[str, Any]:
     t0 = time.time()
     try:
-        design_experiments, fit_hypothesis = _load(program_path)
-        rng = np.random.default_rng(0)
+        world = _hidden_world()
+        n_features = world["N_FEATURES"]
+        query_budget = world["QUERY_BUDGET"]
+        test_n = world["TEST_N"]
+        true_function = world["true_function"]
+        oracle_observe = world["oracle_observe"]
+        sample_inputs = world["sample_inputs"]
 
-        queries = np.asarray(
-            design_experiments(QUERY_BUDGET, N_FEATURES, rng), dtype=np.float64
-        )
-        if queries.ndim != 2 or queries.shape[1] != N_FEATURES:
-            raise ValueError(
-                f"design_experiments must return (budget, {N_FEATURES}), got {queries.shape}"
+        cand_rng, noise_rng, test_rng = _independent_rngs()
+
+        with _sandbox_candidate_imports():
+            design_experiments, fit_hypothesis = _load(program_path)
+            queries = np.asarray(
+                design_experiments(query_budget, n_features, cand_rng), dtype=np.float64
             )
-        if len(queries) > QUERY_BUDGET:
-            queries = queries[:QUERY_BUDGET]
-        queries = np.clip(queries, -2.0, 2.0)
+            if queries.ndim != 2 or queries.shape[1] != n_features:
+                raise ValueError(
+                    f"design_experiments must return (budget, {n_features}), got {queries.shape}"
+                )
+            if len(queries) > query_budget:
+                queries = queries[:query_budget]
+            queries = np.clip(queries, -2.0, 2.0)
 
-        y_obs = oracle_observe(queries, rng)
-        predict = fit_hypothesis(queries, y_obs)
+            y_obs = oracle_observe(queries, noise_rng)
+            predict = fit_hypothesis(queries, y_obs)
 
-        x_test = sample_inputs(TEST_N, rng)
-        y_test = true_function(x_test)  # noiseless held-out truth
-        y_hat = np.asarray(predict(x_test), dtype=np.float64).reshape(-1)
-        if y_hat.shape != y_test.shape:
-            raise ValueError("predict() must return a 1-D array matching y")
+            x_test = sample_inputs(test_n, test_rng)
+            y_test = true_function(x_test)  # noiseless held-out truth
+            y_hat = np.asarray(predict(x_test), dtype=np.float64).reshape(-1)
+            if y_hat.shape != y_test.shape:
+                raise ValueError("predict() must return a 1-D array matching y")
 
         r2 = _r2(y_test, y_hat)
         # Mild reward for using the budget efficiently (not under-querying).
-        coverage = min(1.0, len(queries) / float(QUERY_BUDGET))
+        coverage = min(1.0, len(queries) / float(query_budget))
         mse = float(np.mean((y_test - y_hat) ** 2))
         combined = 0.9 * max(0.0, r2) + 0.1 * coverage
 

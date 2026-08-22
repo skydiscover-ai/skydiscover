@@ -9,7 +9,6 @@ QUERY_BUDGET = 40
 TRAIN_HOLDOUT = 80
 TEST_N = 120
 NOISE = 0.08
-SEED = 0
 
 
 def true_function(x: np.ndarray) -> np.ndarray:
