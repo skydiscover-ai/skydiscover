@@ -35,10 +35,7 @@ prompt:
 
 evaluator:
   timeout: 120
-  cascade_evaluation: true
-  cascade_thresholds:
-    - 0.15
-    - 0.4
+  cascade_evaluation: false
 
 monitor:
   enabled: true

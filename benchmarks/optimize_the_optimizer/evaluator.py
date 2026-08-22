@@ -7,7 +7,8 @@ import os
 import sys
 import time
 import traceback
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Callable
 
 import numpy as np
 
@@ -15,11 +16,64 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from initial_program import run_controller  # noqa: E402
 from problems import TEST_PROBLEMS, TRAIN_PROBLEMS  # noqa: E402
 
 BUDGET = 64
 SEEDS = (0, 1, 2)
+
+
+@dataclass
+class _Member:
+    """Harness-owned population record. Duck-typed as `.x` / `.score` for candidates."""
+
+    x: np.ndarray
+    score: float  # higher is better (negated objective)
+
+
+def run_controller(
+    controller_cls: type,
+    objective: Callable[[np.ndarray], float],
+    dim: int,
+    bounds: tuple[float, float],
+    budget: int,
+    seed: int,
+) -> float:
+    """Run ``controller_cls`` for ``budget`` evaluations; return best maximize-score.
+
+    Lives in the evaluator, not the candidate. Candidates may define their own
+    ``run_controller`` (copies of the seed did); it is never called.
+    """
+    rng = np.random.default_rng(seed)
+    ctrl = controller_cls(dim, bounds, rng)
+    population: list[_Member] = []
+    best = -float("inf")
+    remaining = budget
+
+    init = ctrl.initial_population()
+    for x in init:
+        if remaining <= 0:
+            break
+        score = -float(objective(x))
+        population.append(_Member(x=np.asarray(x, dtype=np.float64), score=score))
+        best = max(best, score)
+        remaining -= 1
+
+    while remaining > 0:
+        batch = min(len(population) or 1, remaining)
+        proposals = ctrl.ask(population, batch)
+        if not proposals:
+            break
+        for x in proposals:
+            if remaining <= 0:
+                break
+            score = -float(objective(np.asarray(x, dtype=np.float64)))
+            population.append(_Member(x=np.asarray(x, dtype=np.float64), score=score))
+            best = max(best, score)
+            remaining -= 1
+            if len(population) > 40:
+                population.sort(key=lambda c: c.score, reverse=True)
+                population = population[:24]
+    return best
 
 
 def _load_controller(program_path: str):
@@ -32,9 +86,9 @@ def _load_controller(program_path: str):
     spec.loader.exec_module(module)
     if not hasattr(module, "SearchController"):
         raise AttributeError("program must define SearchController")
-    # Prefer the candidate's run_controller if present; else shared harness.
-    run_fn = getattr(module, "run_controller", run_controller)
-    return module.SearchController, run_fn
+    # Never take run_controller from the candidate — the seed copies one, and a
+    # stub that returns the per-problem ceiling (0.0) would score 1.0 with no search.
+    return module.SearchController
 
 
 def _normalize_score(raw: float, problem_name: str) -> float:
@@ -61,13 +115,13 @@ def _normalize_score(raw: float, problem_name: str) -> float:
     return float(np.clip((raw - lo) / (hi - lo), 0.0, 1.0))
 
 
-def _eval_suite(controller_cls, run_fn, problems) -> dict[str, float]:
+def _eval_suite(controller_cls, problems) -> dict[str, float]:
     scores = []
     per: dict[str, float] = {}
     for problem in problems:
         seed_scores = []
         for seed in SEEDS:
-            raw = run_fn(
+            raw = run_controller(
                 controller_cls,
                 problem.fn,
                 problem.dim,
@@ -85,9 +139,9 @@ def _eval_suite(controller_cls, run_fn, problems) -> dict[str, float]:
 def evaluate(program_path: str) -> dict[str, Any]:
     t0 = time.time()
     try:
-        controller_cls, run_fn = _load_controller(program_path)
-        train = _eval_suite(controller_cls, run_fn, TRAIN_PROBLEMS)
-        test = _eval_suite(controller_cls, run_fn, TEST_PROBLEMS)
+        controller_cls = _load_controller(program_path)
+        train = _eval_suite(controller_cls, TRAIN_PROBLEMS)
+        test = _eval_suite(controller_cls, TEST_PROBLEMS)
         combined = 0.65 * test["mean"] + 0.35 * train["mean"]
         return {
             "combined_score": float(combined),

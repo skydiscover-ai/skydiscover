@@ -8,7 +8,6 @@ budget on held-out black-box problems. This is the EvoX² wedge: the candidate
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
 
 import numpy as np
 
@@ -66,43 +65,5 @@ class SearchController:
 
 # EVOLVE-BLOCK-END
 
-
-def run_controller(
-    controller_cls: type,
-    objective: Callable[[np.ndarray], float],
-    dim: int,
-    bounds: tuple[float, float],
-    budget: int,
-    seed: int,
-) -> float:
-    """Run ``controller_cls`` for ``budget`` evaluations; return best maximize-score."""
-    rng = np.random.default_rng(seed)
-    ctrl = controller_cls(dim, bounds, rng)
-    population: list[Candidate] = []
-    best = -float("inf")
-    remaining = budget
-
-    init = ctrl.initial_population()
-    for x in init:
-        if remaining <= 0:
-            break
-        score = -float(objective(x))
-        population.append(Candidate(x=np.asarray(x, dtype=np.float64), score=score))
-        best = max(best, score)
-        remaining -= 1
-
-    while remaining > 0:
-        batch = min(len(population) or 1, remaining)
-        proposals = ctrl.ask(population, batch)
-        for x in proposals:
-            if remaining <= 0:
-                break
-            score = -float(objective(np.asarray(x, dtype=np.float64)))
-            population.append(Candidate(x=np.asarray(x, dtype=np.float64), score=score))
-            best = max(best, score)
-            remaining -= 1
-            # Keep population bounded.
-            if len(population) > 40:
-                population.sort(key=lambda c: c.score, reverse=True)
-                population = population[:24]
-    return best
+# The evaluator owns the evaluation loop (run_controller). Candidates only
+# supply SearchController; a copied harness is ignored even if present.
