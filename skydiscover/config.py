@@ -34,13 +34,7 @@ _PROVIDERS: Dict[str, tuple] = {
     "huggingface": (None, ["HF_TOKEN", "HUGGINGFACE_API_KEY"]),
     "ollama": (None, []),
     "vllm": (None, []),
-    "freetoken": ("http://127.0.0.1:1919/v1", []),
 }
-
-# Local OpenAI-compatible servers need no real key, but the OpenAI client still
-# requires a non-empty string, so keyless providers get a harmless placeholder.
-_LOCAL_PROVIDERS = frozenset({"ollama", "vllm", "freetoken"})
-_LOCAL_PLACEHOLDER_KEY = "EMPTY"
 
 # Bare model-name prefixes → provider  (backwards compat for --model gpt-5, etc.)
 _BARE_PREFIX_MAP: Dict[str, str] = {
@@ -84,21 +78,16 @@ def _parse_model_spec(model_str: str) -> tuple:
     return None, model_str, None, []
 
 
-def _resolve_api_key_from_env(
-    env_vars: Optional[List[str]] = None, provider: Optional[str] = None
-) -> Optional[str]:
+def _resolve_api_key_from_env(env_vars: Optional[List[str]] = None) -> Optional[str]:
     """Return the first API key found in *env_vars*.
 
     *env_vars* typically comes from ``_parse_model_spec()``.
-    Only returns a key if it matches the provider's own env vars. Keyless local
-    providers fall back to a placeholder so the OpenAI client accepts them.
+    Only returns a key if it matches the provider's own env vars.
     """
     for var in env_vars or []:
         key = os.environ.get(var)
         if key:
             return key
-    if provider in _LOCAL_PROVIDERS:
-        return _LOCAL_PLACEHOLDER_KEY
     return None
 
 
@@ -212,7 +201,7 @@ class LLMConfig(LLMModelConfig):
                 if provider_base and not (user_set_api_base and provider == "openai"):
                     model.api_base = provider_base
                 if model.api_key is None:
-                    model.api_key = _resolve_api_key_from_env(env_vars, provider)
+                    model.api_key = _resolve_api_key_from_env(env_vars)
                 # Strip provider prefix so the API receives the bare model name
                 if "/" in model.name and provider != "openai":
                     model.name = bare_name
@@ -937,7 +926,7 @@ def apply_overrides(
                     f"Provider '{provider}' requires an explicit api_base.\n"
                     f"Example: model='{spec}', api_base='http://localhost:8000/v1'"
                 )
-            resolved_key = _resolve_api_key_from_env(env_vars, provider)
+            resolved_key = _resolve_api_key_from_env(env_vars)
             models.append(
                 LLMModelConfig(
                     name=model_name,

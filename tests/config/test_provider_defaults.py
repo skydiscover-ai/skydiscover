@@ -192,44 +192,6 @@ class TestNonOpenAIProviderRouting:
         assert "anthropic.com" in cfg.models[2].api_base
 
 
-# ── FreeToken / keyless local providers ────────────────────────────
-
-
-class TestFreeTokenProvider:
-    def test_parse_defaults_to_local_endpoint(self):
-        provider, name, api_base, env_vars = _parse_model_spec("freetoken/Qwen3.6-35B-A3B")
-        assert provider == "freetoken"
-        assert name == "Qwen3.6-35B-A3B"
-        assert api_base == "http://127.0.0.1:1919/v1"
-        assert env_vars == []
-
-    def test_keyless_provider_gets_placeholder_key(self):
-        assert _resolve_api_key_from_env([], "freetoken") == "EMPTY"
-        assert _resolve_api_key_from_env([], "ollama") == "EMPTY"
-        assert _resolve_api_key_from_env([], "vllm") == "EMPTY"
-
-    def test_unknown_provider_still_returns_none(self):
-        assert _resolve_api_key_from_env([], None) is None
-        assert _resolve_api_key_from_env([], "mycompany") is None
-
-    def test_config_works_with_no_env_or_flags(self):
-        """freetoken/<model> resolves endpoint, bare name, and placeholder key off-the-shelf."""
-        env = os.environ.copy()
-        env.pop("OPENAI_API_KEY", None)
-        with patch.dict(os.environ, env, clear=True):
-            cfg = LLMConfig(models=[LLMModelConfig(name="freetoken/Qwen3.6-35B-A3B")])
-        model = cfg.models[0]
-        assert model.name == "Qwen3.6-35B-A3B"
-        assert model.api_base == "http://127.0.0.1:1919/v1"
-        assert model.api_key == "EMPTY"
-
-    def test_custom_api_base_preserved(self):
-        cfg = LLMConfig(
-            models=[LLMModelConfig(name="freetoken/Qwen3.6-35B-A3B", api_base="http://gpu-box:9000/v1")],
-        )
-        assert cfg.models[0].api_base == "http://gpu-box:9000/v1"
-
-
 # ── MonitorConfig defaults ─────────────────────────────────────────
 
 
