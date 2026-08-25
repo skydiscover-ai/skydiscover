@@ -348,7 +348,35 @@ Any [LiteLLM](https://docs.litellm.ai/)-compatible model works using `provider/m
 --model gemini/gemini-3-pro-preview                          # Gemini
 --model anthropic/claude-sonnet-4-20250514                   # Anthropic
 --model ollama/llama3 --api-base http://localhost:11434/v1   # Local (Ollama, vLLM, etc.)
+--model freetoken/Qwen3.6-35B-A3B                            # On-device via FreeToken
 ```
+
+**On-device models via [FreeToken](https://github.com/FlashML-org/FreeToken)** run
+fully local with no API key. Serve a model, then use the `freetoken/` prefix. The
+endpoint (`http://127.0.0.1:1919/v1`) and key are filled in for you:
+
+```bash
+# 1. Install FreeToken and start a local OpenAI-compatible server
+uv pip install "freetoken[accel]"
+ft serve --model Qwen3.6-35B-A3B                # listens on 127.0.0.1:1919
+
+# 2. Point any SkyDiscover run at it (no --api-base, no key)
+uv run skydiscover-run initial_program.py evaluator.py \
+  --model freetoken/Qwen3.6-35B-A3B \
+  --search evox \
+  --iterations 100
+```
+
+Or set it in a config file:
+
+```yaml
+llm:
+  models:
+    - name: "freetoken/Qwen3.6-35B-A3B"
+      weight: 1.0
+```
+
+Running the server on a different host or port? Add `--api-base http://<host>:<port>/v1`.
 
 Multi-model pools with weighted sampling are supported in config:
 
