@@ -3,11 +3,14 @@
 Evaluator hierarchy (pick one per benchmark)::
 
     Evaluator                  Python function: evaluate(program_path) -> dict
+    SubprocessEvaluator        Same as Evaluator but each call runs in a child process
     ContainerizedEvaluator     Docker: Dockerfile + evaluate.sh  ->  JSON on stdout
     └── HarborEvaluator        Harbor protocol: instruction.md + tests/test.sh + environment/
 
 ``create_evaluator()`` auto-detects which one to use based on the benchmark
 directory contents.  Detection order: Harbor > Containerized > Python.
+Set ``evaluator.subprocess_isolation: true`` in config to use SubprocessEvaluator
+instead of the in-process Evaluator.
 
 Supporting modules:
 
@@ -25,10 +28,12 @@ from skydiscover.evaluation.evaluation_result import EvaluationResult
 from skydiscover.evaluation.evaluator import Evaluator
 from skydiscover.evaluation.harbor_evaluator import HarborEvaluator
 from skydiscover.evaluation.llm_judge import LLMJudge
+from skydiscover.evaluation.subprocess_evaluator import SubprocessEvaluator
 
 __all__ = [
     "EvaluationResult",
     "Evaluator",
+    "SubprocessEvaluator",
     "ContainerizedEvaluator",
     "HarborEvaluator",
     "LLMJudge",
@@ -61,13 +66,14 @@ def create_evaluator(
     llm_judge: Optional[LLMJudge] = None,
     max_concurrent: int = 4,
     env_vars: Optional[Dict[str, str]] = None,
-) -> Union[Evaluator, ContainerizedEvaluator, HarborEvaluator]:
+) -> Union[Evaluator, SubprocessEvaluator, ContainerizedEvaluator, HarborEvaluator]:
     """Return the right evaluator for the given config.
 
     Detection order (most specific first):
       1. Harbor task — instruction.md + tests/ + environment/Dockerfile
       2. Containerized — Dockerfile + evaluate.sh
-      3. Python evaluator — fallback
+      3. subprocess_isolation=True — SubprocessEvaluator (process-per-evaluation)
+      4. Python evaluator — fallback (in-process)
     """
     path = config.evaluation_file or ""
     if _is_harbor_task(path):
@@ -75,5 +81,9 @@ def create_evaluator(
     if _is_containerized(path):
         return ContainerizedEvaluator(
             path, config, max_concurrent=max_concurrent, env_vars=env_vars
+        )
+    if getattr(config, "subprocess_isolation", False):
+        return SubprocessEvaluator(
+            config, llm_judge=llm_judge, max_concurrent=max_concurrent, env_vars=env_vars
         )
     return Evaluator(config, llm_judge=llm_judge, max_concurrent=max_concurrent, env_vars=env_vars)
