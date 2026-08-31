@@ -1,5 +1,9 @@
 <h1 align="center">
-  <img src="assets/lockup-dark-bg.svg" height="80" alt="SkyDiscover logo" style="vertical-align: middle;">&nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/lockup-dark-bg.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/lockup-light-bg.svg">
+    <img src="assets/lockup-light-bg.svg" height="80" alt="SkyDiscover logo" style="vertical-align: middle;">
+  </picture>&nbsp;
 </h1>
 
 
