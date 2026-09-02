@@ -1,13 +1,14 @@
 """Synthetic multi-hop tool-use tasks for agent-scaffold discovery (#1).
 
-No external APIs: a fixed knowledge base + deterministic task suite so the
-evaluator can score scaffolds offline.
+No external APIs: a deterministic task suite so the evaluator can score
+scaffolds offline. The lookup KB lives in ``tools.py`` (copied into the
+candidate subprocess); this module is parent-only and is not on the
+candidate's filesystem.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 
 @dataclass(frozen=True)
@@ -17,41 +18,6 @@ class Task:
     answer: str
     # Hints for the README / humans — not passed to the agent.
     notes: str = ""
-
-
-# Entity facts used by the lookup tool.
-KB: dict[str, dict[str, Any]] = {
-    "paris": {"country": "france", "population_m": 2.1, "river": "seine"},
-    "france": {"capital": "paris", "currency": "euro", "neighbor": "germany"},
-    "berlin": {"country": "germany", "population_m": 3.6, "river": "spree"},
-    "germany": {"capital": "berlin", "currency": "euro", "neighbor": "france"},
-    "tokyo": {"country": "japan", "population_m": 14.0, "river": "sumida"},
-    "japan": {"capital": "tokyo", "currency": "yen", "neighbor": "korea"},
-    "cairo": {"country": "egypt", "population_m": 10.0, "river": "nile"},
-    "egypt": {"capital": "cairo", "currency": "pound", "neighbor": "libya"},
-    "ottawa": {"country": "canada", "population_m": 1.0, "river": "ottawa"},
-    "canada": {"capital": "ottawa", "currency": "cad", "neighbor": "usa"},
-}
-
-# Keyword → entity for the search tool.
-SEARCH_INDEX: dict[str, str] = {
-    "paris": "paris",
-    "france": "france",
-    "french capital": "paris",
-    "berlin": "berlin",
-    "germany": "germany",
-    "tokyo": "tokyo",
-    "japan": "japan",
-    "cairo": "cairo",
-    "egypt": "egypt",
-    "ottawa": "canada",
-    "canada": "canada",
-    "seine": "paris",
-    "spree": "berlin",
-    "nile": "cairo",
-    "yen": "japan",
-    "euro france": "france",
-}
 
 
 TASKS: list[Task] = [
