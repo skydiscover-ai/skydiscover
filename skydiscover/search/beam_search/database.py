@@ -76,7 +76,7 @@ class BeamSearchDatabase(ProgramDatabase):
         # Now call super().__init__() which may trigger load()
         super().__init__(name, config)
 
-        logger.info(
+        logger.debug(
             f"BeamSearchDatabase initialized: width={self.beam_width}, "
             f"strategy={self.selection_strategy}, diversity_weight={self.diversity_weight}"
         )
@@ -326,7 +326,7 @@ class BeamSearchDatabase(ProgramDatabase):
         top_programs = self.get_top_programs(n + 1)
         other_context_programs = [p for p in top_programs if p.id != parent.id][:n]
 
-        logger.info(
+        logger.debug(
             f"Beam search: selected parent {parent.id} (depth={self.depth.get(parent.id, 0)}, "
             f"score={self._get_program_score(parent):.4f}), "
             f"beam_size={len(self.beam)}, other_context_programs={len(other_context_programs)}"
@@ -504,7 +504,7 @@ class BeamSearchDatabase(ProgramDatabase):
     def log_status(self) -> None:
         """Log the status of the beam search database."""
         stats = self.get_search_stats()
-        logger.info(
+        logger.debug(
             f"BeamSearchDatabase status: {stats['total_programs']} programs, "
             f"beam_size={stats['beam_size']}, max_depth={stats['max_depth_reached']}, "
             f"expansions={stats['total_expansions']}"
@@ -513,9 +513,9 @@ class BeamSearchDatabase(ProgramDatabase):
         # Log beam contents
         if self.beam:
             beam_progs = self.get_beam_programs()
-            logger.info("Current beam:")
+            logger.debug("Current beam:")
             for i, prog in enumerate(beam_progs[:5]):  # Show top 5
-                logger.info(
+                logger.debug(
                     f"  {i+1}. {prog.id}: score={self._get_program_score(prog):.4f}, "
                     f"depth={self.depth.get(prog.id, 0)}"
                 )
@@ -566,7 +566,7 @@ class BeamSearchDatabase(ProgramDatabase):
         with open(os.path.join(save_path, "metadata.json"), "w") as f:
             json.dump(metadata, f, indent=2)
 
-        logger.info(
+        logger.debug(
             f"Saved BeamSearchDatabase with {len(self.programs)} programs, "
             f"beam_size={len(self.beam)} to {save_path}"
         )
@@ -599,7 +599,7 @@ class BeamSearchDatabase(ProgramDatabase):
             saved_stats = metadata.get("stats", {})
             self.stats.update(saved_stats)
 
-            logger.info(
+            logger.debug(
                 f"Loaded metadata: last_iteration={self.last_iteration}, "
                 f"beam_size={len(self.beam)}"
             )
@@ -622,7 +622,7 @@ class BeamSearchDatabase(ProgramDatabase):
         # Validate and reconstruct beam if needed
         self._validate_and_reconstruct_beam()
 
-        logger.info(f"Loaded BeamSearchDatabase with {len(self.programs)} programs from {path}")
+        logger.debug(f"Loaded BeamSearchDatabase with {len(self.programs)} programs from {path}")
         self.log_status()
 
     def _validate_and_reconstruct_beam(self) -> None:
@@ -648,15 +648,15 @@ class BeamSearchDatabase(ProgramDatabase):
         # Reconstruct depth for programs missing it
         missing_depth = [pid for pid in self.programs if pid not in self.depth]
         if missing_depth:
-            logger.info(f"Reconstructing depth for {len(missing_depth)} programs")
+            logger.debug(f"Reconstructing depth for {len(missing_depth)} programs")
             self._reconstruct_depths()
 
         # If beam is empty but we have programs, reconstruct beam from top programs
         if not self.beam and self.programs:
-            logger.info("Beam is empty, reconstructing from top programs")
+            logger.debug("Beam is empty, reconstructing from top programs")
             top_programs = self.get_top_programs(self.beam_width)
             self.beam = {p.id for p in top_programs}
-            logger.info(f"Reconstructed beam with {len(self.beam)} programs")
+            logger.debug(f"Reconstructed beam with {len(self.beam)} programs")
 
     def _reconstruct_depths(self) -> None:
         """

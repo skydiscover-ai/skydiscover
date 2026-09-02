@@ -1,0 +1,54 @@
+# Tuned defaults for the AlphaEvolve backend.
+# Applied when no user config (-c) overrides these values.
+#
+# Required fields (project_id, engine_id) must be provided by the user via an
+# `alphaevolve:` section in their own config file (-c) or via the
+# ALPHAEVOLVE_* environment variables, which take precedence. They are
+# commented out here to avoid committing real GCP credentials.
+
+alphaevolve:
+  # ---- Required GCP settings ------------------------------------------------
+  # Your GCP project ID. Must have the Discovery Engine API enabled.
+  # project_id: "your-gcp-project-id"
+
+  # The Discovery Engine engine ID for your AlphaEvolve instance.
+  # engine_id: "your-engine-id"
+
+  # ---- Optional GCP settings ------------------------------------------------
+  # GCP location for the Discovery Engine resources.
+  location: "global"
+
+  # Discovery Engine collection ID.
+  collection: "default_collection"
+
+  # Discovery Engine assistant ID.
+  assistant: "default_assistant"
+
+  # Path to a GCP service-account JSON file. Overrides ambient ADC.
+  # Supports ${VAR} env-var expansion (e.g., ${HOME}/.config/sa.json).
+  # credentials_file: "/path/to/service-account.json"
+
+  # ---- Worker settings -------------------------------------------------------
+  # Number of concurrent sampling workers that poll for new candidates.
+  num_samplers: 1
+
+  # Number of concurrent evaluation workers.
+  # 1 (the default) runs the evaluator inline on the event loop, which blocks
+  # sampling while an evaluation is in flight. That is fine for fast
+  # evaluators, and required by evaluators that use signal.alarm (main thread
+  # only). Use more than 1 for slow evaluators such as compile/benchmark
+  # loops, where inline evaluation can starve the samplers and let candidate
+  # lock tokens expire.
+  num_evaluators: 1
+
+  # ---- Experiment settings ---------------------------------------------------
+  # Experiment title. Auto-derived from skydiscover config if not set.
+  # title: "My AlphaEvolve Experiment"
+
+  # Problem description for the experiment. Auto-derived from system_prompt if not set.
+  # problem_description: "Evolve the program to maximize score."
+
+  # ---- Timeout settings ------------------------------------------------------
+  # Seconds of inactivity (no new candidates, empty queue) before the controller
+  # loop exits early. Set to 0 to disable.
+  idle_timeout_s: 120
