@@ -1,13 +1,20 @@
-"""Post-NAS microbenchmark: evolve MLP topologies, train with NumPy SGD."""
+"""Post-NAS microbenchmark: evolve MLP topologies, train with NumPy SGD.
+
+``build_architecture`` runs in a subprocess so the candidate cannot rewrite
+this module's globals or ``evaluate`` closure cells.
+"""
 
 from __future__ import annotations
 
-import copy
-import importlib.util
+import json
 import math
 import os
+import subprocess
+import sys
+import tempfile
 import time
 import traceback
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -22,6 +29,67 @@ STEPS = 120
 BATCH = 32
 LR = 0.15
 SEED = 0
+_CANDIDATE_TIMEOUT_S = 20.0
+
+_WORKER_SOURCE = r"""
+import importlib.util
+import json
+import os
+import sys
+import traceback
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+os.chdir(HERE)
+sys.path[:] = [HERE] + [
+    p for p in sys.path if p not in ("", ".") and os.path.abspath(p) != HERE
+]
+sys.stdout = sys.stderr
+
+
+def _jsonify(obj):
+    if isinstance(obj, dict):
+        return {str(k): _jsonify(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_jsonify(v) for v in obj]
+    if isinstance(obj, (bool, int, float, str)) or obj is None:
+        return obj
+    if hasattr(obj, "item"):
+        return obj.item()
+    raise TypeError(f"architecture is not JSON-serializable: {type(obj)!r}")
+
+
+def main():
+    spec = importlib.util.spec_from_file_location(
+        "candidate_arch", os.path.join(HERE, "candidate.py")
+    )
+    if spec is None or spec.loader is None:
+        raise ImportError("cannot load candidate")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    if not hasattr(module, "build_architecture"):
+        raise AttributeError("program must define build_architecture(...)")
+    req = json.loads(sys.stdin.read())
+    arch = module.build_architecture(req["input_dim"], req["num_classes"])
+    json.dump({"arch": _jsonify(arch)}, sys.__stdout__)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as exc:
+        json.dump(
+            {"error": f"{type(exc).__name__}: {exc}", "traceback": traceback.format_exc()},
+            sys.__stdout__,
+        )
+        sys.exit(1)
+"""
+
+
+def _clean_env(workdir: str) -> dict[str, str]:
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+    env["PWD"] = workdir
+    return env
 
 
 def _make_dataset(n: int, rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
@@ -210,25 +278,40 @@ def _train_eval(
     return {"accuracy": acc, "n_params": float(n_params), "complexity": complexity}
 
 
-def _load_builder(program_path: str):
-    spec = importlib.util.spec_from_file_location("candidate_arch", program_path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"cannot load {program_path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    if not hasattr(module, "build_architecture"):
-        raise AttributeError("program must define build_architecture(...)")
-    return module.build_architecture
+def _load_architecture(program_path: str, input_dim: int, num_classes: int) -> list[dict[str, Any]]:
+    """Run ``build_architecture`` in a subprocess; return a JSON-decoded copy."""
+    source = Path(program_path).read_text(encoding="utf-8")
+    with tempfile.TemporaryDirectory(prefix="skydiscover_nas_") as td:
+        Path(td, "candidate.py").write_text(source, encoding="utf-8")
+        Path(td, "worker.py").write_text(_WORKER_SOURCE, encoding="utf-8")
+        proc = subprocess.run(
+            [sys.executable, "-u", os.path.join(td, "worker.py")],
+            cwd=td,
+            input=json.dumps({"input_dim": input_dim, "num_classes": num_classes}),
+            capture_output=True,
+            text=True,
+            timeout=_CANDIDATE_TIMEOUT_S,
+            env=_clean_env(td),
+            check=False,
+        )
+    if not proc.stdout.strip():
+        raise RuntimeError(f"candidate worker produced no output: {proc.stderr[-2000:]}")
+    msg = json.loads(proc.stdout)
+    if "error" in msg:
+        raise RuntimeError(msg["error"])
+    arch = msg.get("arch")
+    if not isinstance(arch, list):
+        raise TypeError("build_architecture must return a list")
+    return arch
 
 
 def _make_evaluate(validate_fn, train_eval_fn, input_dim: int, num_classes: int):
-    """Close over trusted helpers so sys.modules rebinds cannot hijack scoring."""
+    """Close over trusted helpers so in-process rebinds cannot hijack scoring."""
 
     def evaluate(program_path: str) -> dict[str, Any]:
         t0 = time.time()
         try:
-            builder = _load_builder(program_path)
-            arch = copy.deepcopy(builder(input_dim, num_classes))
+            arch = _load_architecture(program_path, input_dim, num_classes)
             validate_fn(arch)
             metrics = train_eval_fn(arch)
             combined = 0.85 * metrics["accuracy"] + 0.15 * max(0.0, 1.0 - metrics["complexity"])
