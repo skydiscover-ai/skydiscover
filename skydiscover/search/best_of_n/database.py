@@ -29,7 +29,7 @@ class BestOfNDatabase(ProgramDatabase):
         self.current_parent_id: Optional[str] = None
         self.parent_iteration_count: int = 0
 
-        logger.info(f"BestOfNDatabase initialized: N={self.n}")
+        logger.debug(f"BestOfNDatabase initialized: N={self.n}")
 
     def add(self, program: Program, iteration: Optional[int] = None, **kwargs) -> str:
         """
@@ -94,7 +94,7 @@ class BestOfNDatabase(ProgramDatabase):
             self.current_parent_id = parent.id
             self.parent_iteration_count = 0
 
-            logger.info(
+            logger.debug(
                 f"Best-of-N: sampled new parent {parent.id} (score={safe_score(parent):.4f})"
             )
         else:

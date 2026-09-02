@@ -162,7 +162,7 @@ def _build_gepa_config(config: Config, iterations: int):
                 provider, bare_name, _, _ = _parse_model_spec(secondary.name)
                 refiner_kwargs["refiner_lm"] = f"{provider}/{bare_name}"
 
-            logger.info(
+            logger.debug(
                 "GEPA model mapping: reflection_lm='%s', refiner_lm='%s'",
                 primary.name,
                 secondary.name,
@@ -174,7 +174,7 @@ def _build_gepa_config(config: Config, iterations: int):
                     len(config.llm.models) - 2,
                 )
         else:
-            logger.info(
+            logger.debug(
                 "GEPA model mapping: reflection_lm='%s' (also used as refiner_lm)",
                 primary.name,
             )
@@ -260,10 +260,10 @@ async def run(
             else:
                 system_prompt = (system_prompt or "") + "\n\n## Human Guidance\n" + feedback
             feedback_reader.set_current_prompt(system_prompt)
-            logger.info(
+            logger.debug(
                 f"Human feedback applied to GEPA background ({len(feedback)} chars, mode={feedback_reader.mode})"
             )
-            logger.info("Note: GEPA runs synchronously; feedback is applied once at startup.")
+            logger.debug("Note: GEPA runs synchronously; feedback is applied once at startup.")
 
     # Log to file so screen output is captured
     log_dir = os.path.join(output_dir, "logs")

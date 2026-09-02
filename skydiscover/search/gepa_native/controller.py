@@ -73,7 +73,7 @@ class GEPANativeController(DiscoveryController):
         self._merge_attempts_used: int = 0
         self._merge_pairs_tried: Set[Tuple[str, str]] = set()
 
-        logger.info(
+        logger.debug(
             f"GEPANativeController initialized: "
             f"acceptance_gating={self.acceptance_gating}, "
             f"use_merge={self.use_merge}, "
@@ -258,7 +258,7 @@ class GEPANativeController(DiscoveryController):
             child = Program.from_dict(result.child_program_dict)
             self.database.add_rejected(child)
 
-            logger.info(
+            logger.debug(
                 f"Iteration {iteration}: REJECTED child "
                 f"(child_score={child_score:.4f} <= parent_score={parent_score:.4f})"
             )
@@ -312,7 +312,7 @@ class GEPANativeController(DiscoveryController):
         score_a = get_score(prog_a.metrics)
         score_b = get_score(prog_b.metrics)
 
-        logger.info(
+        logger.debug(
             f"Iteration {iteration}: Attempting merge "
             f"(stagnation={self._iterations_without_improvement}, "
             f"attempt={self._merge_attempts_used}/{self.max_merge_attempts}, "
@@ -354,7 +354,7 @@ class GEPANativeController(DiscoveryController):
             return
 
         merged_score = get_score(eval_result.metrics)
-        logger.info(
+        logger.debug(
             f"Iteration {iteration}: Merge completed"
             f" (llm: {llm_generation_time:.2f}s,"
             f" eval: {eval_time:.2f}s)"
@@ -389,7 +389,7 @@ class GEPANativeController(DiscoveryController):
                 responses=[llm_response],  # already str via .text extraction above
             )
 
-            logger.info(
+            logger.debug(
                 f"Merge ACCEPTED: score={merged_score:.4f} "
                 f"(>= max({score_a:.4f}, {score_b:.4f}))"
             )
@@ -409,7 +409,7 @@ class GEPANativeController(DiscoveryController):
                         f"Monitor callback failed: {e}"
                     )  # Never crash discovery due to monitor
         else:
-            logger.info(
+            logger.debug(
                 f"Merge REJECTED: score={merged_score:.4f} " f"< max({score_a:.4f}, {score_b:.4f})"
             )
             # Stagnation counter NOT reset on rejected merge

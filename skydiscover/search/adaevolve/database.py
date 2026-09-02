@@ -270,7 +270,7 @@ class AdaEvolveDatabase(ProgramDatabase):
         # Last sampling mode (stashed by sample() for the controller to read)
         self._last_sampling_mode: Optional[str] = None
 
-        logger.info(
+        logger.debug(
             f"AdaEvolveDatabase initialized: "
             f"num_islands={self.num_islands}, "
             f"decay={self.decay}, "
@@ -379,7 +379,7 @@ class AdaEvolveDatabase(ProgramDatabase):
             program: The initial/seed program to copy to all islands
             iteration: Current iteration (for tracking)
         """
-        logger.info(f"Seeding all {self.num_islands} islands with initial program")
+        logger.debug(f"Seeding all {self.num_islands} islands with initial program")
 
         for island_idx in range(self.num_islands):
             if island_idx == 0:
@@ -399,7 +399,7 @@ class AdaEvolveDatabase(ProgramDatabase):
                 )
                 self.add(copy, iteration=iteration, target_island=island_idx)
 
-        logger.info(
+        logger.debug(
             f"All islands seeded. Island sizes: "
             f"{[self.get_island_size(i) for i in range(self.num_islands)]}"
         )
@@ -792,7 +792,7 @@ class AdaEvolveDatabase(ProgramDatabase):
         # Periodic migration (can be disabled for ablation)
         if self.use_migration and iteration > 0 and iteration % self.migration_interval == 0:
             self._migrate()
-            logger.info(f"Migration completed at iteration {iteration}")
+            logger.debug(f"Migration completed at iteration {iteration}")
 
     def _migrate(self) -> None:
         """
@@ -1290,7 +1290,7 @@ class AdaEvolveDatabase(ProgramDatabase):
 
             json.dump(metadata, f, indent=2, cls=SafeJSONEncoder)
 
-        logger.info(f"Saved AdaEvolve state to {save_path}")
+        logger.debug(f"Saved AdaEvolve state to {save_path}")
 
     def load(self, path: str) -> None:
         """
@@ -1335,7 +1335,7 @@ class AdaEvolveDatabase(ProgramDatabase):
 
         # Handle dynamic island count - may need to expand
         if saved_num_islands > self.num_islands:
-            logger.info(
+            logger.debug(
                 f"Checkpoint has {saved_num_islands} islands, " f"expanding from {self.num_islands}"
             )
             self._expand_to_island_count(saved_num_islands, metadata)
@@ -1401,7 +1401,7 @@ class AdaEvolveDatabase(ProgramDatabase):
                         self.islands[island_idx].append(self.programs[pid])
 
         self._invalidate_global_pareto_cache()
-        logger.info(
+        logger.debug(
             f"Loaded AdaEvolve state from {path}: "
             f"{self.num_islands} islands, {len(self.programs)} programs, "
             f"unified_archive={self.use_unified_archive}"
@@ -1431,7 +1431,7 @@ class AdaEvolveDatabase(ProgramDatabase):
                     self.islands[island_idx].append(program)
 
         self._invalidate_global_pareto_cache()
-        logger.info(f"Distributed {len(programs_list)} programs across {self.num_islands} islands")
+        logger.debug(f"Distributed {len(programs_list)} programs across {self.num_islands} islands")
 
     def _expand_to_island_count(self, target_count: int, metadata: Dict[str, Any]) -> None:
         """
@@ -2033,7 +2033,7 @@ class AdaEvolveDatabase(ProgramDatabase):
         if global_productivity >= self.spawn_productivity_threshold:
             return False
 
-        logger.info(
+        logger.debug(
             f"Spawn conditions met: global_productivity={global_productivity:.3f} "
             f"< threshold={self.spawn_productivity_threshold}, "
             f"islands={self.num_islands}/{self.max_islands}"
@@ -2097,7 +2097,7 @@ class AdaEvolveDatabase(ProgramDatabase):
         self.num_islands += 1
         self.last_spawn_iteration = self._iteration_count
 
-        logger.info(
+        logger.debug(
             f"Spawned new island {new_island_idx} with config '{config_name}' "
             f"(total islands: {self.num_islands}/{self.max_islands})"
         )

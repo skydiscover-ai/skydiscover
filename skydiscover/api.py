@@ -15,7 +15,7 @@ Quick-start::
     result = run_discovery(
         evaluator="examples/my_problem/eval.py",
         initial_program="examples/my_problem/init.py",  # optional
-        model="gpt-5",
+        model="openai/gpt-5",  # or "gemini/gemini-3-pro", "anthropic/claude-3-sonnet", etc.
         iterations=50,
     )
     print(result.best_score, result.best_solution)
@@ -74,7 +74,7 @@ def run_discovery(
         evaluator: File path or callable (program_path) -> metrics_dict.
         initial_program: File path or inline source code (string / list of lines).
             Optional — when omitted the LLM generates a solution from scratch.
-        model: Model name(s), comma-separated. e.g. "gpt-5" or "gpt-5,gemini/gemini-3-pro".
+        model: Model name(s), comma-separated. e.g. "openai/gpt-5" or "gemini/gemini-3-pro".
         iterations: Max iterations (overrides config).
         search: Algorithm name ("topk", "adaevolve", "evox", "openevolve_native", etc.).
         config: YAML path, Config object, or None for defaults.

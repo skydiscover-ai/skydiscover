@@ -60,7 +60,7 @@ class DefaultContextBuilder(ContextBuilder):
         """
         self.system_template_override = system_template
         self.user_template_override = user_template
-        logger.info(f"Templates set: system={system_template}, user={user_template}")
+        logger.debug(f"Templates set: system={system_template}, user={user_template}")
 
     # ------------------------------------------------------------------
     # Main Prompt Builder
@@ -228,6 +228,21 @@ class DefaultContextBuilder(ContextBuilder):
 
         return "".join(lines)
 
+    def _db_config(self):
+        return getattr(self.config.search, "database", None)
+
+    def _is_multiobjective_enabled(self) -> bool:
+        return bool(getattr(self._db_config(), "pareto_objectives", None) or [])
+
+    def _objective_descriptions(self) -> List[str]:
+        db_config = self._db_config()
+        higher_is_better = getattr(db_config, "higher_is_better", None) or {}
+        descriptions = []
+        for objective in getattr(db_config, "pareto_objectives", None) or []:
+            direction = "maximize" if higher_is_better.get(objective, True) else "minimize"
+            descriptions.append(f"{objective} ({direction})")
+        return descriptions
+
     def _identify_improvement_areas(
         self,
         current_program: str,
@@ -236,6 +251,14 @@ class DefaultContextBuilder(ContextBuilder):
     ) -> str:
         """Generate bullet points: score trend vs previous attempt, simplification hint."""
         improvement_areas = []
+
+        if self._is_multiobjective_enabled():
+            improvement_areas.append(
+                "Focus on Pareto trade-offs across: " + ", ".join(self._objective_descriptions())
+            )
+            for objective in getattr(self._db_config(), "pareto_objectives", None) or []:
+                if objective in metrics and isinstance(metrics[objective], (int, float)):
+                    improvement_areas.append(f"Current {objective}: {metrics[objective]:.4f}")
 
         current_score = metrics.get("combined_score", 0.0)
         if not isinstance(current_score, (int, float)):
@@ -268,7 +291,7 @@ class DefaultContextBuilder(ContextBuilder):
         threshold = self.context_config.suggest_simplification_after_chars
         if threshold and len(current_program) > threshold:
             improvement_areas.append(
-                f"Consider simplifying - solution length exceeds {threshold} characters"
+                f"Solution is long (>{threshold} chars); consider simplifying while preserving quality"
             )
 
         if not improvement_areas:

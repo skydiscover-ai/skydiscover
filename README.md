@@ -1,7 +1,9 @@
 <h1 align="center">
-  <img src="assets/logo_vector.png" height="80" alt="SkyDiscover logo" style="vertical-align: middle;">&nbsp;
-
-  <b>SkyDiscover</b>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/lockup-dark-bg.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/lockup-light-bg.svg">
+    <img src="assets/lockup-light-bg.svg" height="80" alt="SkyDiscover logo" style="vertical-align: middle;">
+  </picture>&nbsp;
 </h1>
 
 
@@ -29,7 +31,7 @@ See the getting started page for quickstart guides for each.
 ## SkyDiscover Optimize
 
 <p align="center">
-  <img src="assets/architecture.png" width="720" alt="SkyDiscover architecture"><br>
+  <img src="assets/architecture.png" width="720" alt="SkyDiscover Optimize architecture"><br>
 </p>
 
 **SkyDiscover Optimize** is a modular framework for AI-driven scientific and algorithmic discovery, providing a unified interface for implementing, running, and fairly comparing discovery algorithms across 200+ optimization tasks.
@@ -42,7 +44,9 @@ Get started with our [quick start guide here](link-to-quickstart).
 
 ## SkyDiscover Synthesize
 
-![Test-Driven Synthesis](assets/test_driven_synthesis.png)
+<p align="center">
+<img width="870" height="376" alt="SkyDiscover Synthesize Architecture" src="https://github.com/user-attachments/assets/285cee92-3eba-47b3-a8b8-fcfee586afcc" />
+</p>
 
 **SkyDiscover Synthesize** is a set of tooling that enables full, end-to-end synthesis of compliant and highly-performant systems, such as LLM inference systems, model routing, or key-value stores. 
 

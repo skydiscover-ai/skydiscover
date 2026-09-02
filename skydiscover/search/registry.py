@@ -93,7 +93,7 @@ def get_program(
     search_type = config.search.type
 
     if search_type == "evox" and getattr(config.search.database, "database_file_path", None):
-        logger.info(f"Using search strategy from: {config.search.database.database_file_path}")
+        logger.debug(f"Using search strategy from: {config.search.database.database_file_path}")
         _, program_class = load_database_from_file(config.search.database.database_file_path)
         return program_class(
             id=initial_program_id,

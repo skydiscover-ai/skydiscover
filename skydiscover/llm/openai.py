@@ -106,7 +106,7 @@ class OpenAILLM(LLMInterface):
                 provider = "Mistral"
             else:
                 provider = "OpenAI"
-            logger.info(f"{provider} LLM: {self.model}")
+            logger.debug(f"{provider} LLM: {self.model}")
             logger._initialized_models.add(self.model)
 
     async def generate(
@@ -239,7 +239,7 @@ class OpenAILLM(LLMInterface):
             # Fall back transparently when Chat Completions is unsupported.
             if "unsupported" not in str(exc).lower() and "not found" not in str(exc).lower():
                 raise
-            logger.info("Chat Completions unsupported; falling back to Responses API")
+            logger.debug("Chat Completions unsupported; falling back to Responses API")
             return await self._call_api_via_responses(params)
 
     async def _call_api_via_responses(self, params: Dict[str, Any]) -> str:
@@ -334,7 +334,7 @@ class OpenAILLM(LLMInterface):
                     image_path = os.path.join(output_dir, fname)
                     with open(image_path, "wb") as f:
                         f.write(base64.b64decode(image_b64))
-                    logger.info(f"Image saved: {image_path}")
+                    logger.debug(f"Image saved: {image_path}")
 
                 return LLMResponse(text=text, image_path=image_path)
 
