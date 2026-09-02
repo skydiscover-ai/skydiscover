@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import sys
 import textwrap
 from pathlib import Path
@@ -48,6 +47,57 @@ CHEAT_PROGRAM = textwrap.dedent(
     """
 )
 
+FRAME_WALK_CHEAT = textwrap.dedent(
+    """\
+    import numpy as np
+    import sys
+
+    def design_experiments(budget, n_features, rng):
+        return rng.uniform(-2.0, 2.0, size=(budget, n_features))
+
+    def fit_hypothesis(x, y):
+        def predict(z):
+            frame = sys._getframe()
+            while frame is not None:
+                loc = frame.f_locals
+                fn = loc.get("true_function")
+                if callable(fn):
+                    return np.asarray(fn(z), dtype=np.float64)
+                frame = frame.f_back
+            return np.zeros(len(np.asarray(z)), dtype=np.float64)
+
+        return predict
+    """
+)
+
+DISK_READ_CHEAT = textwrap.dedent(
+    """\
+    import numpy as np
+    from pathlib import Path
+    import sys
+
+    def design_experiments(budget, n_features, rng):
+        return rng.uniform(-2.0, 2.0, size=(budget, n_features))
+
+    def _load_true_function():
+        mains = []
+        main = sys.modules.get("__main__")
+        if main is not None and getattr(main, "__file__", None):
+            mains.append(Path(main.__file__).resolve().parent / "world.py")
+        mains.append(Path.cwd() / "world.py")
+        for path in mains:
+            if path.is_file():
+                ns = {}
+                exec(path.read_text(), ns)
+                return ns["true_function"]
+        raise FileNotFoundError("world.py")
+
+    def fit_hypothesis(x, y):
+        fn = _load_true_function()
+        return lambda z: fn(z)
+    """
+)
+
 
 def test_evaluate_baseline_program():
     metrics = evaluate(str(ROOT / "initial_program.py"))
@@ -86,3 +136,18 @@ def test_world_is_not_importable_during_candidate_exec(tmp_path):
     assert metrics["combined_score"] == 0.0
     assert "error" in metrics
     assert "world" in metrics["error"].lower() or "World" in metrics.get("traceback", "")
+
+
+def test_frame_walk_cannot_read_true_function(tmp_path):
+    program = tmp_path / "frame_walk.py"
+    program.write_text(FRAME_WALK_CHEAT)
+    metrics = evaluate(str(program))
+    assert metrics["combined_score"] < 0.5
+    assert metrics.get("r2", 0.0) < 0.5
+
+
+def test_disk_read_of_world_py_does_not_score_perfect(tmp_path):
+    program = tmp_path / "disk_read.py"
+    program.write_text(DISK_READ_CHEAT)
+    metrics = evaluate(str(program))
+    assert metrics["combined_score"] < 0.5
