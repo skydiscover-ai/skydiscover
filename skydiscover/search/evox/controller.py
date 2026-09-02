@@ -79,6 +79,9 @@ class CoEvolutionController(DiscoveryController):
 
         self._switch_interval = getattr(self.config.search, "switch_interval", None)
         self._stagnant_count = 0
+        self._meta_evolution_failures = 0
+        self._guide_llm_available = True
+        self._meta_llm_available = True
         self._last_tracked_best_score: Optional[float] = None
 
         self._diverge_label = ""
@@ -96,6 +99,52 @@ class CoEvolutionController(DiscoveryController):
         self.search_outputs_dir = os.path.join(base_dir, "search")
         os.makedirs(self.search_outputs_dir, exist_ok=True)
 
+    async def _check_meta_llm_availability(self) -> None:
+        """Probe guide and meta-search LLM pools at startup and warn if unreachable."""
+        import asyncio
+
+        guide_pool = self.search_controller.guide_llms
+        meta_pool = self.search_controller.llms
+
+        guide_endpoint = guide_pool.models_cfg[0].api_base if guide_pool.models_cfg else "unknown"
+        meta_endpoint = meta_pool.models_cfg[0].api_base if meta_pool.models_cfg else "unknown"
+
+        guide_ok, meta_ok = await asyncio.gather(
+            guide_pool.check_availability(),
+            meta_pool.check_availability(),
+        )
+
+        self._guide_llm_available = guide_ok
+        self._meta_llm_available = meta_ok
+
+        if guide_ok and meta_ok:
+            logger.info(
+                "Meta-search LLM connectivity verified (guide: %s, meta: %s)",
+                guide_endpoint,
+                meta_endpoint,
+            )
+            return
+
+        if not guide_ok:
+            logger.warning(
+                "Guide LLM (label generation) at %s is not reachable. "
+                "Variation operator labels will fall back to generic defaults. "
+                "The meta-search can still evolve strategies, but without "
+                "problem-specific labels. To fix: set search.share_llm: true "
+                "to use the main discovery endpoint.",
+                guide_endpoint,
+            )
+
+        if not meta_ok:
+            logger.warning(
+                "Meta-search LLM (search strategy evolution) at %s is not "
+                "reachable. Search strategy evolution will be skipped; the "
+                "initial search algorithm will be used throughout the run. "
+                "Solution evolution is unaffected. To fix: set "
+                "search.share_llm: true to use the main discovery endpoint.",
+                meta_endpoint,
+            )
+
     async def run_discovery(
         self,
         start_iteration: int,
@@ -109,11 +158,14 @@ class CoEvolutionController(DiscoveryController):
 
         if self._switch_interval is None:
             self._switch_interval = max(1, int(max_iterations * self.DEFAULT_SWITCH_RATIO))
-            logger.info(f"Switch if {self._switch_interval} iterations of stagnation detected")
+            logger.debug(f"Switch if {self._switch_interval} iterations of stagnation detected")
 
         self.start_db_stats = self.database.get_statistics(
             improvement_threshold=self.DEFAULT_IMPROVEMENT_THRESHOLD
         )
+
+        # Check meta-search LLM availability before starting
+        await self._check_meta_llm_availability()
 
         # Set up search window and labels
         self._reset_search_window()
@@ -152,10 +204,26 @@ class CoEvolutionController(DiscoveryController):
 
                 # Co-evolve search strategy if needed (skip on final iteration)
                 if iteration < self.total_solution_iterations and self._should_evolve_search():
-                    logger.info(
+                    logger.debug(
                         f"Stagnation detected -> evolving search strategy (solution_iter={completed_solution_iter})"
                     )
-                    await self._evolve_search(completed_solution_iter)
+                    try:
+                        await self._evolve_search(completed_solution_iter)
+                    except Exception as e:
+                        # Meta-evolution is an optimization, not a correctness
+                        # requirement. If the meta-search LLM is unreachable,
+                        # keep the current search strategy and continue the run
+                        # rather than killing hours of solution evolution. Set
+                        # search.share_llm: true if the meta-search should use the
+                        # main process's (reachable) endpoint.
+                        logger.warning(
+                            "Search-strategy evolution failed (%s); continuing "
+                            "with the current strategy. Solution evolution is "
+                            "unaffected.",
+                            e,
+                            exc_info=True,
+                        )
+                        self._meta_evolution_failures += 1
 
             except Exception as e:
                 logger.error(f"Error in iteration {iteration}: {e}", exc_info=True)
@@ -169,10 +237,18 @@ class CoEvolutionController(DiscoveryController):
             await self._finalize_pending_search()
 
         logger.info(f"[SOLUTION EVOLUTION] Evolution completed: {self.database.name}")
+        if self._meta_evolution_failures:
+            logger.warning(
+                "Meta-search evolution failed %d time(s) during this run.",
+                self._meta_evolution_failures,
+            )
         return self.database.get_best_program()
 
     def _should_evolve_search(self) -> bool:
         """Check if it's time to evolve the search algorithm (stagnation-based)."""
+        if not self._meta_llm_available:
+            return False
+
         current = self._get_best_score()
 
         if self._last_tracked_best_score is None:
@@ -281,9 +357,14 @@ class CoEvolutionController(DiscoveryController):
 
             self._diverge_label = DEFAULT_DIVERGE_TEMPLATE
             self._refine_label = DEFAULT_REFINE_TEMPLATE
-            logger.info(
+            logger.debug(
                 "Using default variation operators (auto_generate_variation_operators=false)"
             )
+            self._assign_labels_to_db(self.database)
+            return
+
+        if not self._guide_llm_available:
+            logger.info("Skipping label generation (guide LLM unavailable at startup)")
             self._assign_labels_to_db(self.database)
             return
 
@@ -296,20 +377,25 @@ class CoEvolutionController(DiscoveryController):
             problem_dir = Path(self.evaluation_file).parent if self.evaluation_file else None
             label_llms = self.search_controller.guide_llms
             model_names = ", ".join(m.name for m in label_llms.models_cfg)
-            logger.info(f"Label generation: using guide_model = [{model_names}]")
+            logger.debug(f"Label generation: using guide_model = [{model_names}]")
             self._diverge_label, self._refine_label = await generate_variation_operators(
                 system_message,
                 evaluator_code,
                 problem_dir=problem_dir,
                 llm_pool=label_llms,
             )
-            logger.info(
+            logger.debug(
                 f"Generated variation operator labels ({len(self._diverge_label)}/{len(self._refine_label)} chars)"
             )
         except Exception as e:
             self._diverge_label = ""
             self._refine_label = ""
-            logger.error(f"Label generation failed: {e}, setting labels to empty strings")
+            logger.warning(
+                "Guide LLM unreachable during label generation (%s); using "
+                "default variation operators. Meta-search evolution is "
+                "unaffected.",
+                e,
+            )
 
         self._assign_labels_to_db(self.database)
 
@@ -341,6 +427,7 @@ class CoEvolutionController(DiscoveryController):
                 result,
                 solution_iter,
             )
+            self._meta_evolution_failures += 1
             self._num_search_evolutions += 1
             return
 
@@ -364,6 +451,7 @@ class CoEvolutionController(DiscoveryController):
                 solution_iter,
                 "validation",
             )
+            self._meta_evolution_failures += 1
             self._num_search_evolutions += 1
             return
 
@@ -425,7 +513,7 @@ class CoEvolutionController(DiscoveryController):
             self.database = new_db
             if self.evaluator.llm_judge:
                 self.evaluator.llm_judge.database = new_db
-            logger.info(
+            logger.debug(
                 f"Switched to search algorithm {search_program_id} ({migrated_count} programs migrated)"
             )
 
@@ -493,11 +581,13 @@ class CoEvolutionController(DiscoveryController):
         return migrated
 
     def _get_best_score(self) -> float:
-        """Get the current best solution score (combined_score metric)."""
+        """Get the current best solution score (proxy / combined_score)."""
 
         best = self.database.get_best_program()
 
         if best and best.metrics:
+            if getattr(self.database, "is_multiobjective_enabled", lambda: False)():
+                return float(self.database._proxy_score(best))
             score = best.metrics.get("combined_score")
             return float(score) if isinstance(score, (int, float)) else 0.0
         return getattr(self.database, "initial_program_score", None) or 0.0
@@ -568,7 +658,7 @@ class CoEvolutionController(DiscoveryController):
 
         is_new_best = self._best_search_score is not None and score > self._best_search_score
         if is_new_best:
-            logger.info(
+            logger.debug(
                 f"New best search score: {score:.6f} (+{score - self._best_search_score:.6f})"
             )
         if is_new_best or self._best_search_score is None:
@@ -576,16 +666,16 @@ class CoEvolutionController(DiscoveryController):
         return is_new_best
 
     def _log_coevolution_setup(self, db_cfg) -> None:
-        logger.info("=" * 70)
-        logger.info("[EVOX CO-EVOLUTION SETUP]")
-        logger.info("-" * 70)
-        logger.info(f"  [SOLUTION EVOLUTION]")
-        logger.info(f"    Initial search strategy file : {db_cfg.database_file_path}")
-        logger.info(f"    Solution database class      : {self.database.__class__.__name__}")
-        logger.info(f"  [META EVOLUTION OF SEARCH STRATEGY]")
-        logger.info(
+        logger.debug("=" * 70)
+        logger.debug("[EVOX CO-EVOLUTION SETUP]")
+        logger.debug("-" * 70)
+        logger.debug(f"  [SOLUTION EVOLUTION]")
+        logger.debug(f"    Initial search strategy file : {db_cfg.database_file_path}")
+        logger.debug(f"    Solution database class      : {self.database.__class__.__name__}")
+        logger.debug(f"  [META EVOLUTION OF SEARCH STRATEGY]")
+        logger.debug(
             f"    Search strategy database class: {self.search_controller.database.__class__.__name__}"
         )
-        logger.info(f"    Search strategy evaluator     : {db_cfg.evaluation_file}")
-        logger.info(f"    Search strategy config        : {db_cfg.config_path}")
-        logger.info("=" * 70)
+        logger.debug(f"    Search strategy evaluator     : {db_cfg.evaluation_file}")
+        logger.debug(f"    Search strategy config        : {db_cfg.config_path}")
+        logger.debug("=" * 70)

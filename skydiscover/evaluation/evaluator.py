@@ -50,7 +50,7 @@ class Evaluator:
         self.env_vars = dict(env_vars or {})
 
         self._load_evaluation_function()
-        logger.info(f"Initialized evaluator with {self.evaluation_file}")
+        logger.debug(f"Initialized evaluator with {self.evaluation_file}")
 
     # ------------------------------------------------------------------
     # Module loading
@@ -148,7 +148,7 @@ class Evaluator:
                         eval_result.artifacts.update(llm_result.artifacts)
 
                 elapsed = time.time() - start_time
-                logger.info(
+                logger.debug(
                     f"Evaluated program{label} in {elapsed:.2f}s: {format_metrics(eval_result.metrics)}"
                 )
                 return eval_result

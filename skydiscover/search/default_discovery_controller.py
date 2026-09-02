@@ -97,7 +97,7 @@ class DiscoveryController:
             from skydiscover.llm.agentic_generator import AgenticGenerator
 
             self.agentic_generator = AgenticGenerator(self.llms, self.config.agentic)
-            logger.info(f"Agentic mode enabled (codebase: {self.config.agentic.codebase_root})")
+            logger.debug(f"Agentic mode enabled (codebase: {self.config.agentic.codebase_root})")
 
         self.num_context_programs = controller_input.config.search.num_context_programs
 
@@ -109,7 +109,7 @@ class DiscoveryController:
         # the LLM knows what problem to solve (especially for from-scratch).
         self._inject_evaluator_context()
 
-        logger.info(
+        logger.debug(
             f"DiscoveryController initialized: num_context_programs={self.num_context_programs}"
         )
 
@@ -279,7 +279,7 @@ class DiscoveryController:
         pending: set = set()
         last_result: Optional[SerializableResult] = None
 
-        logger.info(
+        logger.debug(
             f"Parallel discovery: up to {max_parallel} iterations in flight "
             f"({start_iteration}..{total_iterations - 1})"
         )
@@ -502,7 +502,7 @@ class DiscoveryController:
                 )
 
                 if failed_attempts:
-                    logger.info(
+                    logger.debug(
                         f"Retry {retry + 1}/{retry_times}: rebuilding prompt with {len(failed_attempts)} failed attempt(s)"
                     )
 
@@ -961,7 +961,7 @@ class DiscoveryController:
 
         if iteration > 0 and iteration % self.config.checkpoint_interval == 0:
             if verbose:
-                logger.info(f"[CHECKPOINT] Checkpoint interval reached at iteration {iteration}")
+                logger.debug(f"Checkpoint interval reached at iteration {iteration}")
 
             self.database.log_status()
             if checkpoint_callback:
@@ -973,7 +973,7 @@ class DiscoveryController:
                     f"{k}={v:.4f}" if isinstance(v, (int, float)) else f"{k}={v}"
                     for k, v in child_program.metrics.items()
                 )
-                logger.info(f"Metrics: {metrics_str}")
+                logger.debug(f"Metrics: {metrics_str}")
 
             if not hasattr(self, "_warned_about_combined_score"):
                 self._warned_about_combined_score = False

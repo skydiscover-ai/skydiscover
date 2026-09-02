@@ -16,7 +16,12 @@ class EvolvedProgram(Program):
 
 
 class EvolvedProgramDatabase(ProgramDatabase):
-    """Initial search strategy database."""
+    """Initial search strategy database.
+
+    When ``config.pareto_objectives`` is set, sampling prefers members of the
+    global Pareto front (issue #42) while still mixing in non-front programs
+    for exploration. Scalar mode keeps the original uniform random sample.
+    """
 
     def __init__(self, name: str, config: DatabaseConfig):
         super().__init__(name, config)
@@ -44,19 +49,37 @@ class EvolvedProgramDatabase(ProgramDatabase):
         self, num_context_programs: Optional[int] = 4, **kwargs
     ) -> Tuple[Dict[str, EvolvedProgram], Dict[str, List[EvolvedProgram]]]:
         """
-        Picks a random parent and set of context programs.
+        Picks a parent and set of context programs.
+
+        Multiobjective: parent is drawn from the Pareto front when available;
+        context mixes front members with the broader population.
         """
         candidates = list(self.programs.values())
 
         if len(candidates) == 0:
             raise ValueError("No candidates available for sampling")
 
-        parent = random.choice(candidates)
+        front: List[EvolvedProgram] = []
+        if self.is_multiobjective_enabled():
+            front = [p for p in self.get_pareto_front() if p.id in self.programs]
 
-        sample_size = min(num_context_programs + 1, len(candidates))
-        examples = random.sample(candidates, sample_size)
-
-        examples = [p for p in examples if p.id != parent.id][:num_context_programs]
+        if front:
+            parent = random.choice(front)
+            # Prefer other front members for context, then fill from population.
+            pool = [p for p in front if p.id != parent.id]
+            if len(pool) < (num_context_programs or 0):
+                extras = [p for p in candidates if p.id != parent.id and p not in pool]
+                random.shuffle(extras)
+                pool.extend(extras)
+            examples = pool[:num_context_programs]
+            if len(examples) < (num_context_programs or 0):
+                # Extremely small front — allow duplicates avoidance only.
+                examples = [p for p in candidates if p.id != parent.id][:num_context_programs]
+        else:
+            parent = random.choice(candidates)
+            sample_size = min((num_context_programs or 0) + 1, len(candidates))
+            examples = random.sample(candidates, sample_size)
+            examples = [p for p in examples if p.id != parent.id][:num_context_programs]
 
         parent_dict = {"": parent}
         context_programs_dict = {"": examples}

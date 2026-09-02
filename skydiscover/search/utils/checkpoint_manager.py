@@ -98,7 +98,7 @@ class CheckpointManager:
         with open(os.path.join(save_path, "metadata.json"), "w") as f:
             json.dump(metadata, f)
 
-        logger.info(f"[CHECKPOINT] Saved database with {len(programs)} programs to {save_path}")
+        logger.debug(f"Saved database with {len(programs)} programs to {save_path}")
 
     def load(self, path: str) -> Tuple[Dict[str, Program], Optional[str], int]:
         """
@@ -130,7 +130,7 @@ class CheckpointManager:
             best_program_id = metadata.get("best_program_id")
             last_iteration = metadata.get("last_iteration", 0)
 
-            logger.info(f"Loaded database metadata with last_iteration={last_iteration}")
+            logger.debug(f"Loaded database metadata with last_iteration={last_iteration}")
 
         # Load programs
         programs_dir = os.path.join(path, "programs")
@@ -147,7 +147,7 @@ class CheckpointManager:
                     except Exception as e:
                         logger.warning(f"Error loading program {program_file}: {str(e)}")
 
-        logger.info(f"Loaded database with {len(programs)} programs from {path}")
+        logger.debug(f"Loaded database with {len(programs)} programs from {path}")
 
         return programs, best_program_id, last_iteration
 

@@ -118,7 +118,7 @@ class MonitorServer:
         # AI summary state
         self._summary_model: str = ""
         self._summary_api_key: str = ""
-        self._summary_api_base: str = "https://api.openai.com/v1"
+        self._summary_api_base: str = ""
         self._summary_top_k: int = 3
         self._summary_interval: int = 0  # 0 = manual only
         self._summary_text: str = ""
@@ -140,7 +140,7 @@ class MonitorServer:
         self._thread.start()
         # Wait until TCP port is actually bound (up to 5s)
         self._ready_event.wait(timeout=5)
-        logger.info(f"Monitor server started → http://localhost:{self.port}/")
+        logger.debug(f"Monitor server started → http://localhost:{self.port}/")
 
     def stop(self) -> None:
         """Signal the server to stop and wait for the thread to finish."""
@@ -178,23 +178,28 @@ class MonitorServer:
 
     def configure_summary(
         self,
-        model: str = "gpt-5-mini",
+        model: str = "",
         api_key: str = "",
-        api_base: str = "https://api.openai.com/v1",
+        api_base: str = "",
         top_k: int = 3,
         interval: int = 0,
     ) -> None:
         """Configure the AI summary generator.
 
         Args:
-            model: OpenAI model name (default gpt-5-mini).
+            model: LLM model name for summary generation.
             api_key: API key. Falls back to OPENAI_API_KEY env var.
             api_base: API base URL.
             top_k: Number of top programs to include in summary prompt.
             interval: Auto-generate every N new programs (0 = manual only).
         """
         self._summary_model = model
-        self._summary_api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
+        if not api_key and model:
+            from skydiscover.config import _parse_model_spec, _resolve_api_key_from_env
+
+            _, _, _, env_vars = _parse_model_spec(model)
+            api_key = _resolve_api_key_from_env(env_vars) or ""
+        self._summary_api_key = api_key
         self._summary_api_base = api_base.rstrip("/")
         self._summary_top_k = top_k
         self._summary_interval = interval
@@ -206,7 +211,7 @@ class MonitorServer:
                 "Click 'Refresh Summary' to generate an AI summary of the top programs."
             )
 
-        logger.info(
+        logger.debug(
             f"AI summary configured: model={model}, top_k={top_k}, "
             f"interval={interval or 'manual'}, api_key={'set' if self._summary_api_key else 'MISSING'}"
         )
@@ -428,7 +433,7 @@ class MonitorServer:
                     "human_feedback_mode": self._feedback_reader.mode,
                 }
                 await self._broadcast(json.dumps(ack))
-                logger.info(f"Human feedback set from dashboard ({len(text)} chars)")
+                logger.debug(f"Human feedback set from dashboard ({len(text)} chars)")
             else:
                 await self._ws_send(
                     writer,
@@ -451,7 +456,7 @@ class MonitorServer:
                     "human_feedback_mode": self._feedback_reader.mode,
                 }
                 await self._broadcast(json.dumps(ack))
-                logger.info("Human feedback cleared from dashboard")
+                logger.debug("Human feedback cleared from dashboard")
         elif t == "request_feedback_state":
             await self._ws_send(
                 writer,
@@ -471,7 +476,7 @@ class MonitorServer:
                     "human_feedback_mode": mode,
                 }
                 await self._broadcast(json.dumps(ack))
-                logger.info(f"Human feedback mode set to: {mode}")
+                logger.debug(f"Human feedback mode set to: {mode}")
         elif t == "request_system_prompt":
             prompt_text = ""
             if self._feedback_reader:
@@ -798,10 +803,10 @@ class MonitorServer:
             top_programs = self._get_top_k_programs()
             if not top_programs:
                 self._summary_text = "No scored programs yet. Run some iterations first."
-                logger.info("AI summary skipped: no scored programs")
+                logger.debug("AI summary skipped: no scored programs")
             else:
                 prompt_data = self._build_summary_prompt(top_programs)
-                logger.info(
+                logger.debug(
                     f"AI summary: calling {self._summary_model} with {len(top_programs)} "
                     f"top programs, api_base={self._summary_api_base}"
                 )
@@ -814,7 +819,7 @@ class MonitorServer:
                     prompt_data,
                 )
                 self._summary_text = result or "AI returned empty response."
-                logger.info(f"AI summary generated ({len(self._summary_text)} chars)")
+                logger.debug(f"AI summary generated ({len(self._summary_text)} chars)")
         except Exception as e:
             logger.warning(f"AI summary generation failed: {e}", exc_info=True)
             self._summary_text = f"Summary generation failed: {e}"

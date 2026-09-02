@@ -158,7 +158,7 @@ class ParadigmTracker:
 
         # Log paradigm usage with idea
         paradigm = self.active_paradigms[self.current_paradigm_index]
-        logger.info(
+        logger.debug(
             f"Using paradigm {self.current_paradigm_index + 1}/{len(self.active_paradigms)} "
             f"({current_uses + 1}/{self.max_paradigm_uses}): {paradigm.get('idea', 'N/A')}"
         )
@@ -190,7 +190,7 @@ class ParadigmTracker:
         self.best_score_at_paradigm_gen = current_best_score
         self.best_score_during_paradigm = current_best_score
 
-        logger.info(f"Set {len(paradigms)} new paradigms (best score: {current_best_score:.6f})")
+        logger.debug(f"Set {len(paradigms)} new paradigms (best score: {current_best_score:.6f})")
 
     def clear_paradigms(self) -> None:
         """
@@ -228,7 +228,7 @@ class ParadigmTracker:
                 return True
 
         # All paradigms exhausted
-        logger.info("All paradigms exhausted, will archive on next check")
+        logger.debug("All paradigms exhausted, will archive on next check")
         return False
 
     def _archive_current_paradigms(self) -> None:
@@ -265,14 +265,14 @@ class ParadigmTracker:
 
         # Log archived paradigms with outcomes
         if self.active_paradigms:
-            logger.info(
+            logger.debug(
                 f"Archived {len(self.active_paradigms)} paradigms (improvement: {score_improvement:+.6f}):"
             )
             for idx, paradigm in enumerate(self.active_paradigms):
                 uses = self.paradigm_usage_counts.get(idx, 0)
                 if uses > 0:
                     outcome = "SUCCESS" if score_improvement > 0.001 else "FAILED"
-                    logger.info(f"  [{outcome}] {paradigm.get('idea', 'N/A')} (uses: {uses})")
+                    logger.debug(f"  [{outcome}] {paradigm.get('idea', 'N/A')} (uses: {uses})")
 
     # =========================================================================
     # Feedback for Generator

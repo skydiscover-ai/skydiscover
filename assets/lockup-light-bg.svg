@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 220" fill="none">
+  
+  <g transform="translate(6,44) scale(0.72)">
+  <path d="M248 16 L6 81 L75 98 Z" fill="#FFC960"></path>
+  <path d="M248 16 L75 98 L85 160 L112 114 Z" fill="#2B2347"></path>
+  <path d="M248 16 L112 114 L182 152 Z" fill="#F0A32B"></path>
+  <path d="M272 -18 C274 -5 279 0 292 2 C279 4 274 9 272 22 C270 9 265 4 252 2 C265 0 270 -5 272 -18 Z" fill="#E08B0B"></path>
+  <path d="M298 24 C299.3 32 302 34.7 310 36 C302 37.3 299.3 40 298 48 C296.7 40 294 37.3 286 36 C294 34.7 296.7 32 298 24 Z" fill="#1E1A38"></path>
+  <path d="M256 40 C256.9 45.3 258.7 47.1 264 48 C258.7 48.9 256.9 50.7 256 56 C255.1 50.7 253.3 48.9 248 48 C253.3 47.1 255.1 45.3 256 40 Z" fill="#E08B0B"></path>
+  </g>
+  <text x="256" y="146" font-family="'Space Grotesk', sans-serif" font-weight="600" font-size="92" letter-spacing="-1.5"><tspan fill="#1E1A38">Sky</tspan><tspan fill="#E08B0B">Discover</tspan></text>
+</svg>

@@ -248,7 +248,7 @@ if __name__ == "__main__":
                                         original_prompt + "\n\n## Human Guidance\n" + feedback
                                     )
                                 feedback_reader.set_current_prompt(sampler.task_sys_msg)
-                                logger.info(
+                                logger.debug(
                                     f"Human feedback injected into ShinkaEvolve ({len(feedback)} chars, mode={feedback_reader.mode})"
                                 )
                             elif sampler and not feedback:

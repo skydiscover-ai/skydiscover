@@ -45,11 +45,26 @@ def start_monitor(
         monitor_server.start()
         monitor_callback = create_external_callback(monitor_server, time.time())
 
-        if config.monitor.summary_model:
+        summary_model = config.monitor.summary_model
+        summary_api_base = config.monitor.summary_api_base
+        summary_api_key = config.monitor.summary_api_key
+
+        if not summary_model and config.llm.models:
+            first = config.llm.models[0]
+            summary_model = first.name
+            summary_api_base = summary_api_base or first.api_base
+            summary_api_key = summary_api_key or first.api_key
+
+        if not summary_model:
+            logger.warning(
+                "Summary feature disabled: no summary model configured "
+                "and no model available from the main LLM configuration."
+            )
+        else:
             monitor_server.configure_summary(
-                model=config.monitor.summary_model,
-                api_key=config.monitor.summary_api_key or "",
-                api_base=config.monitor.summary_api_base,
+                model=summary_model,
+                api_key=summary_api_key or "",
+                api_base=summary_api_base or "",
                 top_k=config.monitor.summary_top_k,
                 interval=config.monitor.summary_interval,
             )
@@ -63,13 +78,13 @@ def start_monitor(
             feedback_mode = getattr(config, "human_feedback_mode", "append")
             feedback_reader = HumanFeedbackReader(feedback_path, mode=feedback_mode)
             monitor_server.set_feedback_reader(feedback_reader)
-            logger.info("Human feedback enabled — file: %s", feedback_path)
+            logger.debug("Human feedback enabled — file: %s", feedback_path)
         except Exception as exc:
             logger.warning("Failed to set up human feedback: %s", exc)
 
         url = f"http://localhost:{monitor_server.port}/"
         print(f"\n  Live monitor: {url}\n", flush=True)
-        logger.info("Live monitor: %s", url)
+        logger.debug("Live monitor: %s", url)
 
     except Exception as exc:
         logger.warning("Failed to start monitor: %s", exc)

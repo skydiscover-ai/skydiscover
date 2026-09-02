@@ -1,0 +1,35 @@
+# QNN circuit topology discovery
+# Usage: skydiscover-run initial_program.py evaluator.py -c config.yaml -s <strategy>
+language: python
+diff_based_generation: true
+max_iterations: 50
+checkpoint_interval: 5
+max_solution_length: 40000
+llm:
+  api_base: https://api.openai.com/v1
+  models:
+    - name: "gpt-4o-mini"
+      weight: 1.0
+  max_tokens: 8192
+  timeout: 300
+prompt:
+  system_message: |
+    You are an expert in variational quantum algorithms and quantum neural networks.
+    Improve build_topology() so a 2-qubit QNN classifies a 2D synthetic dataset more accurately.
+
+    Rules:
+    - Evolve only the gate topology (list of gate dicts). Parameters are fit by the evaluator.
+    - Allowed gates: RX/RY/RZ (with qubit 0|1), H (qubit 0|1), CNOT(control, target) with control != target.
+    - Validator cap is 24 gates; prefer compact circuits (<= 16). Deeper is not always better on this toy task.
+    - Fitting is vectorized; timeout is 600s so a valid 24-gate circuit is not scored 0 for runtime.
+    - Useful motifs: data re-uploading (interleave RY on both qubits), entangling CNOT, alternating rotation axes.
+    - Keep the EVOLVE-BLOCK markers intact.
+
+evaluator:
+  timeout: 600
+  cascade_evaluation: false
+
+monitor:
+  enabled: true
+  port: 8765
+  host: "127.0.0.1"

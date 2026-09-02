@@ -163,7 +163,7 @@ class HarborEvaluator(ContainerizedEvaluator):
             match = re.search(r"timeout_sec\s*=\s*(\d+)", text)
             if match:
                 config.timeout = int(match.group(1))
-                logger.info(f"Harbor task.toml: set evaluator timeout to {config.timeout}s")
+                logger.debug(f"Harbor task.toml: set evaluator timeout to {config.timeout}s")
         except Exception as e:
             logger.warning(f"Failed to read task.toml: {e}")
 
@@ -251,13 +251,13 @@ class HarborEvaluator(ContainerizedEvaluator):
         # Tier 1: parse solution/solve.sh (most reliable).
         path = self._extract_path_from_solve_sh()
         if path:
-            logger.info(f"Extracted solution path from solve.sh: {path}")
+            logger.debug(f"Extracted solution path from solve.sh: {path}")
             return path
 
         # Tier 2: parse instruction.md.
         path = self._extract_path_from_instruction()
         if path:
-            logger.info(f"Extracted solution path from instruction.md: {path}")
+            logger.debug(f"Extracted solution path from instruction.md: {path}")
             return path
 
         # Tier 3: default.

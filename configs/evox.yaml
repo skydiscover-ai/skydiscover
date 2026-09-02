@@ -34,6 +34,13 @@ search:
   type: "evox"
   database:
     auto_generate_variation_operators: true
+    # Opt-in multiobjective (issue #42). Leave empty for scalar combined_score.
+    # pareto_objectives: ["accuracy", "latency"]
+    # higher_is_better:
+    #   accuracy: true
+    #   latency: false
+    # fitness_key: accuracy
+    # pareto_objectives_weight: 0.4
 
 # Prompt configuration
 prompt:
