@@ -1,0 +1,38 @@
+# Post-NAS microbenchmark (#2): evolve feed-forward MLP topologies.
+# Usage:
+#   uv run skydiscover-run benchmarks/post_nas_mlp/initial_program.py \
+#     benchmarks/post_nas_mlp/evaluator.py \
+#     -c benchmarks/post_nas_mlp/config.yaml -s best_of_n -i 50
+
+language: python
+diff_based_generation: true
+max_iterations: 100
+checkpoint_interval: 10
+max_solution_length: 40000
+
+llm:
+  api_base: https://api.openai.com/v1
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+  max_tokens: 8192
+  timeout: 600
+
+prompt:
+  system_message: |
+    You are doing neural architecture search on a tiny synthetic classification
+    task. Evolve `build_architecture(input_dim, num_classes)` to return a list
+    of layer dicts (linear / relu / tanh / sigmoid / dropout).
+
+    The evaluator trains with NumPy SGD. Final linear layer must output
+    `num_classes`. Keep ≤ 8 layers and hidden width ≤ 64. Optimize test
+    accuracy; compact nets get a small bonus.
+
+evaluator:
+  timeout: 120
+  cascade_evaluation: false
+
+monitor:
+  enabled: true
+  port: 8765
+  host: "127.0.0.1"
