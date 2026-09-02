@@ -16,10 +16,50 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from problems import TEST_PROBLEMS, TRAIN_PROBLEMS  # noqa: E402
+from problems import Problem, TEST_PROBLEMS as _RAW_TEST, TRAIN_PROBLEMS as _RAW_TRAIN  # noqa: E402
 
 BUDGET = 64
 SEEDS = (0, 1, 2)
+
+# Hidden per-problem offsets so a do-nothing controller at the origin cannot
+# farm a near-perfect score. Not imported by candidate programs.
+_OFFSET_SEED = 0x51DE5A1D
+
+
+def _offset_for(dim: int, bounds: tuple[float, float], rng: np.random.Generator) -> np.ndarray:
+    lo, hi = bounds
+    span = hi - lo
+    offset = np.empty(dim, dtype=np.float64)
+    for i in range(dim):
+        if rng.random() < 0.5:
+            offset[i] = rng.uniform(lo + 0.15 * span, lo + 0.35 * span)
+        else:
+            offset[i] = rng.uniform(hi - 0.35 * span, hi - 0.15 * span)
+    return offset
+
+
+def _shift_objective(base_fn, dim: int, bounds: tuple[float, float], name: str, rng: np.random.Generator):
+    offset = _offset_for(dim, bounds, rng)
+    if name.startswith("rosenbrock"):
+        # Canonical Rosenbrock is minimized at ones; move that point to `offset`.
+        def fn(x, _base=base_fn, _o=offset):
+            return _base(np.asarray(x, dtype=np.float64) - _o + 1.0)
+    else:
+        def fn(x, _base=base_fn, _o=offset):
+            return _base(np.asarray(x, dtype=np.float64) - _o)
+    return fn
+
+
+def _shifted_suite(problems: list[Problem], rng: np.random.Generator) -> list[Problem]:
+    return [
+        Problem(p.name, p.dim, p.bounds, _shift_objective(p.fn, p.dim, p.bounds, p.name, rng))
+        for p in problems
+    ]
+
+
+_offset_rng = np.random.default_rng(_OFFSET_SEED)
+TRAIN_PROBLEMS = _shifted_suite(_RAW_TRAIN, _offset_rng)
+TEST_PROBLEMS = _shifted_suite(_RAW_TEST, _offset_rng)
 
 
 @dataclass

@@ -54,6 +54,22 @@ EMPTY_ASK = textwrap.dedent(
     """
 )
 
+ORIGIN_NOOP = textwrap.dedent(
+    """\
+    import numpy as np
+
+    class SearchController:
+        def __init__(self, dim, bounds, rng):
+            self.dim = dim
+
+        def initial_population(self):
+            return [np.zeros(self.dim)]
+
+        def ask(self, population, n):
+            return []
+    """
+)
+
 
 def test_evaluate_baseline_program():
     metrics = evaluate(str(ROOT / "initial_program.py"))
@@ -79,3 +95,15 @@ def test_empty_ask_does_not_hang(tmp_path):
         metrics = future.result(timeout=15)
     assert "combined_score" in metrics
     assert metrics["latency_s"] < 10.0
+
+
+def test_origin_noop_does_not_beat_baseline(tmp_path):
+    baseline = evaluate(str(ROOT / "initial_program.py"))
+    program = tmp_path / "origin_noop.py"
+    program.write_text(ORIGIN_NOOP)
+    metrics = evaluate(str(program))
+    assert "error" not in metrics
+    # Pre-shift, zeros + empty ask scored ~0.998 and beat the baseline (~0.959).
+    assert metrics["combined_score"] < baseline["combined_score"]
+    assert metrics["combined_score"] < 0.95
+
