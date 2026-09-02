@@ -68,7 +68,7 @@ class LogWindowScorer:
         log_weight = 1.0 + math.log(1.0 + max(0.0, start))
         combined_score = improvement * log_weight / math.sqrt(horizon_int)
 
-        logger.info(
+        logger.debug(
             f"Search strategy score: combined={combined_score:.6f}, "
             f"improvement={improvement:.6f}, start={start:.6f}, "
             f"end={running_best:.6f}, horizon={horizon_int}"

@@ -82,12 +82,12 @@ class ContainerizedEvaluator:
         self.llm_judge = None
         self.env_vars = dict(env_vars or {})
         if self.env_vars:
-            logger.info(
+            logger.debug(
                 f"Passing {len(self.env_vars)} environment variables to container: {list(self.env_vars.keys())}"
             )
         self.image_tag = self._build_image()
         self.container_id = self._start_container()
-        logger.info(f"ContainerizedEvaluator ready: container={self.container_id[:12]}")
+        logger.debug(f"ContainerizedEvaluator ready: container={self.container_id[:12]}")
 
     def close(self):
         """Stop and remove the persistent container."""
@@ -156,7 +156,7 @@ class ContainerizedEvaluator:
                     timeout=self.config.timeout,
                 )
                 elapsed = time.time() - start_time
-                logger.info(
+                logger.debug(
                     f"Evaluated program{label} [{mode}] in {elapsed:.2f}s:"
                     f" {format_metrics(result.metrics)}"
                 )

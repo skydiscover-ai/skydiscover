@@ -61,7 +61,7 @@ async def log_search_algorithm_generated(
     )
 
     iteration_dir = os.path.join(outputs_dir, f"iteration_{iteration}")
-    logger.info(
+    logger.debug(
         f"New search algorithm generated (iteration {iteration}) - "
         f"saved to {os.path.abspath(iteration_dir)} (score pending)"
     )
@@ -129,7 +129,7 @@ async def save_search_algorithm(
                 labels_text += f"  {line}\n"
             with open(labels_path, "w") as f:
                 f.write(labels_text)
-            logger.info(
+            logger.debug(
                 f"Saved labels to {labels_path} ({len(diverge_label)}/{len(refine_label)} chars)"
             )
         except Exception as e:
