@@ -55,6 +55,7 @@ llm:
 | Provider | Format | API key env var |
 |----------|--------|-----------------|
 | OpenAI | `gpt-5`, `o3-mini` | OPENAI_API_KEY |
+| Atlas Cloud | `atlas/Qwen/Qwen3-235B-A22B-Instruct-2507` | ATLASCLOUD_API_KEY |
 | Gemini | `gemini/gemini-2.0-flash` | GEMINI_API_KEY or GOOGLE_API_KEY |
 | Anthropic | `claude-sonnet-4-6` or `anthropic/claude-sonnet-4-6` | ANTHROPIC_API_KEY |
 | DeepSeek | `deepseek-chat` or `deepseek/deepseek-chat` | DEEPSEEK_API_KEY |
@@ -69,6 +70,12 @@ llm:
 llm:
   primary_model: "gpt-5"
   primary_model_weight: 1.0
+```
+
+For Atlas Cloud, set `ATLASCLOUD_API_KEY` and use the `atlas/` prefix:
+```yaml
+llm:
+  primary_model: "atlas/Qwen/Qwen3-235B-A22B-Instruct-2507"
 ```
 
 **Multi-model pool (weighted sampling):**

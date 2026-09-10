@@ -37,6 +37,15 @@ class TestParseModelSpec:
         assert provider == "anthropic"
         assert name == "claude-3-sonnet"
 
+    def test_atlas_model_preserves_namespaced_model_id(self):
+        provider, name, api_base, env_vars = _parse_model_spec(
+            "atlas/Qwen/Qwen3-235B-A22B-Instruct-2507"
+        )
+        assert provider == "atlas"
+        assert name == "Qwen/Qwen3-235B-A22B-Instruct-2507"
+        assert api_base == "https://api.atlascloud.ai/v1"
+        assert env_vars == ["ATLASCLOUD_API_KEY"]
+
     def test_unknown_model_returns_none_provider(self):
         provider, name, api_base, env_vars = _parse_model_spec("my-custom-model")
         assert provider is None
@@ -137,6 +146,15 @@ class TestOpenAIConfiguredRuns:
 
 
 class TestNonOpenAIProviderRouting:
+    @patch.dict(os.environ, {"ATLASCLOUD_API_KEY": "atlas-key"})
+    def test_atlas_model_uses_atlas_endpoint_and_key(self):
+        cfg = LLMConfig(
+            models=[LLMModelConfig(name="atlas/Qwen/Qwen3-235B-A22B-Instruct-2507")],
+        )
+        assert cfg.models[0].name == "Qwen/Qwen3-235B-A22B-Instruct-2507"
+        assert cfg.models[0].api_base == "https://api.atlascloud.ai/v1"
+        assert cfg.models[0].api_key == "atlas-key"
+
     def test_gemini_model_uses_gemini_endpoint(self):
         cfg = LLMConfig(
             models=[LLMModelConfig(name="gemini/gemini-3-pro")],
