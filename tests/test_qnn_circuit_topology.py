@@ -2,15 +2,31 @@
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1] / "benchmarks" / "qnn_circuit_topology"
-sys.path.insert(0, str(ROOT))
 
-from evaluator import _validate_topology, evaluate  # noqa: E402
+
+def _load_qnn_evaluator():
+    path = ROOT / "evaluator.py"
+    name = "qnn_circuit_topology_evaluator"
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"cannot load {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_qnn = _load_qnn_evaluator()
+evaluate = _qnn.evaluate
+_validate_topology = _qnn._validate_topology
+MAX_GATES = _qnn.MAX_GATES
 
 
 def test_validate_topology_accepts_baseline():
@@ -37,8 +53,6 @@ def test_evaluate_baseline_program():
 
 
 def test_validate_topology_cap_is_24():
-    from evaluator import MAX_GATES
-
     assert MAX_GATES == 24
     ok = [{"gate": "RY", "qubit": i % 2} for i in range(24)]
     _validate_topology(ok)
