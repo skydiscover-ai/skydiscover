@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 _PROVIDERS: Dict[str, tuple] = {
     "openai": ("https://api.openai.com/v1", ["OPENAI_API_KEY"]),
+    "atlas": ("https://api.atlascloud.ai/v1", ["ATLASCLOUD_API_KEY"]),
     "azure": ("https://api.openai.com/v1", ["AZURE_API_KEY", "OPENAI_API_KEY"]),
     "gemini": (
         "https://generativelanguage.googleapis.com/v1beta/openai/",
