@@ -11,7 +11,11 @@
 #
 # ===--------------------------------------------------------------------------------------===#
 
-import sys, os, time, numpy as np
+import os
+import sys
+import time
+
+import numpy as np
 import sympy as sp
 
 BENCHMARK = 0.3215872333529007

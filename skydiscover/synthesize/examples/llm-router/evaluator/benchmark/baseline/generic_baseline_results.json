@@ -1,0 +1,129 @@
+{
+  "baseline": "GenericPolicy (one tenant-blind policy for the merged traffic)",
+  "recipe": "embed+ridge quality side; price-spread placement with static ttft guard, headroom pacing, backoff on 429/outage",
+  "selection_metric": "U = mean_quality - 1.0*slo_violation_rate - 3.0*cost_usd/request (non-answers count as violated requests); fixed before eval 1",
+  "tuning_budget": {
+    "allowed": 5,
+    "used": 5
+  },
+  "budget_log": [
+    {
+      "eval_index": 1,
+      "config": {
+        "lambda": 0.0,
+        "placement": "latency"
+      },
+      "utility": 0.3398,
+      "mean_quality": 0.4925,
+      "total_cost_usd": 39.7686,
+      "slo_violation_rate": 0.0811,
+      "violation_count": 0
+    },
+    {
+      "eval_index": 2,
+      "config": {
+        "lambda": 5.0,
+        "placement": "latency"
+      },
+      "utility": 0.3602,
+      "mean_quality": 0.445,
+      "total_cost_usd": 21.0645,
+      "slo_violation_rate": 0.0468,
+      "violation_count": 0
+    },
+    {
+      "eval_index": 3,
+      "config": {
+        "lambda": 15.0,
+        "placement": "latency"
+      },
+      "utility": 0.3658,
+      "mean_quality": 0.4216,
+      "total_cost_usd": 7.9843,
+      "slo_violation_rate": 0.0414,
+      "violation_count": 0
+    },
+    {
+      "eval_index": 4,
+      "config": {
+        "lambda": 40.0,
+        "placement": "latency"
+      },
+      "utility": 0.3671,
+      "mean_quality": 0.418,
+      "total_cost_usd": 5.2734,
+      "slo_violation_rate": 0.0414,
+      "violation_count": 0
+    },
+    {
+      "eval_index": 5,
+      "config": {
+        "lambda": 40.0,
+        "placement": "cheapest"
+      },
+      "utility": 0.3483,
+      "mean_quality": 0.418,
+      "total_cost_usd": 4.7105,
+      "slo_violation_rate": 0.0613,
+      "violation_count": 0
+    }
+  ],
+  "selected": {
+    "config": {
+      "lambda": 40.0,
+      "placement": "latency"
+    },
+    "utility": 0.3671
+  },
+  "val": {
+    "merged": {
+      "mean_quality": 0.418,
+      "total_cost_usd": 5.2734,
+      "slo_violation_rate": 0.0414,
+      "violation_count": 0
+    },
+    "per_tenant": {
+      "A": {
+        "requests": 972,
+        "completed": 972,
+        "shed": 0,
+        "lost_or_dead": 0,
+        "mean_quality": 0.5195,
+        "cost_usd": 4.0194,
+        "slo_violations": 69,
+        "slo_violation_rate": 0.071,
+        "throttles_429": 0,
+        "outage_rejects": 0,
+        "p95_latency_ms": 2832.7
+      },
+      "B": {
+        "requests": 693,
+        "completed": 693,
+        "shed": 0,
+        "lost_or_dead": 0,
+        "mean_quality": 0.2756,
+        "cost_usd": 1.254,
+        "slo_violations": 0,
+        "slo_violation_rate": 0.0,
+        "throttles_429": 0,
+        "outage_rejects": 0,
+        "p95_latency_ms": 185046
+      }
+    }
+  },
+  "artifacts": {
+    "predictions": {
+      "path": "evaluator/benchmark/.data/traces/generic_predictions.json",
+      "sha256": "c1a8b5af047cf4ec92b0327d628f354aaa54c925387e2eea8eb4cebd2cdd301a"
+    },
+    "heads": {
+      "path": "evaluator/benchmark/.data/traces/generic_heads.npz",
+      "sha256": "f52092d8588cc94bd8abf7819d04ab66cd9895169114375038afce5b9293efed"
+    },
+    "env_card": {
+      "path": "evaluator/benchmark/env_card.yaml",
+      "sha256": "14b1d5b1ac020b7e1b8d8d5d331fae948cd125f13da598b263f586ff9e447b16"
+    }
+  },
+  "test": "NOT RUN, sealed; the harness owner replays test once per router"
+}

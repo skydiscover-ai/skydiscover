@@ -12,11 +12,12 @@
 #
 # ===--------------------------------------------------------------------------------------===#
 
-import time
-import numpy as np
-import sys
 import os
+import sys
+import time
 from importlib import __import__
+
+import numpy as np
 
 BENCHMARK = 2.3658321334167627
 NUM_CIRCLES = 21

@@ -1,0 +1,145 @@
+---
+title: "Quick Start"
+description: "Install the skill in your coding agent, run one prompt, read the result."
+---
+
+SkySynth runs inside a coding agent: Claude Code, Cursor, Codex, or pi. All four use the same
+skill; only the install differs.
+
+<Steps>
+<Step>
+### Install the skill
+
+From the repository root, after [installing SkyDiscover](/docs/installation). Linux or macOS
+(Windows through WSL): the hooks are shell scripts and need `bash` and `jq`; C++ tests need a
+compiler (`g++`, or whatever `$CXX` names).
+
+```bash
+uv run skydiscover init   # wires every coding agent found on PATH; or --agent claude|cursor|codex|pi
+```
+
+Restart your coding agent so it picks up the `/skysynth` skill.
+
+Claude Code and Codex can install it as a self-updating plugin instead:
+
+<Tabs items={["Claude Code", "Codex"]}>
+  <Tab value="Claude Code">
+```
+/plugin marketplace add skydiscover-ai/skydiscover
+/plugin install skysynth
+```
+  </Tab>
+  <Tab value="Codex">
+```bash
+codex plugin marketplace add skydiscover-ai/skydiscover
+codex plugin add skysynth
+```
+  </Tab>
+</Tabs>
+
+The plugin does not install the `skydiscover` Python package; the scripts it runs need
+`uv pip install git+https://github.com/skydiscover-ai/skydiscover`, or `uv sync` in a checkout.
+</Step>
+
+<Step>
+### Describe what you want
+
+Inside your coding agent:
+
+```
+/skysynth build me a fast in-memory key-value store
+```
+
+The agents study real systems of the same kind (the domain), ask you what your prompt leaves
+open, and ask how long to run: Quick (about 20 iterations, a few hours), Standard, or Thorough.
+Then they design, build, test, benchmark, and audit the system, hands-off. The
+[tutorial](/docs/synthesize/examples#tutorial) shows a real one end to end.
+
+To build for your own data, add a script that replays your workload and prints a score, and
+mention it in the prompt. The agents optimize against it, and you can re-run it yourself at any
+time.
+</Step>
+
+<Step>
+### Read the result
+
+Your system is `outputs/synthesize/<slug>_<timestamp>/best/artifact/` (`<slug>` is a short name made
+from your prompt; the folder compiles standalone).
+Start with `spec.md` beside it: what was asked, what was decided, the test that checks each answer,
+and how it scored. `tests/` holds the tests it passes and `score.json` the number, next to every baseline it was measured
+against (the stock systems or policies it had to beat).
+
+For the history of the run: `checkpoints/checkpoint_N/` keeps every scored iteration (`artifact/`,
+`score.json`, `tests.json`, the tests it was scored against), and `history.json` has one row per
+checkpoint with its score and the tests it fails today, so a reward hack (a change that raised the
+score while breaking a property) that once led is visible. Hidden `best/.verification/` keeps the
+logs of the final check.
+
+| Path | What it is |
+|---|---|
+| `outputs/synthesize/<slug>_<timestamp>/` | The result: `best/`, `checkpoints/`, `history.json` |
+| `.skydiscover/<slug>/` (in your project) | The run's working files, one folder per phase of the figure (`specification/`, `synthesis/`, `review/`); its `README.md` explains them. Deleted when the run finishes and the result is written, unless you ask the agent to keep it; a proof-driven run always keeps it, for proof replay |
+| `~/.skydiscover/<domain>/` (in your home) | The knowledge base of the figure: what the next run on the same kind of system starts from. The tests the Auditor and Evaluator kept (`tests/`), your answers (`decisions.json`), and an optional wiki on the reference systems (`wiki/`) |
+</Step>
+</Steps>
+
+## Where the files land
+
+`skydiscover init` links the `/skysynth` skill, the agent roles (Spec Builder, Planner, Coding
+Agent, Evaluator, Critic, Auditor), and the hooks: one that runs the tests before anything is
+delivered, and a guard that reuses already-cloned reference systems. Cursor gets the guard only; its deliveries are checked when the run finishes.
+
+| Agent | Skill | Roles | Hooks |
+|---|---|---|---|
+| Claude Code | `.claude/skills/skysynth` | `.claude/agents/*.md` | `.claude/settings.local.json` |
+| Cursor | `.cursor/skills/skysynth` | `.cursor/agents/*.md` | `.cursor/hooks.json` |
+| Codex | `.agents/skills/skysynth` | `.codex/agents/*.toml` | `.codex/hooks.json` |
+| pi | `.agents/skills/skysynth` | `.pi/agents/*.md` | `.pi/extensions/skydiscover-hooks.ts` |
+
+## Agent-specific setup
+
+<Accordions type="multiple">
+<Accordion title="Codex">
+Agent definitions are generated as TOML from the shared briefs. Edit a brief and re-run the
+installer rather than editing a TOML. Then:
+
+1. **Trust the project** so Codex reads `.codex/`: approve on first launch, or set
+   `trust_level = "trusted"` under `[projects."/abs/path"]` in `~/.codex/config.toml`. Untrusted,
+   Codex silently falls back to generic agents.
+2. **Run with `--sandbox workspace-write`**; the default read-only policy blocks compile and
+   benchmark steps.
+3. **Run `/hooks` once** inside Codex to trust the hooks.
+
+If you installed the plugin, also run `skydiscover init --agent codex`: plugins cannot ship the
+role definitions yet, and without them the roles run one at a time in the main session.
+
+On Ubuntu 24.04+ the sandbox also needs a bubblewrap profile, or shell commands fail with
+`bwrap: setting up uid map: Permission denied`:
+
+```bash
+sudo apt-get install -y bubblewrap
+sudo tee /etc/apparmor.d/bwrap >/dev/null <<'EOF'
+abi <abi/4.0>,
+include <tunables/global>
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+  include if exists <local/bwrap>
+}
+EOF
+sudo apparmor_parser -r /etc/apparmor.d/bwrap
+```
+
+For scripting, `codex exec` blocks on stdin (redirect `< /dev/null`), and persist the API key with
+`printenv OPENAI_API_KEY | codex login --with-api-key` (a bare environment variable returns 401).
+</Accordion>
+<Accordion title="pi">
+pi has no `hooks.json`, so the hooks run through `.pi/extensions/skydiscover-hooks.ts`. Trust the
+project on first launch so pi loads `.pi/` and `.agents/skills/`. A subagent tool (pi ships one at
+`examples/extensions/subagent` in its own repository) lets the agents run in parallel; everything
+works without it too.
+</Accordion>
+</Accordions>
+
+## Next steps
+
+- [Examples](/docs/synthesize/examples): four systems you can build, and how to write your own

@@ -19,7 +19,16 @@ env/
 .vscode/
 *.swp
 *.swo
+# Per-user coding-agent wiring written by `skydiscover init` (skydiscover/synthesize/scripts/install.sh):
+# skill symlinks, role briefs, hooks. Only the Codex plugin marketplace manifest is shared.
 .claude/
+.cursor/
+.agents/*
+!.agents/plugins/
+.agents/plugins/*
+!.agents/plugins/marketplace.json
+.codex/
+.pi/
 
 # OS
 .DS_Store
@@ -58,3 +67,10 @@ eval_runs/
 
 # Local documentation
 tasks/
+
+# SkySynth runs: the agents' working files. Results go to outputs/ (above); the knowledge base
+# lives under ~/.skydiscover/, outside the repo.
+.skydiscover/
+skydiscover/synthesize/examples/tutorial/play.log
+
+.mypy_cache/

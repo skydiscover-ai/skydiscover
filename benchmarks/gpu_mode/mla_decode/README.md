@@ -9,7 +9,7 @@ Core attention mechanism from DeepSeek-V2/V3, used for efficient inference with 
 From the repo root:
 
 ```bash
-uv run skydiscover-run \
+uv run skydiscover optimize \
   benchmarks/gpu_mode/mla_decode/initial_program.py \
   benchmarks/gpu_mode/mla_decode/evaluator.py \
   -c benchmarks/gpu_mode/mla_decode/config.yaml \
@@ -28,7 +28,7 @@ uv run skydiscover-run \
 
 ```bash
 GPUMODE_USE_MODAL=true GPUMODE_MODAL_GPU=H200 \
-  uv run skydiscover-run \
+  uv run skydiscover optimize \
   benchmarks/gpu_mode/mla_decode/initial_program.py \
   benchmarks/gpu_mode/mla_decode/evaluator.py \
   -c benchmarks/gpu_mode/mla_decode/config.yaml \

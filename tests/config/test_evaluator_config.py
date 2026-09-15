@@ -1,6 +1,6 @@
 """Tests for EvaluatorConfig defaults."""
 
-from skydiscover.config import EvaluatorConfig
+from skydiscover.optimize.config import EvaluatorConfig
 
 
 class TestEvaluatorConfigDefaults:

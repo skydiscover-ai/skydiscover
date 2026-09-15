@@ -1,9 +1,10 @@
 # EVOLVE-BLOCK-START
-import networkx as nx
 import json
 import os
-import pandas as pd
 from typing import Dict, List
+
+import networkx as nx
+import pandas as pd
 
 
 def search_algorithm(src, dsts, G, num_partitions):
@@ -27,7 +28,13 @@ class SingleDstPath(Dict):
 
 
 class BroadCastTopology:
-    def __init__(self, src: str, dsts: List[str], num_partitions: int = 4, paths: Dict[str, SingleDstPath] = None):
+    def __init__(
+        self,
+        src: str,
+        dsts: List[str],
+        num_partitions: int = 4,
+        paths: Dict[str, SingleDstPath] = None,
+    ):
         self.src = src  # single str
         self.dsts = dsts  # list of strs
         self.num_partitions = num_partitions
@@ -63,6 +70,7 @@ class BroadCastTopology:
             self.paths[dst][partition] = []
         self.paths[dst][partition].append(path)
 
+
 def make_nx_graph(cost_path=None, throughput_path=None, num_vms=1):
     """
     Default graph with capacity constraints and cost info
@@ -74,7 +82,7 @@ def make_nx_graph(cost_path=None, throughput_path=None, num_vms=1):
     """
     # Use relative path from this file's location
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    
+
     if cost_path is None:
         cost = pd.read_csv(os.path.join(current_dir, "profiles/cost.csv"))
     else:
@@ -89,7 +97,12 @@ def make_nx_graph(cost_path=None, throughput_path=None, num_vms=1):
     for _, row in throughput.iterrows():
         if row["src_region"] == row["dst_region"]:
             continue
-        G.add_edge(row["src_region"], row["dst_region"], cost=None, throughput=num_vms * row["throughput_sent"] / 1e9)
+        G.add_edge(
+            row["src_region"],
+            row["dst_region"],
+            cost=None,
+            throughput=num_vms * row["throughput_sent"] / 1e9,
+        )
 
     for _, row in cost.iterrows():
         if row["src"] in G and row["dest"] in G[row["src"]]:
@@ -108,10 +121,12 @@ def make_nx_graph(cost_path=None, throughput_path=None, num_vms=1):
 
 # EVOLVE-BLOCK-END
 
+
 # Helper functions that won't be evolved
 def create_broadcast_topology(src: str, dsts: List[str], num_partitions: int = 4):
     """Create a broadcast topology instance"""
     return BroadCastTopology(src, dsts, num_partitions)
+
 
 def run_search_algorithm(src: str, dsts: List[str], G, num_partitions: int):
     """Run the search algorithm and return the topology"""

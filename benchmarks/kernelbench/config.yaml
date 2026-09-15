@@ -1,5 +1,5 @@
 # KernelBench optimization benchmark configuration
-# Usage: skydiscover-run evaluator/ -c config.yaml -s <strategy>
+# Usage: skydiscover optimize evaluator/ -c config.yaml -s <strategy>
 # Note: initial_program is automatically fetched from KernelBench dataset, based on the `level` and `problem_id` fields.
 
 language: python

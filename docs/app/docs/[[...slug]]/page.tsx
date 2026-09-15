@@ -37,7 +37,8 @@ export async function generateMetadata(props: PageProps<'/docs/[[...slug]]'>): P
   if (!page) notFound();
 
   return {
-    title: page.data.title,
+    // The landing page is titled "SkyDiscover"; do not suffix it with "| SkyDiscover".
+    title: params.slug?.length ? page.data.title : { absolute: page.data.title },
     description: page.data.description,
   };
 }

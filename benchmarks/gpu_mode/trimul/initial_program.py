@@ -4,9 +4,9 @@ Initial TriMul submission — PyTorch baseline with dummy Triton kernel.
 """
 
 import torch
-from torch import nn, einsum
 import triton
 import triton.language as tl
+from torch import einsum, nn
 
 
 @triton.jit
@@ -55,7 +55,9 @@ class TriMul(nn.Module):
         left = left * left_gate
         right = right * right_gate
 
-        out = einsum('... i k d, ... j k d -> ... i j d', left.to(torch.bfloat16), right.to(torch.bfloat16))
+        out = einsum(
+            "... i k d, ... j k d -> ... i j d", left.to(torch.bfloat16), right.to(torch.bfloat16)
+        )
 
         out = out.to(torch.float32)
         out = self.to_out_norm(out)
@@ -67,18 +69,20 @@ def custom_kernel(data):
     input_tensor, mask, weights, config = data
     trimul = TriMul(config["dim"], config["hidden_dim"]).to(input_tensor.device)
 
-    trimul.norm.weight = nn.Parameter(weights['norm.weight'].to(torch.float32))
-    trimul.left_proj.weight = nn.Parameter(weights['left_proj.weight'].to(torch.float32))
-    trimul.right_proj.weight = nn.Parameter(weights['right_proj.weight'].to(torch.float32))
-    trimul.left_gate.weight = nn.Parameter(weights['left_gate.weight'].to(torch.float32))
-    trimul.right_gate.weight = nn.Parameter(weights['right_gate.weight'].to(torch.float32))
-    trimul.out_gate.weight = nn.Parameter(weights['out_gate.weight'].to(torch.float32))
-    trimul.to_out_norm.weight = nn.Parameter(weights['to_out_norm.weight'].to(torch.float32))
-    trimul.to_out.weight = nn.Parameter(weights['to_out.weight'].to(torch.float32))
-    trimul.norm.bias = nn.Parameter(weights['norm.bias'].to(torch.float32))
-    trimul.to_out_norm.bias = nn.Parameter(weights['to_out_norm.bias'].to(torch.float32))
+    trimul.norm.weight = nn.Parameter(weights["norm.weight"].to(torch.float32))
+    trimul.left_proj.weight = nn.Parameter(weights["left_proj.weight"].to(torch.float32))
+    trimul.right_proj.weight = nn.Parameter(weights["right_proj.weight"].to(torch.float32))
+    trimul.left_gate.weight = nn.Parameter(weights["left_gate.weight"].to(torch.float32))
+    trimul.right_gate.weight = nn.Parameter(weights["right_gate.weight"].to(torch.float32))
+    trimul.out_gate.weight = nn.Parameter(weights["out_gate.weight"].to(torch.float32))
+    trimul.to_out_norm.weight = nn.Parameter(weights["to_out_norm.weight"].to(torch.float32))
+    trimul.to_out.weight = nn.Parameter(weights["to_out.weight"].to(torch.float32))
+    trimul.norm.bias = nn.Parameter(weights["norm.bias"].to(torch.float32))
+    trimul.to_out_norm.bias = nn.Parameter(weights["to_out_norm.bias"].to(torch.float32))
 
     output = trimul(input_tensor, mask).to(torch.float32)
 
     return output
+
+
 # EVOLVE-BLOCK-END

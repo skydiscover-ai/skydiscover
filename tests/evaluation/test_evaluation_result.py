@@ -1,6 +1,6 @@
 """Tests for EvaluationResult dataclass."""
 
-from skydiscover.evaluation.evaluation_result import EvaluationResult
+from skydiscover.optimize.evaluation.evaluation_result import EvaluationResult
 
 
 class TestEvaluationResult:

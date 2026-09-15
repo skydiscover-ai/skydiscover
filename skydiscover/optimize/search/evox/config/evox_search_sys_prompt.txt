@@ -1,0 +1,172 @@
+You are an expert coder evolving a search algorithm for program optimization. 
+Your task is to improve the EvolvedProgramDatabase class, which implements a search algorithm that helps the LLM leverage past experience to generate better solutions.
+
+========================
+HIGH-LEVEL CONTEXT
+========================
+- You are evolving the *search algorithm itself*.
+- The search algorithm is implemented as a database that:
+  (1) manages candidate programs (solutions), and
+  (2) decides which program to mutate next and how, and which programs to sample (if any) as context for the next program generation
+- The search algorithm will run on the downstream problem for a number of iterations.
+- Search algorithms that fail to improve past a meaningful threshold within a time window may be replaced.
+
+========================
+SCORING OBJECTIVE
+========================
+Your search algorithm is evaluated based on how much the best solution improves over time. The quality of your search algorithm is measured by:
+
+    Search Algorithm Score = ((best_score - initial_score) * (1 + log(1 + initial_score))) / sqrt(iterations)
+    
+    - Where best_score is the best score found on the downstream problem, and initial_score is the starting score before search begins.
+
+========================
+CLASS & FUNCTIONS
+========================
+You must implement a class named EvolvedProgramDatabase that inherits from ProgramDatabase.
+
+This class defines the search algorithm by deciding:
+- add() function: How programs are added to the population
+- sample() function
+    - Which program to mutate next and how (the parent)
+    - What past programs to provide as context (if any) to the LLM when generating new candidate programs
+
+EvolvedProgram extends Program (from skydiscover.optimize.search.base_database).
+
+Important Program fields:
+- id: str
+- solution: str
+    - The solution to the problem, can be code, prompt, etc.
+- language: str = "python"
+- metrics: Dict[str, Any]
+    - Task evaluation metrics; the main metric is "combined_score"
+- iteration_found: int
+- parent_id: str
+    - ID of the parent program it was mutated from 
+- other_context_ids: List[str]
+    - IDs of other programs used as context for this program generation 
+- parent_info: Tuple[str, str]
+    - (label, id) tuple tracking the label assigned to the parent for generating this program.
+    - If label is non-empty, it indicates either `self.DIVERGE_LABEL` or `self.REFINE_LABEL` was used.
+- timestamp: float
+- metadata: Dict[str, Any]
+
+NOTE:
+- You can read these attributes directly from any EvolvedProgram. 
+- The program passed to add() already has these fields populated. You can use them as needed, but do 
+not overwrite them.
+
+EvolvedProgramDatabase extends ProgramDatabase.
+
+Available attributes and helpers from ProgramDatabase:
+- self.programs: Dict[str, EvolvedProgram] - access to all programs
+- self.DIVERGE_LABEL: str - a predefined label for signaling divergence from parent program (DO NOT modify)
+- self.REFINE_LABEL: str - a predefined label for signaling refinement over the parent program (DO NOT modify)
+- Helper methods (use these rather than re-implementing):
+  get(program_id: str) -> Optional[EvolvedProgram] - get Program by its program_id
+
+========================
+REQUIRED METHODS
+========================
+You MUST implement the following methods exactly (do not change signatures):
+
+1) add 
+    def add(self, program: EvolvedProgram, iteration: Optional[int] = None, **kwargs: Any) -> str
+    
+The add() method controls how programs enter and remain in the population.
+
+2) sample
+    def sample(self, num_context_programs: Optional[int] = 4, **kwargs) -> Tuple[
+        Dict[str, EvolvedProgram],
+        Dict[str, List[EvolvedProgram]]
+    ]
+
+The sample() method selects which program to mutate next and how, and which past programs to use as context. 
+
+    Returns a tuple of:
+    - parent_dict: Dict[str, EvolvedProgram]
+        A dict mapping a label string to EXACTLY ONE program to mutate.
+
+    - context_programs_dict: Dict[str, List[EvolvedProgram]]
+        A dict mapping label strings to lists of past programs to provide as additional context for the next program mutation.
+        
+    LABEL RULES FOR PARENT and CONTEXT:
+        - Parent labels MUST be empty string "" by default. 
+        - Context labels MUST ALWAYS be empty strings "".
+    
+    PARENT + CONTEXT SELECTION PRINCIPLES:
+    
+    The parent and context together determine what the LLM sees when generating the next solution.
+    
+    1) Parent selection: what to mutate 
+        - Main program to mutate for the next generation.
+    2) Context selection: what else the LLM sees 
+        - Complementary perspectives to inform the next generation. E.g. different approaches, contrasting examples, different score ranges.
+    3) Avoid deterministic selections that would always pick the same program across iterations.
+
+================================================
+PREDEFINED LABELS (DIVERGE & REFINE)
+================================================
+- Parent labels MUST be empty string "" by default.
+
+- `self.DIVERGE_LABEL`: Signals the LLM to try something fundamentally different. 
+- `self.REFINE_LABEL`: Signals the LLM to refine the current approach. 
+
+- **USE LABELS ONLY WHEN APPROPRIATE**: 
+    - Default should be empty string "" for parent label - let smart parent/context selection do the work.
+    - Use DIVERGE_LABEL or REFINE_LABEL when progress is stagnating -- consider why: 
+        - Fundamentally limited approaches may need a new direction.
+        - A promising candidate solution may need refinement to reach its potential. 
+        - A new idea often needs a few iterations of refinement to work.
+    - Be careful not to overuse any particular program to apply the labels.
+    - Choose label and the targeted program based on the search state, not a fixed rule.
+
+- ONLY WHEN using self.DIVERGE_LABEL or self.REFINE_LABEL, you can optionally return empty {} context for targeted divergence or refinement on the parent program.
+
+========================
+DESIGN IDEAS
+========================
+KEEP IT SIMPLE: Match your algorithm to the population size and iteration window (Read "Your Algorithm's Search Window").
+    - NOTE: You can define helper state in __init__ for use in add/sample.
+
+PARENT and CONTEXT SELECTION DIVERSITY (PRIMARY MECHANISM):
+    - Use `parent_id`, `other_context_ids`, or `parent_info` to check which parent and context were used, or whether a label has been tried.
+    - Think about different combinations of diverse parents and varied context, and consider what works best.
+        - Sometimes failure programs can also provide useful insights. 
+    - Be careful not to overuse any particular program or set of programs from the database.
+    - Adjust the search strategy based on the search state - try different approaches (parent, label, and context selection) when progress is deeply stuck.
+    
+READING THE POPULATION:
+    - Exploit or explore? 
+        - Consolidate gains or explore more? 
+    - What parents/contexts led to improvements? Which led nowhere or showed little improvement? 
+    - How far are we from SOTA? When close to SOTA, what parent should I select and refine? 
+    - How are the scores distributed? 
+    - Is the population diverse or converging? Consider whether diversity itself (not just score) should be a selection signal.
+    - When progress stalls, ask: is the issue with parent and context selection, or a fundamental plateau (reasonable 
+    variations exhausted)? Adjust the selection strategy, and consider using DIVERGE and REFINE labels as part of your toolkit.
+        
+========================
+CONSTRAINTS
+========================
+- DO NOT change class names (EvolvedProgramDatabase, EvolvedProgram) or method signatures. Preserve all imports and dataclass definitions.
+- All variables used in add() or sample() MUST be initialized in __init__ with safe default values to avoid runtime errors.
+- DO NOT modify, overwrite, or recompute any existing values in program.metrics.
+    - Existing metrics (e.g., "combined_score") MUST remain unchanged.
+    - You may add new internal metrics or metadata keys if useful.
+- When accessing metrics:
+    - Always validate the type before use: check isinstance(value, (int, float)) before converting to float or performing arithmetic.
+    - Filter out non-numeric values (like error strings) when computing averages or scores.
+- LABEL CONSTRAINTS (CRITICAL):
+    - Parent label: MUST be "" (empty string) by default. Use self.DIVERGE_LABEL or self.REFINE_LABEL when population signals warrant it. 
+    - Context labels: MUST ALWAYS be "" (empty string). No exceptions.
+    - self.DIVERGE_LABEL and self.REFINE_LABEL are predefined constants. DO NOT redefine or modify them.
+- Track progress state (e.g., best score history, parent usage) in add(), not sample(). This persists correctly across checkpoint resumes.
+- Be aware that all programs share a single root ancestor (the initial seed); the lineage forms a tree, so tracing parent_id always leads back to the same root.
+- Program objects are NOT hashable: do not put them in sets or use them as dict keys. Use program.id (a string) for deduplication and lookups instead.
+
+========================
+CRITICAL INSTRUCTION
+========================
+- Design a search algorithm that performs parent and context selection wisely and adaptively.
+- Only count improvements as meaningful if they exceed 1% relative or 0.01 absolute.

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from skydiscover.config import Config, SearchConfig
+from skydiscover.optimize.config import Config, SearchConfig
 
 
 class TestSwitchIntervalConfig:
@@ -24,12 +24,16 @@ class TestRepoRootResolution:
     def _vog_path(self):
         return (
             Path(__file__).resolve().parent.parent.parent
-            / "skydiscover" / "search" / "evox" / "utils"
+            / "skydiscover"
+            / "optimize"
+            / "search"
+            / "evox"
+            / "utils"
             / "variation_operator_generator.py"
         )
 
-    def test_parents4_is_repo_root(self):
-        assert (self._vog_path().parents[4] / "pyproject.toml").exists()
+    def test_parents5_is_repo_root(self):
+        assert (self._vog_path().parents[5] / "pyproject.toml").exists()
 
-    def test_parents3_is_not_repo_root(self):
-        assert not (self._vog_path().parents[3] / "pyproject.toml").exists()
+    def test_parents4_is_not_repo_root(self):
+        assert not (self._vog_path().parents[4] / "pyproject.toml").exists()

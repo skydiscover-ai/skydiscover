@@ -1,0 +1,14 @@
+{
+  "domain": "Concurrent latch-free key-value store for multi-core + larger-than-memory (the SIGMOD'18 reference). Embedded C++ library; single-node, multi-threaded, in-place updates over a hybrid memory/disk log.",
+  "how_detected": "README + paper describe a concurrent KV store with in-place updates; cc/src/core/faster.h exposes Read/Upsert/RMW/Delete with per-thread sessions; the index/, light_epoch.h, persistent_memory_malloc.h files name the signature mechanisms (latch-free index, epochs, HybridLog).",
+  "axes": [
+    {"id": "code-structure", "question": "What are the modules and the operation/session API?", "rationale": "Universal baseline.", "signals": ["FasterKv class", "Read/Upsert/RMW/Delete + StartSession", "optimize/ index/ device/"]},
+    {"id": "data-model", "question": "How are keys/values and records laid out?", "rationale": "Defining choice: compact index + records in a log.", "signals": ["templated K/V", "RecordInfo header", "64-byte hash buckets"]},
+    {"id": "durability", "question": "What survives a crash, and what window is lost?", "rationale": "Checkpoint-based (no WAL); CPR is the signature recovery algorithm.", "signals": ["Checkpoint/Recover", "CPR phases", "13-bit record version"]},
+    {"id": "consistency", "question": "What does recovery guarantee per thread?", "rationale": "Per-thread monotonicity (consistent prefix) is the precise promise.", "signals": ["CPR consistent prefix", "monotonic_serial_num", "version stamping"]},
+    {"id": "memory-reclamation", "question": "How is footprint bounded and memory reclaimed?", "rationale": "HybridLog tiering + epoch-based page reclamation; natural caching with no per-record stats.", "signals": ["HybridLog mutable/read-only/disk regions", "epoch trigger actions", "ShiftBeginAddress GC"]},
+    {"id": "concurrency", "question": "How does it scale across cores without locks?", "rationale": "Latch-free CAS index + epoch synchronization + in-place updates is the whole point.", "signals": ["AtomicHashBucketEntry CAS", "LightEpoch Protect/Bump", "InternalUpsert in-place"]},
+    {"id": "partitioning", "question": "Single node or sharded?", "rationale": "Single-node multi-threaded; F2 adds hot/cold tiering, not sharding.", "signals": ["single FasterKv instance", "F2Kv hot/cold", "no network layer"]},
+    {"id": "transactions", "question": "What atomicity do operations give?", "rationale": "Per-op atomicity (esp. RMW); no multi-key transactions.", "signals": ["RMW = atomic fetch-add on hot records", "no MULTI/transaction API"]}
+  ]
+}

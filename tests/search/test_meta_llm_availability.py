@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from skydiscover.config import LLMModelConfig
-from skydiscover.llm.llm_pool import LLMPool
+from skydiscover.optimize.config import LLMModelConfig
+from skydiscover.optimize.llm.llm_pool import LLMPool
 
 
 class TestLLMPoolCheckAvailability:
@@ -20,7 +20,7 @@ class TestLLMPoolCheckAvailability:
             timeout=10,
             retries=0,
         )
-        with patch("skydiscover.llm.openai.openai.OpenAI"):
+        with patch("skydiscover.optimize.llm.openai.openai.OpenAI"):
             pool = LLMPool([cfg])
         return pool
 
@@ -50,13 +50,12 @@ class TestLLMPoolCheckAvailability:
         assert result is False
 
 
-
 class TestCoEvolutionControllerAvailabilityCheck:
     """Tests for CoEvolutionController._check_meta_llm_availability()."""
 
     def _make_controller(self):
         """Create a minimal CoEvolutionController without full init."""
-        from skydiscover.search.evox.controller import CoEvolutionController
+        from skydiscover.optimize.search.evox.controller import CoEvolutionController
 
         controller = object.__new__(CoEvolutionController)
         controller.search_controller = MagicMock()
@@ -79,7 +78,7 @@ class TestCoEvolutionControllerAvailabilityCheck:
         controller.search_controller.guide_llms.check_availability = AsyncMock(return_value=True)
         controller.search_controller.llms.check_availability = AsyncMock(return_value=True)
 
-        with caplog.at_level(logging.INFO, logger="skydiscover.search.evox.controller"):
+        with caplog.at_level(logging.INFO, logger="skydiscover.optimize.search.evox.controller"):
             await controller._check_meta_llm_availability()
 
         assert "connectivity verified" in caplog.text
@@ -95,7 +94,7 @@ class TestCoEvolutionControllerAvailabilityCheck:
         controller.search_controller.guide_llms.check_availability = AsyncMock(return_value=False)
         controller.search_controller.llms.check_availability = AsyncMock(return_value=True)
 
-        with caplog.at_level(logging.WARNING, logger="skydiscover.search.evox.controller"):
+        with caplog.at_level(logging.WARNING, logger="skydiscover.optimize.search.evox.controller"):
             await controller._check_meta_llm_availability()
 
         assert "Guide LLM (label generation)" in caplog.text
@@ -112,7 +111,7 @@ class TestCoEvolutionControllerAvailabilityCheck:
         controller.search_controller.guide_llms.check_availability = AsyncMock(return_value=True)
         controller.search_controller.llms.check_availability = AsyncMock(return_value=False)
 
-        with caplog.at_level(logging.WARNING, logger="skydiscover.search.evox.controller"):
+        with caplog.at_level(logging.WARNING, logger="skydiscover.optimize.search.evox.controller"):
             await controller._check_meta_llm_availability()
 
         assert "Meta-search LLM (search strategy evolution)" in caplog.text
@@ -120,4 +119,3 @@ class TestCoEvolutionControllerAvailabilityCheck:
         assert "share_llm: true" in caplog.text
         assert controller._guide_llm_available is True
         assert controller._meta_llm_available is False
-

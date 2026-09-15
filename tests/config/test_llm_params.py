@@ -5,11 +5,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from skydiscover.config import LLMConfig, LLMModelConfig
+from skydiscover.optimize.config import LLMConfig, LLMModelConfig
 
-_OPENAI_DEFAULT_API_BASE: str = next(
-    f.default for f in fields(LLMConfig) if f.name == "api_base"
-)
+_OPENAI_DEFAULT_API_BASE: str = next(f.default for f in fields(LLMConfig) if f.name == "api_base")
 
 
 class TestLLMConfigDefaults:
@@ -66,7 +64,7 @@ class TestApiBaseRouting:
 
 class TestOpenAILLMParams:
     def _make_llm(self, temperature=0.7, top_p=0.95):
-        from skydiscover.llm.openai import OpenAILLM
+        from skydiscover.optimize.llm.openai import OpenAILLM
 
         cfg = LLMModelConfig(
             name="test-model",
@@ -78,7 +76,7 @@ class TestOpenAILLMParams:
             retries=0,
             retry_delay=0,
         )
-        with patch("skydiscover.llm.openai.openai.OpenAI"):
+        with patch("skydiscover.optimize.llm.openai.openai.OpenAI"):
             llm = OpenAILLM(cfg)
         return llm
 

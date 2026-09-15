@@ -1,35 +1,19 @@
-"""
-Live integration test for the AlphaEvolve external backend.
+"""Live test of the AlphaEvolve external backend against the real Google Discovery Engine API.
 
-This test runs the full AlphaEvolve backend lifecycle against the real
-Google Discovery Engine API.  It is gated on GCP credentials **and** the
-required environment variables (``ALPHAEVOLVE_PROJECT_ID``,
-``ALPHAEVOLVE_ENGINE_ID``).  When either is missing the test is cleanly
-skipped.
-
-Markers:
-    @pytest.mark.integration  — requires a live external service
-    @pytest.mark.slow         — 10-minute wall-time budget
-
-Never logs GCP access tokens, project IDs, or full API response bodies
-in test output.  Uses ``iterations=3`` to keep the
-experiment short and avoid unnecessary API cost.
+Skipped unless GCP credentials and ALPHAEVOLVE_PROJECT_ID / ALPHAEVOLVE_ENGINE_ID are present.
+Marked integration and slow (10-minute budget). Never logs tokens, project ids, or response bodies.
 """
 
 import asyncio
 import os
 import textwrap
-from typing import Dict
 
 import pytest
 
-from skydiscover.api import DiscoveryResult
-from skydiscover.extras.external.alphaevolve_backend import run
+from skydiscover.optimize.api import DiscoveryResult
+from skydiscover.optimize.extras.external.alphaevolve_backend import run
 
-
-# ---------------------------------------------------------------------------
 # Credential / env-var gating helpers
-# ---------------------------------------------------------------------------
 
 
 def _has_gcp_credentials() -> bool:
@@ -59,12 +43,9 @@ def _has_alphaevolve_env_vars() -> bool:
     return bool(project_id) and bool(engine_id)
 
 
-# ---------------------------------------------------------------------------
 # Inline test data constants
-# ---------------------------------------------------------------------------
 
-TRIVIAL_EVALUATOR_SOURCE = textwrap.dedent(
-    """\
+TRIVIAL_EVALUATOR_SOURCE = textwrap.dedent("""\
     def evaluate(program_path: str) -> dict:
         \"\"\"Score based on source-code length to give AlphaEvolve score variance.\"\"\"
         with open(program_path, "r") as f:
@@ -73,20 +54,15 @@ TRIVIAL_EVALUATOR_SOURCE = textwrap.dedent(
         # meaningful score differences across candidates so it can drive evolution.
         score = min(1.0, len(source) / 200.0)
         return {"combined_score": score}
-    """
-)
+    """)
 
-SEED_PROGRAM_SOURCE = textwrap.dedent(
-    """\
+SEED_PROGRAM_SOURCE = textwrap.dedent("""\
     def solve(x):
         return x + 1
-    """
-)
+    """)
 
 
-# ---------------------------------------------------------------------------
 # Integration test
-# ---------------------------------------------------------------------------
 
 
 class TestAlphaEvolveIntegration:
@@ -96,24 +72,14 @@ class TestAlphaEvolveIntegration:
     @pytest.mark.slow
     @pytest.mark.asyncio
     async def test_live_lifecycle(self, tmp_path):  # type: ignore[no-untyped-def]
-        """Run the full AlphaEvolve backend lifecycle against the live API.
-
-        The test is cleanly skipped when credentials or env vars are absent.
-        On flaky API errors, it retries once with a 30-second backoff before
-        skipping.
-
-        Uses ``asyncio.wait_for`` with a 600-second (10-minute) timeout in
-        lieu of ``pytest-timeout`` which is not installed.
-        """
-        # -- Gate on credentials and env vars ---------------------------------
+        """The full backend lifecycle against the live API; one retry after 30 s on a flaky error."""
+        # Gate on credentials and env vars
         if not _has_gcp_credentials():
             pytest.skip("No GCP credentials available")
         if not _has_alphaevolve_env_vars():
-            pytest.skip(
-                "ALPHAEVOLVE_PROJECT_ID and/or ALPHAEVOLVE_ENGINE_ID not set"
-            )
+            pytest.skip("ALPHAEVOLVE_PROJECT_ID and/or ALPHAEVOLVE_ENGINE_ID not set")
 
-        # -- Write test artifacts to tmp_path ---------------------------------
+        # Write test artifacts to tmp_path
         evaluator = tmp_path / "evaluator.py"
         evaluator.write_text(TRIVIAL_EVALUATOR_SOURCE)
 
@@ -123,16 +89,16 @@ class TestAlphaEvolveIntegration:
         output = tmp_path / "output"
         output.mkdir()
 
-        # -- Minimal Config object (only needs file_suffix for the backend) ---
+        # Minimal Config object (only needs file_suffix for the backend)
         # The backend reads project_id / engine_id from env vars, so no
         # alphaevolve config section is required on the Config object.
-        from skydiscover.config import Config
+        from skydiscover.optimize.config import Config
 
         config = object.__new__(Config)
         config.file_suffix = ".py"
         config.language = "python"
 
-        # -- Retry wrapper (one retry + 30 s backoff) -------------------
+        # Retry wrapper (one retry + 30 s backoff)
         async def _attempt() -> DiscoveryResult:
             return await run(
                 program_path=str(seed),
@@ -148,9 +114,7 @@ class TestAlphaEvolveIntegration:
                 result = await asyncio.wait_for(_attempt(), timeout=600)
                 break
             except asyncio.TimeoutError:
-                pytest.skip(
-                    "AlphaEvolve API timed out after 600 s"
-                )
+                pytest.skip("AlphaEvolve API timed out after 600 s")
             except Exception as exc:
                 last_exc = exc
                 if attempt == 0:
@@ -158,11 +122,9 @@ class TestAlphaEvolveIntegration:
                     await asyncio.sleep(30)
                 else:
                     # Second failure — skip, not hard-fail
-                    pytest.skip(
-                        f"AlphaEvolve API flaky: {last_exc}"
-                    )
+                    pytest.skip(f"AlphaEvolve API flaky: {last_exc}")
 
-        # -- Assertions -----------------------------------------------
+        # Assertions
         assert isinstance(result, DiscoveryResult)
         assert isinstance(result.best_solution, str) and len(result.best_solution) > 0
         assert isinstance(result.best_score, float) and result.best_score >= 0.0

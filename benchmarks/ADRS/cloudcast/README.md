@@ -29,7 +29,7 @@ Based on the Skyplane/Cloudcast system (NSDI'24).
 From the repo root:
 
 ```bash
-uv run skydiscover-run \
+uv run skydiscover optimize \
   benchmarks/ADRS/cloudcast/initial_program.py \
   benchmarks/ADRS/cloudcast/evaluator.py \
   -c benchmarks/ADRS/cloudcast/config.yaml \

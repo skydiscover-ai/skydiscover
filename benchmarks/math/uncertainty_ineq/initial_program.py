@@ -3,14 +3,15 @@ import os
 
 os.environ["TQDM_DISABLE"] = "1"
 
+from dataclasses import dataclass
+
 # EVOLVE-BLOCK-START
 import jax
 import jax.numpy as jnp
-import optax
 import numpy as np
-from dataclasses import dataclass
-from scipy.special import hermite
+import optax
 import tqdm
+from scipy.special import hermite
 
 
 @dataclass

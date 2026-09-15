@@ -39,11 +39,11 @@ TASK_NUM=0 ARC_TASK_FILE=training CONFIG_OUT=./config_task_0.yaml \
   uv run python generate_config.py
 
 # Run with any backend
-uv run skydiscover-run initial_program.py evaluator.py \
+uv run skydiscover optimize initial_program.py evaluator.py \
   -c config_task_0.yaml -s [your_algorithm] -i 30
 
 # Or with evox, openevolve, gepa:
-uv run skydiscover-run initial_program.py evaluator.py \
+uv run skydiscover optimize initial_program.py evaluator.py \
   -c config_task_0.yaml -s [your_algorithm] -i 30
 ```
 
@@ -57,7 +57,7 @@ NUM_TASKS=$(uv run python -c "import json; print(len(json.load(open('data/arc-ag
 
 for i in $(seq 0 $((NUM_TASKS - 1))); do
   TASK_NUM=$i CONFIG_OUT=./config_task_${i}.yaml uv run python generate_config.py
-  TASK_NUM=$i uv run skydiscover-run initial_program.py evaluator.py \
+  TASK_NUM=$i uv run skydiscover optimize initial_program.py evaluator.py \
     -c config_task_${i}.yaml -s [your_algorithm] -i 30 \
     -o outputs/eval_task_${i}
 done
@@ -78,7 +78,7 @@ TASK_NUM=0 ARC_TASK_FILE=evaluation \
 Edit `config.yaml` — comment the GPT block and uncomment the Gemini block, or override with `--model`:
 
 ```bash
-uv run skydiscover-run ... -m gemini/gemini-3-pro-preview
+uv run skydiscover optimize ... -m gemini/gemini-3-pro-preview
 ```
 
 ## Files

@@ -5,6 +5,7 @@ from workloads import WORKLOAD_1, WORKLOAD_2, WORKLOAD_3
 
 # EVOLVE-BLOCK-START
 
+
 def get_best_schedule(workload, num_seqs):
     """
     Get optimal schedule using greedy cost sampling strategy.
@@ -12,6 +13,7 @@ def get_best_schedule(workload, num_seqs):
     Returns:
         Tuple of (lowest makespan, corresponding schedule)
     """
+
     def get_greedy_cost_sampled(num_samples, sample_rate):
         # greedy with random starting point
         start_txn = random.randint(0, workload.num_txns - 1)
@@ -22,7 +24,7 @@ def get_best_schedule(workload, num_seqs):
         # min_costs = []
         # key_map, total_cost = workload.get_incremental_seq_cost(start_txn, {}, 0)
         for i in range(0, workload.num_txns - 1):
-            min_cost = 100000 # MAX
+            min_cost = 100000  # MAX
             min_relative_cost = 10
             min_txn = -1
             # min_index = 0
@@ -54,14 +56,14 @@ def get_best_schedule(workload, num_seqs):
                 cost = 0
                 cost = workload.get_opt_seq_cost(test_seq)
                 if cost < min_cost:
-                # if relative_cost < min_relative_cost:
+                    # if relative_cost < min_relative_cost:
                     min_cost = cost
                     min_txn = t
                     # min_relative_cost = relative_cost
                     # min_index = j
                 if done:
                     break
-            assert(min_txn != -1)
+            assert min_txn != -1
             running_cost = min_cost
             txn_seq.append(min_txn)
             holdout_txns.remove(min_txn)
@@ -81,7 +83,9 @@ def get_best_schedule(workload, num_seqs):
 
     return get_greedy_cost_sampled(10, 1.0)
 
+
 # EVOLVE-BLOCK-END
+
 
 def get_random_costs():
     workload_size = 100

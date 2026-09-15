@@ -1,0 +1,5 @@
+{
+  "title": "Optimize",
+  "defaultOpen": true,
+  "pages": ["index", "quick-start", "evaluators", "configuration", "benchmarks"]
+}

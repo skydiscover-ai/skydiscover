@@ -1,0 +1,26 @@
+{
+  "title": "Redis — Derived System Card (code-to-spec)",
+  "source": "redis/redis @ f6ffa00 (unstable HEAD), ~199k LOC C. In-memory data-structure server.",
+  "derived_by": "code-to-spec pipeline (static source analysis, 8 axes)",
+
+  "purpose": "An in-memory key-value / data-structure server (strings, lists, sets, hashes, sorted sets, streams) with optional persistence, async replication, and hash-slot clustering. Single process, single-threaded command execution.",
+
+  "interface": {
+    "operations": ["GET/SET/INCR (string)", "LPUSH/RPOP (list)", "SADD/SISMEMBER (set)", "HSET/HGET (hash)", "ZADD/ZRANGE (sorted set)", "XADD/XREAD (stream)", "DEL/UNLINK", "MULTI/EXEC, WATCH", "EVAL/FUNCTION"],
+    "semantics": "Keys are opaque binary-safe strings in a per-DB hash table (kvstore = array of dicts; one dict per slot in cluster). Values are typed objects (robj) with adaptive physical encodings; optional per-key TTL.",
+    "access_pattern": "Point operations dominate; sorted sets add log-time range queries. No SQL/secondary indexes.",
+    "evidence": {"dispatch": "server.c:4391 processCommand, server.c:3588 lookupCommand", "keyspace": "server.h:1206 redisDb {kvstore *keys; kvstore *expires;}"}
+  },
+
+  "axes": {
+    "data_model": {"property": "Typed objects with adaptive compact→scaled encodings", "guarantee": "robj packs type:4/encoding:4/refcount/lru + ptr. Small collections use compact index-free encodings (listpack/intset, embstr ≤44B) and convert to hashtable/skiplist past configurable thresholds. Same commands across encodings.", "evidence": "object.h:100 redisObject; object.c:337 OBJ_ENCODING_EMBSTR_SIZE_LIMIT=44; config.c:3271-3357 thresholds"},
+    "durability": {"property": "RDB snapshots + AOF op-log; fsync cadence tunable", "guarantee": "Loss window = 0 (AOF always) / ≤1s (everysec, default) / ~30s (no) / minutes (RDB-only). fork()+COW for non-blocking snapshots; hybrid base RDB + incremental AOF; recovery via AOF manifest or RDB; atomic temp+rename.", "evidence": "aof.c:1147 flushAppendOnlyFile; server.h:643 AOF_FSYNC_NO/ALWAYS/EVERYSEC; rdb.c:2070 rdbSaveBackground; server.c:7612 loadDataFromDisk"},
+    "consistency": {"property": "Linearizable per key locally; eventual when replicated", "guarantee": "Single-thread gives a total order per key. Replication is ASYNCHRONOUS => eventual: the master acks before any replica has the write, so auto-failover loses unacked writes. WAIT/WAITAOF give opt-in stronger acks; cluster manual failover pauses to avoid loss.", "evidence": "replication.c:631 replicationFeedSlaves; replication.c:4754 waitCommand; cluster_legacy.c:4657 (manual failover pause)"},
+    "memory_reclamation": {"property": "No tracing GC: refcount + TTL expiry + approximate-LRU eviction + async free", "guarantee": "maxmemory enforces a hard cap via 8 eviction policies; approximate LRU/LFU samples ~5 keys into a fixed 16-entry pool. TTL expiry is lazy (on access) + active (adaptive cycle). Large objects freed on background threads. In-memory only — maxmemory evicts, never spills.", "evidence": "evict.c:532 performEvictions; evict.c:36 EVPOOL_SIZE 16; expire.c:287 activeExpireCycle; lazyfree.c:226 freeObjAsync"},
+    "concurrency": {"property": "Single-threaded keyspace; lock-free, atomic-for-free", "guarantee": "One thread runs the event loop and executes every command serially against a lock-free keyspace — so every command, MULTI/EXEC block, and script is atomic with no locks. I/O threads parallelize only socket read/parse + reply write; BIO threads + fork children do slow work off the hot path. Capped at one core for execution.", "evidence": "ae.c:492 aeMain; server.c:3928 call; iothread.c; bio.c:127 bioInit"},
+    "partitioning": {"property": "Optional cluster: 16384 client-routed hash slots", "guarantee": "slot = CRC16(key)&0x3FFF; each slot owned by one master; -MOVED/-ASK redirections let clients cache the slot map. Cross-slot multi-key ops are rejected (-CROSSSLOT) unless co-located via {hashtag}. Quorum-voted failover.", "evidence": "cluster.h:23 CLUSTER_SLOTS 16384; cluster.h:67 keyHashSlot; cluster.c:1448 MOVED / cluster.c:1282 CROSSSLOT"},
+    "transactions": {"property": "MULTI/EXEC + scripts atomic, but NO rollback", "guarantee": "MULTI/EXEC queues then runs commands as one uninterrupted serial batch; WATCH gives optimistic CAS; Lua/FUNCTION run atomically. CRITICAL: a runtime error mid-EXEC does NOT abort the rest — their effects persist. Not ACID. Serializable for the block's duration; a long script blocks all clients.", "evidence": "multi.c:127 execCommand; multi.c:186-237 (no rollback); eval.c:552 evalGenericCommand"}
+  },
+
+  "design_space_notes": "Redis's defining choices for a synthesizer to weigh: single-threaded lock-free keyspace (simplicity + atomicity vs single-core ceiling); in-memory + eviction (speed vs no larger-than-memory); async replication (throughput vs eventual/failover loss); compact adaptive encodings (density vs conversion cost); no-rollback transactions (speed vs ACID)."
+}

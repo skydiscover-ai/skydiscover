@@ -1,0 +1,51 @@
+{
+  "single_prompts": [
+    "def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(",
+    "def binary_search(arr, target):\n    lo, hi = 0, len(arr) - 1\n    while lo <= hi:\n        mid = (lo + hi) //",
+    "def add(a: int, b: int) ->",
+    "import json\n\nwith open(\"config.json\") as f:\n    config = json.",
+    "class Point:\n    def __init__(self, x, y):\n        self.x = x\n        self.y ="
+  ],
+  "shared_prefix_sets": [
+    {
+      "name": "utils_module_small",
+      "prefix": "# utils.py -- small file I/O helpers\n\ndef read_lines(path):\n    with open(path) as f:\n        return f.read().splitlines()\n\ndef write_lines(path, lines):\n    with open(path, \"w\") as f:\n        f.write(\"\\n\".join(lines))\n\ndef word_count(text):\n    return len(text.split())\n\n",
+      "branches": [
+        "# Count the number of lines in a file, reusing read_lines\ndef count_lines(path):\n    return len(read_lines(",
+        "# Read a file, uppercase every line, and write it back, reusing the helpers above\ndef shout_file(path):\n    lines = read_lines(path)\n    write_lines(path, [line.upper() for line in",
+        "# Return the total number of words across all lines of a file\ndef total_words(path):\n    return sum(word_count(line) for line in read_lines(",
+        "# Return the first non-empty line of a file, or None\ndef first_nonempty(path):\n    for line in read_lines(path):\n        if line.strip():\n            return"
+      ]
+    },
+    {
+      "name": "stack_class_small",
+      "prefix": "class Stack:\n    def __init__(self):\n        self.items = []\n\n    def push(self, item):\n        self.items.append(item)\n\n    def is_empty(self):\n        return len(self.items) == 0\n\n",
+      "branches": [
+        "    # Remove and return the top item; raise IndexError if empty\n    def pop(self):\n        if self.is_empty():\n            raise IndexError(\"pop from empty stack\")\n        return self.items.pop(",
+        "    # Return the top item without removing it\n    def peek(self):\n        return self.items[",
+        "    # Return the number of items on the stack\n    def size(self):\n        return len(self.",
+        "    # Return True if the stack contains the given item\n    def contains(self, item):\n        return item in self."
+      ]
+    },
+    {
+      "name": "json_config_structured",
+      "prefix": "import json\n\nDEFAULT_CONFIG = {\n    \"host\": \"localhost\",\n    \"port\": 8080,\n    \"debug\": False,\n    \"max_connections\": 100,\n}\n\n",
+      "branches": [
+        "# Load config from a path, falling back to DEFAULT_CONFIG on any error\ndef load_config(path):\n    try:\n        with open(path) as f:\n            return json.load(",
+        "# Return the port from a config dict, defaulting to DEFAULT_CONFIG's port\ndef get_port(config):\n    return config.get(\"port\", DEFAULT_CONFIG[",
+        "# Serialize a config dict to a JSON string with 2-space indentation\ndef dump_config(config):\n    return json.dumps(config, indent=",
+        "# Merge user overrides onto DEFAULT_CONFIG and return the result\ndef merged_config(overrides):\n    config = dict(DEFAULT_CONFIG)\n    config.update("
+      ]
+    },
+    {
+      "name": "medium_repo_context",
+      "prefix": "# geometry.py -- 2D vector utilities used across the project.\nimport math\n\n\nclass Vec2:\n    def __init__(self, x, y):\n        self.x = x\n        self.y = y\n\n    def __add__(self, other):\n        return Vec2(self.x + other.x, self.y + other.y)\n\n    def __sub__(self, other):\n        return Vec2(self.x - other.x, self.y - other.y)\n\n    def dot(self, other):\n        return self.x * other.x + self.y * other.y\n\n    def length(self):\n        return math.sqrt(self.dot(self))\n\n\ndef distance(a, b):\n    return (a - b).length()\n\n\ndef normalize(v):\n    n = v.length()\n    return Vec2(v.x / n, v.y / n)\n\n",
+      "branches": [
+        "# Return the midpoint of two Vec2 points\ndef midpoint(a, b):\n    return Vec2((a.x + b.x) / 2, (a.y + b.y) /",
+        "# Scale a Vec2 by a scalar factor\ndef scale(v, factor):\n    return Vec2(v.x * factor, v.y *",
+        "# Return the cosine of the angle between two vectors, reusing dot() and length()\ndef cos_angle(a, b):\n    return a.dot(b) / (a.length() * b.",
+        "# Return True if two points are within `eps` of each other, reusing distance()\ndef close(a, b, eps=1e-9):\n    return distance(a, b) <"
+      ]
+    }
+  ]
+}

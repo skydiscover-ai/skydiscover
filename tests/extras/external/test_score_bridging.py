@@ -2,7 +2,7 @@
 
 import pytest
 
-from skydiscover.extras.external.alphaevolve_backend import (
+from skydiscover.optimize.extras.external.alphaevolve_backend import (
     _ae_scores_to_metrics,
     _metrics_to_ae_scores,
 )
@@ -30,9 +30,7 @@ class TestMetricsToAeScores:
         assert metrics_found["speed"] == 0.7
 
     def test_filters_non_numeric(self) -> None:
-        result = _metrics_to_ae_scores(
-            {"score": 0.5, "name": "test", "passed": True}
-        )
+        result = _metrics_to_ae_scores({"score": 0.5, "name": "test", "passed": True})
 
         scores_list = result["scores"]["scores"]
         assert len(scores_list) == 1
@@ -49,21 +47,13 @@ class TestAeScoresToMetrics:
     """Tests for _ae_scores_to_metrics (AE format -> skydiscover metrics)."""
 
     def test_extracts_combined_score(self) -> None:
-        evaluation = {
-            "scores": {
-                "scores": [{"metric": "combined_score", "score": 0.9}]
-            }
-        }
+        evaluation = {"scores": {"scores": [{"metric": "combined_score", "score": 0.9}]}}
 
         result = _ae_scores_to_metrics(evaluation)
         assert result["combined_score"] == 0.9
 
     def test_auto_adds_combined_score_from_first(self) -> None:
-        evaluation = {
-            "scores": {
-                "scores": [{"metric": "accuracy", "score": 0.8}]
-            }
-        }
+        evaluation = {"scores": {"scores": [{"metric": "accuracy", "score": 0.8}]}}
 
         result = _ae_scores_to_metrics(evaluation)
         assert result["accuracy"] == 0.8
@@ -76,11 +66,7 @@ class TestAeScoresToMetrics:
         assert result == {}
 
     def test_none_score_becomes_zero(self) -> None:
-        evaluation = {
-            "scores": {
-                "scores": [{"metric": "combined_score", "score": None}]
-            }
-        }
+        evaluation = {"scores": {"scores": [{"metric": "combined_score", "score": None}]}}
 
         result = _ae_scores_to_metrics(evaluation)
         assert result["combined_score"] == 0.0

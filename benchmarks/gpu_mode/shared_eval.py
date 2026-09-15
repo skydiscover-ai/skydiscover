@@ -26,24 +26,23 @@ Optional benchmark configuration in reference.py:
   - BENCH_WARMUP_STYLE: str ('tiny_benchmark' or 'timed_calls', default 'tiny_benchmark')
 """
 
+import contextlib
+import copy
+import dataclasses
+import importlib.util
+import math
 import os
 import sys
-import copy
 import time
-import math
-import contextlib
-import dataclasses
 import traceback
-import importlib.util
-
-import torch
-import torch.cuda
-
-from skydiscover.evaluation.evaluation_result import EvaluationResult
 
 # Import problem-specific reference (the problem dir is already on sys.path
 # because SkyDiscover adds the evaluator file's directory before loading it).
 import reference
+import torch
+import torch.cuda
+
+from skydiscover.optimize.evaluation.evaluation_result import EvaluationResult
 
 # ---------------------------------------------------------------------------
 # Environment configuration
@@ -53,14 +52,14 @@ USE_MODAL = os.environ.get("GPUMODE_USE_MODAL", "false").lower() == "true"
 MODAL_GPU = os.environ.get("GPUMODE_MODAL_GPU", "H100")
 
 # Read benchmark configuration from reference module with defaults
-SCORE_SCALE = getattr(reference, 'SCORE_SCALE', 3000.0)
-BENCH_USE_CUDA_EVENTS = getattr(reference, 'BENCH_USE_CUDA_EVENTS', True)
-BENCH_REL_ERROR = getattr(reference, 'BENCH_REL_ERROR', 0.001)
-BENCH_WALL_TIMEOUT_NS = getattr(reference, 'BENCH_WALL_TIMEOUT_NS', 120e9)
-BENCH_NO_GRAD = getattr(reference, 'BENCH_NO_GRAD', False)
-BENCH_MAX_REPEATS = getattr(reference, 'BENCH_MAX_REPEATS', 100)
-BENCH_MAX_TIME_NS = getattr(reference, 'BENCH_MAX_TIME_NS', 10e9)
-BENCH_WARMUP_STYLE = getattr(reference, 'BENCH_WARMUP_STYLE', 'tiny_benchmark')
+SCORE_SCALE = getattr(reference, "SCORE_SCALE", 3000.0)
+BENCH_USE_CUDA_EVENTS = getattr(reference, "BENCH_USE_CUDA_EVENTS", True)
+BENCH_REL_ERROR = getattr(reference, "BENCH_REL_ERROR", 0.001)
+BENCH_WALL_TIMEOUT_NS = getattr(reference, "BENCH_WALL_TIMEOUT_NS", 120e9)
+BENCH_NO_GRAD = getattr(reference, "BENCH_NO_GRAD", False)
+BENCH_MAX_REPEATS = getattr(reference, "BENCH_MAX_REPEATS", 100)
+BENCH_MAX_TIME_NS = getattr(reference, "BENCH_MAX_TIME_NS", 10e9)
+BENCH_WARMUP_STYLE = getattr(reference, "BENCH_WARMUP_STYLE", "tiny_benchmark")
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -82,7 +81,7 @@ def _clone(data):
         return type(data)(**fields)
     if isinstance(data, torch.nn.Module):
         cloned = copy.deepcopy(data)
-        if hasattr(data, 'seq_len'):
+        if hasattr(data, "seq_len"):
             cloned.seq_len = data.seq_len
         return cloned
     return data
@@ -103,7 +102,7 @@ def _stats(durations):
 
 def _warmup(kernel_fn, bench_args):
     """Warmup the kernel to trigger Triton compilation."""
-    if BENCH_WARMUP_STYLE == 'timed_calls':
+    if BENCH_WARMUP_STYLE == "timed_calls":
         # MLA-style: run repeatedly for 200ms
         data = reference.generate_input(**bench_args)
         start = time.perf_counter()
@@ -168,8 +167,10 @@ def _bench_single(kernel_fn, bench_args, max_time_ns=None):
                     break
                 if st["mean"] * st["runs"] > max_time_ns:
                     break
-                if BENCH_WALL_TIMEOUT_NS is not None and \
-                   (time.perf_counter_ns() - bm_start) > BENCH_WALL_TIMEOUT_NS:
+                if (
+                    BENCH_WALL_TIMEOUT_NS is not None
+                    and (time.perf_counter_ns() - bm_start) > BENCH_WALL_TIMEOUT_NS
+                ):
                     break
 
     return _stats(durations_ns), None
@@ -184,9 +185,13 @@ def _evaluate_modal(submission_code):
     parent_dir = os.path.dirname(os.path.abspath(__file__))
     if parent_dir not in sys.path:
         sys.path.insert(0, parent_dir)
+    from modal_eval import app as modal_app
     from modal_eval import (
-        eval_triton_h100, eval_triton_a100, eval_triton_l40s, eval_triton_t4,
-        eval_triton_h200, app as modal_app,
+        eval_triton_a100,
+        eval_triton_h100,
+        eval_triton_h200,
+        eval_triton_l40s,
+        eval_triton_t4,
     )
 
     gpu_fns = {
@@ -198,12 +203,14 @@ def _evaluate_modal(submission_code):
     }
     eval_fn = gpu_fns.get(MODAL_GPU, eval_triton_h100)
 
-    ref_code = getattr(reference, 'MODAL_REFERENCE_CODE', None)
+    ref_code = getattr(reference, "MODAL_REFERENCE_CODE", None)
     if ref_code is None:
         return EvaluationResult(
             metrics={"combined_score": 0.0, "correctness": 0.0},
-            artifacts={"error": "MODAL_REFERENCE_CODE not defined in reference.py",
-                       "failure_stage": "modal_setup"},
+            artifacts={
+                "error": "MODAL_REFERENCE_CODE not defined in reference.py",
+                "failure_stage": "modal_setup",
+            },
         )
 
     with modal_app.run():
@@ -399,7 +406,10 @@ def evaluate_stage1(program_path):
             if not hasattr(mod, "custom_kernel"):
                 return EvaluationResult(
                     metrics={"combined_score": 0.0, "stage1_passed": 0.0},
-                    artifacts={"error": "custom_kernel not found after import", "failure_stage": "import"},
+                    artifacts={
+                        "error": "custom_kernel not found after import",
+                        "failure_stage": "import",
+                    },
                 )
         except Exception as exc:
             return EvaluationResult(

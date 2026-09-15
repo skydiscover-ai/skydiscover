@@ -1,10 +1,11 @@
-import numpy as np
-from typing import List, Tuple, Dict, Any
 import json
 import os
+from typing import Any, Dict, List, Tuple
+
+import numpy as np
 
 try:
-    from skydiscover.evaluation.evaluation_result import EvaluationResult
+    from skydiscover.optimize.evaluation.evaluation_result import EvaluationResult
 except ImportError:
     from dataclasses import dataclass, field
     from typing import Union
@@ -13,6 +14,8 @@ except ImportError:
     class EvaluationResult:
         metrics: Dict[str, float]
         artifacts: Dict[str, Union[str, bytes]] = field(default_factory=dict)
+
+
 import importlib.util
 
 TASK_FILE = os.getenv("ARC_TASK_FILE", "training")
@@ -49,8 +52,7 @@ def best_attempt_cell_accuracy(attempts: List[np.ndarray], gt: np.ndarray) -> fl
 
 
 def pass_at_2_accuracy_single(
-    attempts: List[np.ndarray],
-    gt: np.ndarray
+    attempts: List[np.ndarray], gt: np.ndarray
 ) -> Tuple[int, Dict[int, Any]]:
     """
     Compute pass@2 accuracy for a single ARC test case.
@@ -107,9 +109,9 @@ def pass_at_2_accuracy_single(
 
     return pass_at_2, diagnostics
 
+
 def pass_at_2_accuracy_multi_test(
-    all_attempts: List[List[np.ndarray]],
-    all_gt: List[np.ndarray]
+    all_attempts: List[List[np.ndarray]], all_gt: List[np.ndarray]
 ) -> Tuple[List[int], List[Dict[int, Any]]]:
     """
     Compute pass@2 accuracy across multiple ARC test cases.
@@ -130,6 +132,7 @@ def pass_at_2_accuracy_multi_test(
 
     return all_pass, all_diagnostics
 
+
 def extract_failure_artifacts(diagnostics, pred=None, gt=None):
     """
     Extract failure artifacts from diagnostics for a given example.
@@ -147,29 +150,31 @@ def extract_failure_artifacts(diagnostics, pred=None, gt=None):
             f"has shape {diagnostics['gt_shape']}. Review how you determine output dimensions."
         )
     else:
-        num_incorrect = diagnostics['num_incorrect']
-        num_total = diagnostics['num_total']
-        accuracy = diagnostics['cell_accuracy']
+        num_incorrect = diagnostics["num_incorrect"]
+        num_total = diagnostics["num_total"]
+        accuracy = diagnostics["cell_accuracy"]
         artifacts["error_type"] = "IncorrectCells"
         artifacts["error_message"] = (
-            f"{num_incorrect}/{num_total} cells incorrect "
-            f"(cell accuracy: {accuracy:.1%})."
+            f"{num_incorrect}/{num_total} cells incorrect " f"(cell accuracy: {accuracy:.1%})."
         )
         # Show a compact diff of expected vs actual for first few wrong cells
-        if diagnostics['incorrect_indices'] and pred is not None and gt is not None:
-            wrong = diagnostics['incorrect_indices'][:8]  # first 8 wrong cells
+        if diagnostics["incorrect_indices"] and pred is not None and gt is not None:
+            wrong = diagnostics["incorrect_indices"][:8]  # first 8 wrong cells
             diff_lines = []
             for r, c in wrong:
                 diff_lines.append(f"  [{r},{c}]: got {int(pred[r,c])}, expected {int(gt[r,c])}")
             artifacts["cell_diffs"] = "\n".join(diff_lines)
-            if len(diagnostics['incorrect_indices']) > 8:
-                artifacts["cell_diffs"] += f"\n  ... and {len(diagnostics['incorrect_indices'])-8} more"
+            if len(diagnostics["incorrect_indices"]) > 8:
+                artifacts[
+                    "cell_diffs"
+                ] += f"\n  ... and {len(diagnostics['incorrect_indices'])-8} more"
         artifacts["suggestion"] = (
             f"Your solution gets {accuracy:.1%} of cells correct. "
             f"Review the transformation logic for the failing cells."
         )
 
     return artifacts
+
 
 def evaluate(program_path):
     """
@@ -184,35 +189,39 @@ def evaluate(program_path):
     program_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(program_module)
 
-    if not hasattr(program_module, 'transform_grid_attempt_1') or not hasattr(program_module, 'transform_grid_attempt_2'):
-        print(f"Stage 1 validation failed: Program must define 'transform_grid_attempt_1' and 'transform_grid_attempt_2' functions.")
+    if not hasattr(program_module, "transform_grid_attempt_1") or not hasattr(
+        program_module, "transform_grid_attempt_2"
+    ):
+        print(
+            f"Stage 1 validation failed: Program must define 'transform_grid_attempt_1' and 'transform_grid_attempt_2' functions."
+        )
 
         error_artifacts = {
-                "error_type": "MissingFunction",
-                "error_message": "Stage 1: Program is missing required 'transform_grid_attempt_1' and 'transform_grid_attempt_2' functions.",
-                "suggestion": "Make sure your program includes a functions named 'transform_grid_attempt_1' and 'transform_grid_attempt_2' that take as an argument a 2D numpy array and return a 2D numpy array."
-            }
+            "error_type": "MissingFunction",
+            "error_message": "Stage 1: Program is missing required 'transform_grid_attempt_1' and 'transform_grid_attempt_2' functions.",
+            "suggestion": "Make sure your program includes a functions named 'transform_grid_attempt_1' and 'transform_grid_attempt_2' that take as an argument a 2D numpy array and return a 2D numpy array.",
+        }
 
         return EvaluationResult(
-                metrics={
-                    "runs_successfully": 0.0,
-                    "combined_score": 0.0,
-                    "error": "Missing transform_grid_attempt_1 and transform_grid_attempt_2 functions"
-                },
-                artifacts=error_artifacts
-            )
+            metrics={
+                "runs_successfully": 0.0,
+                "combined_score": 0.0,
+                "error": "Missing transform_grid_attempt_1 and transform_grid_attempt_2 functions",
+            },
+            artifacts=error_artifacts,
+        )
 
     # Load ARC tasks
     challenge_path = os.path.join(DATA_ROOT, f"arc-agi_{TASK_FILE}_challenges.json")
 
-    with open(challenge_path, 'r') as f:
+    with open(challenge_path, "r") as f:
         tasks = json.load(f)
 
     task_id = list(tasks.keys())[int(TASK_NUM)]
     task = tasks[task_id]
 
-    train_inputs = [np.array(inp["input"]) for inp in task['train']]
-    train_gts = [np.array(gt["output"]) for gt in task['train']]
+    train_inputs = [np.array(inp["input"]) for inp in task["train"]]
+    train_gts = [np.array(gt["output"]) for gt in task["train"]]
 
     train_attempts = []
 
@@ -225,16 +234,16 @@ def evaluate(program_path):
             error_artifacts = {
                 "error_type": "InvalidReturnType",
                 "error_message": "Stage 1: transform_grid_attempt_1 did not return a numpy array.",
-                "suggestion": "Make sure your transform_grid_attempt_1 function returns a 2D numpy array."
+                "suggestion": "Make sure your transform_grid_attempt_1 function returns a 2D numpy array.",
             }
 
             return EvaluationResult(
                 metrics={
                     "runs_successfully": 0.0,
                     "combined_score": 0.0,
-                    "error": "transform_grid_attempt_1 did not return a numpy array"
+                    "error": "transform_grid_attempt_1 did not return a numpy array",
                 },
-                artifacts=error_artifacts
+                artifacts=error_artifacts,
             )
 
         attempt_2 = program_module.transform_grid_attempt_2(inp)
@@ -244,26 +253,27 @@ def evaluate(program_path):
             error_artifacts = {
                 "error_type": "InvalidReturnType",
                 "error_message": "Stage 1: transform_grid_attempt_2 did not return a numpy array.",
-                "suggestion": "Make sure your transform_grid_attempt_2 function returns a 2D numpy array."
+                "suggestion": "Make sure your transform_grid_attempt_2 function returns a 2D numpy array.",
             }
 
             return EvaluationResult(
                 metrics={
                     "runs_successfully": 0.0,
                     "combined_score": 0.0,
-                    "error": "transform_grid_attempt_2 did not return a numpy array"
+                    "error": "transform_grid_attempt_2 did not return a numpy array",
                 },
-                artifacts=error_artifacts
+                artifacts=error_artifacts,
             )
         train_attempts.append([attempt_1, attempt_2])
 
-    pass_at_2_train, train_diagnostics_list = pass_at_2_accuracy_multi_test(train_attempts, train_gts)
+    pass_at_2_train, train_diagnostics_list = pass_at_2_accuracy_multi_test(
+        train_attempts, train_gts
+    )
 
     # Compute both binary pass@2 and continuous cell accuracy
     train_pass_score = sum(pass_at_2_train) / len(pass_at_2_train)
     train_cell_acc = sum(
-        best_attempt_cell_accuracy(attempts, gt)
-        for attempts, gt in zip(train_attempts, train_gts)
+        best_attempt_cell_accuracy(attempts, gt) for attempts, gt in zip(train_attempts, train_gts)
     ) / len(train_gts)
 
     # Blended score: pass@2 (60%) + cell accuracy (40%) gives gradient signal
@@ -277,7 +287,9 @@ def evaluate(program_path):
         "train_cell_accuracy": round(train_cell_acc, 4),
     }
     error_artifacts = {}
-    for i, (train_pass, train_diagnostics) in enumerate(zip(pass_at_2_train, train_diagnostics_list)):
+    for i, (train_pass, train_diagnostics) in enumerate(
+        zip(pass_at_2_train, train_diagnostics_list)
+    ):
         example_name = f"train_example_{i}"
         metrics[f"{example_name}_pass_at_2"] = train_pass
         best_acc = best_attempt_cell_accuracy(train_attempts[i], train_gts[i])
@@ -288,15 +300,15 @@ def evaluate(program_path):
             if not attempt_pass:
                 pred = train_attempts[i][attempt]
                 gt = train_gts[i]
-                error_artifacts[f"{example_name}_attempt_{attempt}_diagnostics"] = extract_failure_artifacts(
-                    train_diagnostics[attempt], pred=pred, gt=gt
+                error_artifacts[f"{example_name}_attempt_{attempt}_diagnostics"] = (
+                    extract_failure_artifacts(train_diagnostics[attempt], pred=pred, gt=gt)
                 )
 
     # Optional: include test feedback (uses solutions if available)
     if INCLUDE_TEST:
         solution_path = os.path.join(DATA_ROOT, f"arc-agi_{TASK_FILE}_solutions.json")
         if os.path.isfile(solution_path):
-            with open(solution_path, 'r') as f:
+            with open(solution_path, "r") as f:
                 solutions = json.load(f)
             task_id = list(tasks.keys())[int(TASK_NUM)]
             solution = solutions.get(task_id)
@@ -307,7 +319,7 @@ def evaluate(program_path):
                         f"but {len(solution)} solution outputs. Check that arc-agi_{TASK_FILE}_challenges.json "
                         f"and arc-agi_{TASK_FILE}_solutions.json were generated together."
                     )
-                test_inputs = [np.array(inp["input"]) for inp in task['test']]
+                test_inputs = [np.array(inp["input"]) for inp in task["test"]]
                 test_gts = [np.array(gt) for gt in solution]
 
                 test_attempts = []
@@ -319,13 +331,13 @@ def evaluate(program_path):
                             metrics={
                                 "runs_successfully": 0.0,
                                 "combined_score": 0.0,
-                                "error": "transform_grid_attempt_1 did not return a numpy array (test)"
+                                "error": "transform_grid_attempt_1 did not return a numpy array (test)",
                             },
                             artifacts={
                                 "error_type": "InvalidReturnType",
                                 "error_message": "Stage 1: transform_grid_attempt_1 did not return a numpy array (test).",
-                                "suggestion": "Make sure transform_grid_attempt_1 returns a 2D numpy array."
-                            }
+                                "suggestion": "Make sure transform_grid_attempt_1 returns a 2D numpy array.",
+                            },
                         )
 
                     attempt_2 = program_module.transform_grid_attempt_2(inp)
@@ -335,17 +347,19 @@ def evaluate(program_path):
                             metrics={
                                 "runs_successfully": 0.0,
                                 "combined_score": 0.0,
-                                "error": "transform_grid_attempt_2 did not return a numpy array (test)"
+                                "error": "transform_grid_attempt_2 did not return a numpy array (test)",
                             },
                             artifacts={
                                 "error_type": "InvalidReturnType",
                                 "error_message": "Stage 1: transform_grid_attempt_2 did not return a numpy array (test).",
-                                "suggestion": "Make sure transform_grid_attempt_2 returns a 2D numpy array."
-                            }
+                                "suggestion": "Make sure transform_grid_attempt_2 returns a 2D numpy array.",
+                            },
                         )
                     test_attempts.append([attempt_1, attempt_2])
 
-                pass_at_2_test, test_diagnostics_list = pass_at_2_accuracy_multi_test(test_attempts, test_gts)
+                pass_at_2_test, test_diagnostics_list = pass_at_2_accuracy_multi_test(
+                    test_attempts, test_gts
+                )
                 test_pass_score = sum(pass_at_2_test) / len(pass_at_2_test)
                 test_cell_acc = sum(
                     best_attempt_cell_accuracy(attempts, gt)
@@ -358,16 +372,24 @@ def evaluate(program_path):
                 metrics["test_cell_accuracy"] = round(test_cell_acc, 4)
                 metrics["test_included"] = 1
 
-                for i, (test_pass, test_diagnostics) in enumerate(zip(pass_at_2_test, test_diagnostics_list)):
+                for i, (test_pass, test_diagnostics) in enumerate(
+                    zip(pass_at_2_test, test_diagnostics_list)
+                ):
                     example_name = f"test_example_{i}"
                     metrics[f"{example_name}_pass_at_2"] = test_pass
                     best_acc = best_attempt_cell_accuracy(test_attempts[i], test_gts[i])
                     metrics[f"{example_name}_cell_accuracy"] = round(best_acc, 4)
                     for attempt in test_diagnostics:
-                        metrics[f"{example_name}_attempt_{attempt}"] = test_diagnostics[attempt]["perfect_match"]
+                        metrics[f"{example_name}_attempt_{attempt}"] = test_diagnostics[attempt][
+                            "perfect_match"
+                        ]
                     if test_pass == 0:
                         first_failing_idx = next(
-                            (a for a in test_diagnostics if not test_diagnostics[a]["perfect_match"]),
+                            (
+                                a
+                                for a in test_diagnostics
+                                if not test_diagnostics[a]["perfect_match"]
+                            ),
                             0,
                         )
                         pred = test_attempts[i][first_failing_idx]
@@ -383,10 +405,7 @@ def evaluate(program_path):
         else:
             metrics["test_included"] = 0
 
-    return EvaluationResult(
-        metrics=metrics,
-        artifacts=error_artifacts
-    )
+    return EvaluationResult(metrics=metrics, artifacts=error_artifacts)
 
 
 def _evaluate_as_dict(program_path):

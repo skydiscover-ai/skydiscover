@@ -5,12 +5,12 @@ This evaluator integrates with SkyDiscover to evaluate generated C++ solutions
 against Frontier-CS benchmark problems using the local judge server.
 """
 
-import traceback
-from pathlib import Path
 import logging
-import sys
 import os
 import random
+import sys
+import traceback
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +19,11 @@ DEFAULT_JUDGE_URL = "http://localhost:8081"
 JUDGE_URLS = os.environ.get("JUDGE_URLS", DEFAULT_JUDGE_URL).split(",")
 JUDGE_URLS = [url.strip() for url in JUDGE_URLS if url.strip()]
 
+
 def get_judge_url() -> str:
     """Get a judge URL using random selection for load balancing."""
     return random.choice(JUDGE_URLS)
+
 
 # Add Frontier-CS to path
 frontier_cs_path = Path(__file__).resolve().parent / "Frontier-CS" / "src"
@@ -29,12 +31,15 @@ if str(frontier_cs_path) not in sys.path:
     sys.path.insert(0, str(frontier_cs_path))
 
 try:
-    from frontier_cs.single_evaluator import SingleEvaluator as FrontierCSEvaluator
     from frontier_cs.runner.base import EvaluationStatus
+    from frontier_cs.single_evaluator import SingleEvaluator as FrontierCSEvaluator
 except ImportError as e:
     logger.error(f"Failed to import Frontier-CS: {e}")
-    logger.error("Please ensure Frontier-CS is installed as a submodule in benchmarks/frontier-cs-eval/Frontier-CS")
+    logger.error(
+        "Please ensure Frontier-CS is installed as a submodule in benchmarks/frontier-cs-eval/Frontier-CS"
+    )
     raise
+
 
 def evaluate(program_path: str, problem_id: str = None, **kwargs) -> dict:
     """
@@ -59,9 +64,10 @@ def evaluate(program_path: str, problem_id: str = None, **kwargs) -> dict:
     # Get problem_id from parameter, environment, or kwargs
     if problem_id is None:
         import os
-        problem_id = os.environ.get('FRONTIER_CS_PROBLEM')
+
+        problem_id = os.environ.get("FRONTIER_CS_PROBLEM")
         if problem_id is None:
-            problem_id = kwargs.get('frontier_cs_problem', '0')
+            problem_id = kwargs.get("frontier_cs_problem", "0")
 
     logger.info(f"Evaluating program {program_path} for Frontier-CS problem {problem_id}")
 
@@ -74,7 +80,7 @@ def evaluate(program_path: str, problem_id: str = None, **kwargs) -> dict:
             judge_url=judge_url,
             register_cleanup=False,
         )
-        
+
         # Read the solution code
         solution_path = Path(program_path)
         if not solution_path.exists():
@@ -88,16 +94,17 @@ def evaluate(program_path: str, problem_id: str = None, **kwargs) -> dict:
                 "problem_id": problem_id,
                 "program_path": program_path,
             }
-        
+
         # Extract code and remove any EVOLVE-BLOCK markers
-        code = solution_path.read_text().replace(
-            "// EVOLVE-BLOCK-START", ""
-        ).replace(
-            "// EVOLVE-BLOCK-END", ""
-        ).strip()
-        
+        code = (
+            solution_path.read_text()
+            .replace("// EVOLVE-BLOCK-START", "")
+            .replace("// EVOLVE-BLOCK-END", "")
+            .strip()
+        )
+
         logger.info(f"Code extracted from {program_path}")
-        
+
         # Evaluate the solution
         result = evaluator.evaluate(
             track="algorithmic",
@@ -105,15 +112,17 @@ def evaluate(program_path: str, problem_id: str = None, **kwargs) -> dict:
             code=code,
             backend="docker",
         )
-        
+
         logger.info(f"Evaluation completed with status: {result.status}")
-        
+
         # Process result
         if result.status == EvaluationStatus.SUCCESS:
             print(result)
             score = result.score
             # Use unbounded score for optimization (allows >100 if beating reference)
-            score_unbounded = result.metadata.get('scoreUnbounded', score) if result.metadata else score
+            score_unbounded = (
+                result.metadata.get("scoreUnbounded", score) if result.metadata else score
+            )
             print(f"score={score}, score_unbounded={score_unbounded}")
 
             # Extract only essential metadata (exclude large test case outputs)
@@ -137,7 +146,7 @@ def evaluate(program_path: str, problem_id: str = None, **kwargs) -> dict:
                 "program_path": program_path,
                 "duration_seconds": result.duration_seconds,
                 "metadata": essential_metadata,
-            } 
+            }
         elif result.status == EvaluationStatus.TIMEOUT:
             logger.warning(f"Evaluation timed out: {result.message}")
             return {
@@ -159,7 +168,7 @@ def evaluate(program_path: str, problem_id: str = None, **kwargs) -> dict:
                 "program_path": program_path,
                 "logs": result.logs,
             }
-            
+
     except Exception as e:
         logger.error(f"Evaluation failed completely: {str(e)}")
         logger.error(traceback.format_exc())

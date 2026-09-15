@@ -1,8 +1,10 @@
-from typing import List
-import networkx as nx
 import json
+from typing import List
+
+import networkx as nx
 from broadcast import *
 from utils import *
+
 
 class BCSimulator:
     # Default variables
@@ -110,7 +112,9 @@ class BCSimulator:
                     if not g.has_edge(src, dst):
                         cost = edge_data["cost"]
                         throughput = edge_data["throughput"]  # * self.default_vms_per_region
-                        g.add_edge(src, dst, throughput=throughput, cost=edge_data["cost"], flow=throughput)
+                        g.add_edge(
+                            src, dst, throughput=throughput, cost=edge_data["cost"], flow=throughput
+                        )
                         g[src][dst]["partitions"] = set()
                     g[src][dst]["partitions"].add(partition_id)
 
@@ -133,7 +137,9 @@ class BCSimulator:
                     # or assign based on num of incoming flows
                     flow_proportion = 1 / len(list(in_edges))
 
-                    g[src][dst]["flow"] = min(g[src][dst]["flow"], self.ingress_limits[provider] * flow_proportion)
+                    g[src][dst]["flow"] = min(
+                        g[src][dst]["flow"], self.ingress_limits[provider] * flow_proportion
+                    )
 
             if out_flow_sum > self.egress_limits[provider]:
                 # print("\nExceed egress limit")
@@ -147,12 +153,16 @@ class BCSimulator:
                     flow_proportion = 1 / len(list(out_edges))
 
                     print(f"src: {src}, dst: {dst}, flow proportion: {flow_proportion}")
-                    g[src][dst]["flow"] = min(g[src][dst]["flow"], self.egress_limits[provider] * flow_proportion)
+                    g[src][dst]["flow"] = min(
+                        g[src][dst]["flow"], self.egress_limits[provider] * flow_proportion
+                    )
 
         return g
 
     def __get_path(self):
-        all_paths = [path for node in self.dsts for path in nx.all_simple_paths(self.g, self.src, node)]
+        all_paths = [
+            path for node in self.dsts for path in nx.all_simple_paths(self.g, self.src, node)
+        ]
         return all_paths
 
     def __slowest_capacity_link(self):
@@ -166,8 +176,8 @@ class BCSimulator:
             partition_time = float("-inf")
             for i in range(self.num_partitions):
                 path_edges = self.paths[dst][str(i)]
-                bottleneck = min(self.g[e[0]][e[1]]['flow'] for e in path_edges)
-                t = self.partition_data_vol / bottleneck if bottleneck > 0 else float('inf')
+                bottleneck = min(self.g[e[0]][e[1]]["flow"] for e in path_edges)
+                t = self.partition_data_vol / bottleneck if bottleneck > 0 else float("inf")
                 partition_time = max(partition_time, t)
             t_dict[dst] = partition_time
 
@@ -182,7 +192,7 @@ class BCSimulator:
             edge_data = edge[-1]
             sum_egress_cost += (
                 len(edge_data["partitions"]) * self.partition_data_vol * edge_data["cost"]
-            )  
+            )
 
         runtime_s, _, _ = self.__transfer_time(log=False)
         runtime_s = round(runtime_s, 2)
@@ -190,7 +200,9 @@ class BCSimulator:
         for node in self.g.nodes():
             # print("Default vm per region: ", self.default_vms_per_region)
             # print("Cost per instance hr: ", (self.cost_per_instance_hr / 3600) * runtime_s)
-            sum_instance_cost += self.default_vms_per_region * (self.cost_per_instance_hr / 3600) * runtime_s
+            sum_instance_cost += (
+                self.default_vms_per_region * (self.cost_per_instance_hr / 3600) * runtime_s
+            )
 
         sum_cost = sum_egress_cost + sum_instance_cost
         return sum_cost

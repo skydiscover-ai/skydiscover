@@ -1,6 +1,6 @@
 """Tests for LLM generation time and evaluation time instrumentation."""
 
-from skydiscover.search.utils.discovery_utils import SerializableResult
+from skydiscover.optimize.search.utils.discovery_utils import SerializableResult
 
 
 class TestSerializableResultTimeFields:

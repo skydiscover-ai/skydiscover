@@ -1,0 +1,51 @@
+---
+title: "Overview"
+description: "Describe the system you need. Coding agents build it for your workload, hardware, and requirements."
+---
+
+SkyDiscover-Synthesize (SkySynth) builds a system specialized for your own workload, hardware, and
+requirements, not a one-size-fits-all system. You describe it in plain text or a formal spec.
+Coding agents build it.
+
+The hard part is trust: agents reward hack, finding changes that raise the score while breaking
+what you meant. So the specification grows with the implementation,
+as tests when the requirements cannot be formalized and as machine-checked proofs when they can.
+
+<img src="/img/synthesize_architecture.png" alt="SkySynth: initial specification, synthesis loop, and final deliverables" />
+
+## Two approaches
+
+| Approach | Use it when | How correctness is checked |
+|:---|:---|:---|
+| [Test-driven](https://arxiv.org/abs/2605.24096) | You have a plain-text description | Tests that grow with the implementation. The Auditor adds one for every reward hack it finds |
+| [Formal-proof-driven](https://arxiv.org/abs/2605.23109) | You have a formal spec (e.g. Rocq) | A machine-checked proof, built step by step with the code |
+
+## How it works
+
+1. **Initial Specification**. The Spec Builder studies real systems of the same kind (the domain)
+   and turns what it learns, plus your prompt, into a specification: requirements, environment,
+   workload, and optionally a formal spec.
+2. **Synthesis loop**. The Planner proposes a design, the Coding Agent implements it, the Evaluator runs
+   the tests and the benchmark, and the Critic guides the next round. The Auditor looks
+   for reward hacks (changes that raise the score while violating what you meant) and turns each
+   one into a new test; those tests join the knowledge base the next run in the domain starts from.
+3. **Final Deliverables**. The implementation, its tests or proof, its score, and `spec.md`: the
+   properties it satisfies, what was measured, and how each scored iteration (checkpoint) fared.
+
+## Results
+
+SkySynth has built key-value stores up to 2.3x faster than Redis and FASTER (plus formally verified
+distributed ones), LLM inference engines with up to 2.2x the throughput of vLLM and SGLang, and
+model routers at up to 48% lower cost. Each is a checked-in [example](/docs/synthesize/examples)
+you can run.
+
+## Guides
+
+- [Quick Start](/docs/synthesize/quick-start): install the skill in your coding agent, run one prompt, read the result
+- [Examples](/docs/synthesize/examples): the tutorial and four systems you can build, and how to write your own
+
+## Read more
+
+- [Blog post](https://skydiscover-ai.github.io/blog-skysynth.html)
+- [The Time is Here for Just-in-Time Systems](https://arxiv.org/abs/2605.24096) (test-driven)
+- [Inductive Deductive Synthesis](https://arxiv.org/abs/2605.23109) (formal-proof-driven)

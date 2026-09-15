@@ -1,10 +1,13 @@
-import traceback
-from pathlib import Path
-from ale_bench.result import CaseResult, JudgeResult, Result
-from ale_bench_eval.safe_ale_session import start_ale_bench_session
 import logging
 import sys
+import traceback
+from pathlib import Path
+
+from ale_bench.result import CaseResult, JudgeResult, Result
+from ale_bench_eval.safe_ale_session import start_ale_bench_session
+
 logger = logging.getLogger(__name__ + "_" + "ALE_BENCH_EVALUATOR")
+
 
 def result_feedback(result: Result) -> CaseResult:
     if result.overall_judge_result == JudgeResult.ACCEPTED:
@@ -17,9 +20,12 @@ def result_feedback(result: Result) -> CaseResult:
                 break
         return result.case_results[selected_case_idx]
 
+
 def evaluate(program_path):
     problem_id = "ahc027"
-    logger.info(f"Evaluating program {program_path} for problem {problem_id} in ale bench evaluator")
+    logger.info(
+        f"Evaluating program {program_path} for problem {problem_id} in ale bench evaluator"
+    )
     try:
         session = None
         logger.info("Starting ALE-Bench session")
@@ -32,7 +38,13 @@ def evaluate(program_path):
         if not session:
             raise RuntimeError("Failed to start or restart the session.")
         optim_factor = 1 if session.problem.metadata.score_type == "maximize" else -1
-        code = Path(program_path).read_text().replace("# EVOLVE-BLOCK-START", "").replace("# EVOLVE-BLOCK-END", "").strip()
+        code = (
+            Path(program_path)
+            .read_text()
+            .replace("# EVOLVE-BLOCK-START", "")
+            .replace("# EVOLVE-BLOCK-END", "")
+            .strip()
+        )
         logger.info("Code extracted")
         num_public_cases = 50
         cases = session.case_gen(list(range(num_public_cases)))
@@ -50,8 +62,14 @@ def evaluate(program_path):
         return {
             "judge_result": public_result.overall_judge_result.value,
             "overall_score": public_result.overall_absolute_score,
-            "max_execution_time_sec": max([case_result.execution_time for case_result in public_result.case_results]),
-            "max_memory_usage_mib": max([case_result.memory_usage for case_result in public_result.case_results]) // 1024 // 1024,
+            "max_execution_time_sec": max(
+                [case_result.execution_time for case_result in public_result.case_results]
+            ),
+            "max_memory_usage_mib": max(
+                [case_result.memory_usage for case_result in public_result.case_results]
+            )
+            // 1024
+            // 1024,
             "standard_error": extracted_case.error_str,
             "message": extracted_case.message,
             "combined_score": combined_score,

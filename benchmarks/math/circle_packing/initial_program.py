@@ -1,5 +1,6 @@
 # EVOLVE-BLOCK-START
 """Constructor-based circle packing for n=26 circles"""
+
 import numpy as np
 
 

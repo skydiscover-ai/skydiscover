@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from skydiscover.config import (
+from skydiscover.optimize.config import (
     Config,
     LLMConfig,
     LLMModelConfig,
@@ -15,8 +15,7 @@ from skydiscover.config import (
     _resolve_api_key_from_env,
 )
 
-
-# ── _parse_model_spec ──────────────────────────────────────────────
+# _parse_model_spec
 
 
 class TestParseModelSpec:
@@ -59,7 +58,7 @@ class TestParseModelSpec:
         assert api_base is None
 
 
-# ── _resolve_api_key_from_env ───────────────────────────────────────
+# _resolve_api_key_from_env
 
 
 class TestResolveApiKeyFromEnv:
@@ -96,7 +95,7 @@ class TestResolveApiKeyFromEnv:
         assert result is None
 
 
-# ── LLMConfig defaults ─────────────────────────────────────────────
+# LLMConfig defaults
 
 
 class TestLLMConfigApiBaseDefault:
@@ -109,7 +108,7 @@ class TestLLMConfigApiBaseDefault:
         assert cfg.api_base == "http://localhost:8000/v1"
 
 
-# ── OpenAI-configured runs still work ──────────────────────────────
+# OpenAI-configured runs still work
 
 
 class TestOpenAIConfiguredRuns:
@@ -142,7 +141,62 @@ class TestOpenAIConfiguredRuns:
         assert cfg.models[0].api_key == "sk-test-123"
 
 
-# ── Non-OpenAI runs use correct provider ───────────────────────────
+# provider prefix is stripped from the name sent to the API
+
+
+class TestProviderPrefixStripped:
+    """`provider/model` must reach the API as the bare `model` for every provider. The openai case
+    regressed once: `openai/gpt-4.1` was sent verbatim and the API 400'd on the unknown model id."""
+
+    @pytest.mark.parametrize(
+        "spec, expected",
+        [
+            ("openai/gpt-4.1", "gpt-4.1"),
+            ("gemini/gemini-3-pro", "gemini-3-pro"),
+            ("anthropic/claude-3-sonnet", "claude-3-sonnet"),
+            ("deepseek/deepseek-chat", "deepseek-chat"),
+            ("gpt-5", "gpt-5"),  # bare name, nothing to strip
+        ],
+    )
+    def test_known_provider_prefix_is_stripped(self, spec, expected):
+        cfg = LLMConfig(models=[LLMModelConfig(name=spec)])
+        assert cfg.models[0].name == expected
+
+    def test_unknown_provider_prefix_is_left_verbatim(self):
+        """An unrecognized `provider/model` is passed through untouched (routed via --api-base)."""
+        cfg = LLMConfig(models=[LLMModelConfig(name="mycorp/custom-model")])
+        assert cfg.models[0].name == "mycorp/custom-model"
+
+    def test_openai_prefix_stripped_even_with_custom_api_base(self):
+        """A custom proxy still receives the bare model name, not the `openai/` alias."""
+        cfg = LLMConfig(
+            api_base="http://localhost:8000/v1",
+            models=[LLMModelConfig(name="openai/gpt-4.1")],
+        )
+        assert cfg.models[0].name == "gpt-4.1"
+        assert cfg.models[0].api_base == "http://localhost:8000/v1"
+
+
+# ── search.database unknown keys are kept but warned (typo safety) ──
+
+
+class TestDatabaseExtraKeysWarn:
+    def test_unknown_key_warns_and_is_kept(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="skydiscover.optimize.config"):
+            cfg = Config.from_dict(
+                {"search": {"type": "adaevolve", "database": {"intesity_min": 0.2}}}
+            )
+        assert "unknown keys" in caplog.text and "intesity_min" in caplog.text
+        assert cfg.search.database.intesity_min == 0.2  # still applied, for forward-compat
+
+    def test_declared_field_does_not_warn(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="skydiscover.optimize.config"):
+            cfg = Config.from_dict({"search": {"type": "adaevolve", "database": {"decay": 0.8}}})
+        assert "unknown keys" not in caplog.text
+        assert cfg.search.database.decay == 0.8
+
+
+# Non-OpenAI runs use correct provider
 
 
 class TestNonOpenAIProviderRouting:
@@ -210,7 +264,47 @@ class TestNonOpenAIProviderRouting:
         assert "anthropic.com" in cfg.models[2].api_base
 
 
-# ── MonitorConfig defaults ─────────────────────────────────────────
+# FreeToken / keyless local providers
+
+
+class TestFreeTokenProvider:
+    def test_parse_defaults_to_local_endpoint(self):
+        provider, name, api_base, env_vars = _parse_model_spec("freetoken/Qwen3.6-35B-A3B")
+        assert provider == "freetoken"
+        assert name == "Qwen3.6-35B-A3B"
+        assert api_base == "http://127.0.0.1:1919/v1"
+        assert env_vars == []
+
+    def test_keyless_provider_gets_placeholder_key(self):
+        assert _resolve_api_key_from_env([], "freetoken") == "EMPTY"
+        assert _resolve_api_key_from_env([], "ollama") == "EMPTY"
+        assert _resolve_api_key_from_env([], "vllm") == "EMPTY"
+
+    def test_unknown_provider_still_returns_none(self):
+        assert _resolve_api_key_from_env([], None) is None
+        assert _resolve_api_key_from_env([], "mycompany") is None
+
+    def test_config_works_with_no_env_or_flags(self):
+        """freetoken/<model> resolves endpoint, bare name, and placeholder key off-the-shelf."""
+        env = os.environ.copy()
+        env.pop("OPENAI_API_KEY", None)
+        with patch.dict(os.environ, env, clear=True):
+            cfg = LLMConfig(models=[LLMModelConfig(name="freetoken/Qwen3.6-35B-A3B")])
+        model = cfg.models[0]
+        assert model.name == "Qwen3.6-35B-A3B"
+        assert model.api_base == "http://127.0.0.1:1919/v1"
+        assert model.api_key == "EMPTY"
+
+    def test_custom_api_base_preserved(self):
+        cfg = LLMConfig(
+            models=[
+                LLMModelConfig(name="freetoken/Qwen3.6-35B-A3B", api_base="http://gpu-box:9000/v1")
+            ],
+        )
+        assert cfg.models[0].api_base == "http://gpu-box:9000/v1"
+
+
+# MonitorConfig defaults
 
 
 class TestMonitorConfigDefaults:
@@ -227,7 +321,7 @@ class TestMonitorConfigDefaults:
         assert cfg.summary_api_key is None
 
 
-# ── Monitor summary propagation (runner.py) ────────────────────────
+# Monitor summary propagation (runner.py)
 
 
 class TestMonitorSummaryPropagation:
@@ -243,10 +337,14 @@ class TestMonitorSummaryPropagation:
 
     def test_propagates_from_main_config_when_monitor_not_configured(self):
         """When monitor has no summary_model, it should pick up the first LLM model."""
-        from skydiscover.runner import Runner
+        from skydiscover.optimize.runner import Runner
 
         cfg = self._make_runner_config(
-            llm_models=[LLMModelConfig(name="gemini/gemini-3-pro", api_base="https://gemini.test/v1", api_key="gem-key")],
+            llm_models=[
+                LLMModelConfig(
+                    name="gemini/gemini-3-pro", api_base="https://gemini.test/v1", api_key="gem-key"
+                )
+            ],
         )
 
         mock_server = MagicMock()
@@ -263,11 +361,14 @@ class TestMonitorSummaryPropagation:
 
     def test_monitor_explicit_config_takes_priority(self):
         """When monitor has its own summary_model, it should NOT be overridden."""
-        from skydiscover.runner import Runner
+        from skydiscover.optimize.runner import Runner
 
         cfg = self._make_runner_config(
             llm_models=[LLMModelConfig(name="gpt-5", api_base="https://api.openai.com/v1")],
-            monitor_kwargs={"summary_model": "claude-3-haiku", "summary_api_base": "https://anthropic.test/v1"},
+            monitor_kwargs={
+                "summary_model": "claude-3-haiku",
+                "summary_api_base": "https://anthropic.test/v1",
+            },
         )
 
         mock_server = MagicMock()
@@ -282,7 +383,7 @@ class TestMonitorSummaryPropagation:
 
     def test_no_models_anywhere_disables_summary(self, caplog):
         """When neither monitor nor LLM config has a model, summary is disabled with warning."""
-        from skydiscover.runner import Runner
+        from skydiscover.optimize.runner import Runner
 
         cfg = self._make_runner_config()
 
@@ -297,31 +398,31 @@ class TestMonitorSummaryPropagation:
         assert "Summary feature disabled" in caplog.text
 
 
-# ── server.py: no hardcoded OpenAI ─────────────────────────────────
+# server.py: no hardcoded OpenAI
 
 
 class TestServerNoHardcodedDefaults:
     def test_server_default_summary_model_empty(self):
-        from skydiscover.extras.monitor.server import MonitorServer
+        from skydiscover.optimize.extras.monitor.server import MonitorServer
 
         server = MonitorServer()
         assert server._summary_model == ""
 
     def test_server_default_summary_api_base_empty(self):
-        from skydiscover.extras.monitor.server import MonitorServer
+        from skydiscover.optimize.extras.monitor.server import MonitorServer
 
         server = MonitorServer()
         assert server._summary_api_base == ""
 
     def test_unconfigured_server_does_not_call_openai(self):
         """A server that was never configure_summary()'d should not attempt API calls."""
-        from skydiscover.extras.monitor.server import MonitorServer
+        from skydiscover.optimize.extras.monitor.server import MonitorServer
 
         server = MonitorServer()
         assert not server._summary_model
 
 
-# ── openevolve_backend.py: error on missing api_base ────────────────
+# openevolve_backend.py: error on missing api_base
 
 
 class TestOpenEvolveBackendError:
@@ -347,7 +448,7 @@ class TestOpenEvolveBackendError:
                     )
 
 
-# ── viewer.py: no auto gpt-5-mini assignment ───────────────────────
+# viewer.py: no auto gpt-5-mini assignment
 
 
 class TestViewerNoAutoOpenAI:
@@ -377,46 +478,65 @@ class TestViewerNoAutoOpenAI:
         assert "openai.com" not in args.summary_api_base
 
 
-# ── variation_operator_generator.py: --model required ──────────────
+# variation_operator_generator.py: --model required
 
 
 class TestVariationOperatorCLI:
     def test_default_cli_model_is_none(self):
-        from skydiscover.search.evox.utils.variation_operator_generator import DEFAULT_CLI_MODEL
+        from skydiscover.optimize.search.evox.utils.variation_operator_generator import (
+            DEFAULT_CLI_MODEL,
+        )
 
         assert DEFAULT_CLI_MODEL is None
 
     def test_cli_without_model_returns_error(self):
         """CLI should fail with exit code 1 when --model is not provided."""
-        from skydiscover.search.evox.utils.variation_operator_generator import main
+        from skydiscover.optimize.search.evox.utils.variation_operator_generator import main
 
-        with patch("sys.argv", ["prog", "/tmp/fake-problem-dir"]), \
-             patch("skydiscover.search.evox.utils.variation_operator_generator.os.path.exists", return_value=True), \
-             patch("skydiscover.search.evox.utils.variation_operator_generator.load_config", return_value={"prompt": {}}), \
-             patch("skydiscover.search.evox.utils.variation_operator_generator.load_evaluator", return_value="pass"), \
-             patch("builtins.print") as mock_print:
+        with (
+            patch("sys.argv", ["prog", "/tmp/fake-problem-dir"]),
+            patch(
+                "skydiscover.optimize.search.evox.utils.variation_operator_generator.os.path.exists",
+                return_value=True,
+            ),
+            patch(
+                "skydiscover.optimize.search.evox.utils.variation_operator_generator.load_config",
+                return_value={"prompt": {}},
+            ),
+            patch(
+                "skydiscover.optimize.search.evox.utils.variation_operator_generator.load_evaluator",
+                return_value="pass",
+            ),
+            patch("builtins.print") as mock_print,
+        ):
             result = main()
 
         assert result == 1
         mock_print.assert_any_call("Error: --model is required (e.g. --model gpt-5-mini)")
 
 
-# ── monitor/__init__.py: propagation ───────────────────────────────
+# monitor/__init__.py: propagation
 
 
 class TestMonitorInitPropagation:
     def test_propagates_from_llm_config(self):
         """start_monitor should propagate LLM model to summary when not configured."""
-        from skydiscover.extras.monitor import start_monitor
+        from skydiscover.optimize.extras.monitor import start_monitor
 
         cfg = Config.__new__(Config)
         cfg.monitor = MonitorConfig(enabled=True)
         cfg.llm = LLMConfig(
-            models=[LLMModelConfig(name="anthropic/claude-3-sonnet", api_base="https://anthropic.test/v1", api_key="ant-key")],
+            models=[
+                LLMModelConfig(
+                    name="anthropic/claude-3-sonnet",
+                    api_base="https://anthropic.test/v1",
+                    api_key="ant-key",
+                )
+            ],
         )
         cfg.llm.__post_init__()
 
-        with patch("skydiscover.extras.monitor.MonitorServer") as MockServer:
+        with patch("skydiscover.optimize.extras.monitor.MonitorServer") as MockServer:
             mock_instance = MagicMock()
             MockServer.return_value = mock_instance
 
@@ -430,14 +550,14 @@ class TestMonitorInitPropagation:
 
     def test_no_model_skips_summary(self):
         """start_monitor should not call configure_summary when no model is available."""
-        from skydiscover.extras.monitor import start_monitor
+        from skydiscover.optimize.extras.monitor import start_monitor
 
         cfg = Config.__new__(Config)
         cfg.monitor = MonitorConfig(enabled=True)
         cfg.llm = LLMConfig()
         cfg.llm.__post_init__()
 
-        with patch("skydiscover.extras.monitor.MonitorServer") as MockServer:
+        with patch("skydiscover.optimize.extras.monitor.MonitorServer") as MockServer:
             mock_instance = MagicMock()
             MockServer.return_value = mock_instance
 

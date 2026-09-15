@@ -1,8 +1,9 @@
-import pandas as pd
-from typing import List, Tuple
-from concurrent.futures import ThreadPoolExecutor
-from utils import Trie
 import time
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Tuple
+
+import pandas as pd
+from utils import Trie
 
 
 class Algorithm:
@@ -102,21 +103,30 @@ class Algorithm:
         return df.drop(index=rows)
 
     @staticmethod
-    def merging_columns(df: pd.DataFrame, col_names: List[str], delimiter: str = "_", prepended: bool = False) -> pd.DataFrame:
+    def merging_columns(
+        df: pd.DataFrame, col_names: List[str], delimiter: str = "_", prepended: bool = False
+    ) -> pd.DataFrame:
         if not all(col in df.columns for col in col_names):
             raise ValueError("Column names not found in DataFrame")
 
         # before merging, check that each column to be merged has the same number of unique values
         if len(set(df[col_names].nunique())) != 1:
-            raise ValueError(f"Columns to be merged {col_names}, do not have the same number of unique values: {df.nunique().sort_values()}")
+            raise ValueError(
+                f"Columns to be merged {col_names}, do not have the same number of unique values: {df.nunique().sort_values()}"
+            )
 
         merged_names = delimiter.join(col_names)
         if prepended:
             df[merged_names] = df[col_names].apply(
-                lambda x: merged_names + ": " + delimiter.join([val.split(": ", 1)[1] for col, val in zip(col_names, x)]), axis=1
+                lambda x: merged_names
+                + ": "
+                + delimiter.join([val.split(": ", 1)[1] for col, val in zip(col_names, x)]),
+                axis=1,
             )
         else:
-            df[merged_names] = df[col_names].apply(lambda x: "".join([f"{val}" for val in x]), axis=1)
+            df[merged_names] = df[col_names].apply(
+                lambda x: "".join([f"{val}" for val in x]), axis=1
+            )
         df = df.drop(columns=col_names)
         return df
 

@@ -7,15 +7,13 @@ from unittest.mock import patch
 
 import pytest
 
-from skydiscover.api import DiscoveryResult, run_discovery
-from skydiscover.config import Config, LLMModelConfig
-from skydiscover.evaluation.evaluator import Evaluator, EvaluatorConfig
-from skydiscover.llm.base import LLMResponse
-from skydiscover.llm.llm_pool import LLMPool
+from skydiscover.optimize.api import DiscoveryResult, run_discovery
+from skydiscover.optimize.config import Config, LLMModelConfig
+from skydiscover.optimize.evaluation.evaluator import Evaluator, EvaluatorConfig
+from skydiscover.optimize.llm.base import LLMResponse
+from skydiscover.optimize.llm.llm_pool import LLMPool
 
-# ---------------------------------------------------------------------------
 # Inline evaluator source — scores programs with `def solve` higher
-# ---------------------------------------------------------------------------
 EVALUATOR_SOURCE = textwrap.dedent("""\
     import ast
 
@@ -37,17 +35,13 @@ EVALUATOR_SOURCE = textwrap.dedent("""\
         return {"combined_score": score}
     """)
 
-# ---------------------------------------------------------------------------
 # Inline seed program — intentionally does NOT define `solve` so it scores low
-# ---------------------------------------------------------------------------
 SEED_SOURCE = textwrap.dedent("""\
     def hello():
         return "hi"
     """)
 
-# ---------------------------------------------------------------------------
 # Mock LLM response — a full-rewrite code block containing `def solve`
-# ---------------------------------------------------------------------------
 MOCK_LLM_CODE = textwrap.dedent("""\
     def solve(x):
         return x ** 2 + 1
@@ -56,9 +50,7 @@ MOCK_LLM_CODE = textwrap.dedent("""\
 MOCK_RESPONSE_TEXT = f"```python\n{MOCK_LLM_CODE}```"
 
 
-# ---------------------------------------------------------------------------
 # FakeLLMPool — replaces the real LLMPool so no OpenAI client is created
-# ---------------------------------------------------------------------------
 class FakeLLMPool:
     """Drop-in replacement for LLMPool that returns a canned response."""
 
@@ -77,9 +69,7 @@ class FakeLLMPool:
         return [LLMResponse(text=MOCK_RESPONSE_TEXT)]
 
 
-# ===========================================================================
 # Smoke test: end-to-end pipeline with mocked LLM
-# ===========================================================================
 class TestSmokePipeline:
     def test_run_discovery_returns_result(self, tmp_path):
         """run_discovery completes 2 iterations and returns a valid DiscoveryResult."""
@@ -109,7 +99,7 @@ class TestSmokePipeline:
         )
 
         with patch(
-            "skydiscover.search.default_discovery_controller.LLMPool",
+            "skydiscover.optimize.search.default_discovery_controller.LLMPool",
             FakeLLMPool,
         ):
             result = run_discovery(
@@ -127,9 +117,7 @@ class TestSmokePipeline:
         assert os.path.isdir(output_dir)
 
 
-# ===========================================================================
 # Unit guards for recent bug fixes
-# ===========================================================================
 class TestBugFixGuards:
     def test_llm_pool_raises_on_zero_weights(self):
         """LLMPool must raise ValueError when all model weights are zero."""

@@ -1,16 +1,37 @@
 ---
-title: "SkyDiscover Documentation"
-description: "Welcome to SkyDiscover's documentation."
+title: "SkyDiscover"
+description: "An open-source framework from UC Berkeley that uses AI to discover better algorithms and build complete systems."
 ---
 
-<Callout type="warn">
-  These docs are a work in progress. Some sections are incomplete or may change.
-  For the latest information, see the [README on GitHub](https://github.com/skydiscover-ai/skydiscover).
-</Callout>
+SkyDiscover has two parts:
 
-Welcome to the SkyDiscover documentation! SkyDiscover is a modular framework
-for AI-driven scientific and algorithmic discovery, providing a unified
-interface for implementing, running, and comparing discovery algorithms
-across 200+ optimization tasks.
+- **Optimize**: improve an algorithm or a component of your system. You provide a way to score
+  solutions, and evolutionary search finds programs that score better and better.
+- **Synthesize**: build an end-to-end system. You describe it in plain text or a formal spec, and
+  coding agents build it for your workload, hardware, and requirements.
 
-- **[Getting Started](/docs/getting-started)** — install SkyDiscover, run your first task, and learn the configuration system
+<img src="/img/skydiscover_overview.png" alt="Optimize evolves algorithms, prompts, and system components; Synthesize builds end-to-end specialized systems" />
+
+## Getting Started
+
+- [Installation](/docs/installation): install SkyDiscover and set up model access
+
+## Optimize
+
+- [Overview](/docs/optimize): how the search loop works and what it has achieved
+- [Quick Start](/docs/optimize/quick-start): evolve a text-similarity function in five minutes
+- [Writing Evaluators](/docs/optimize/evaluators): the one thing you write
+- [Configuration](/docs/optimize/configuration): models, search algorithms, config files, Python API, CLI
+- [Benchmarks](/docs/optimize/benchmarks): hundreds of tasks across ten suites, all run through one command
+
+## Synthesize
+
+- [Overview](/docs/synthesize): the two approaches and how the agents work
+- [Quick Start](/docs/synthesize/quick-start): install the skill in Claude Code, Cursor, Codex, or pi, and build your first system
+- [Examples](/docs/synthesize/examples): four systems you can build, and how to add your own
+
+## Community
+
+- [GitHub](https://github.com/skydiscover-ai/skydiscover)
+- [Blog](https://skydiscover-ai.github.io/blogs.html)
+- [Contributing](https://github.com/skydiscover-ai/skydiscover/blob/main/CONTRIBUTING.md)

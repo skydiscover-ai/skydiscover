@@ -160,9 +160,7 @@ def evaluate(program_path):
         start_time = time.time()
 
         # Use subprocess to run with timeout
-        makespan, schedule = run_with_timeout(
-            program_path, timeout_seconds=600  # Single timeout
-        )
+        makespan, schedule = run_with_timeout(program_path, timeout_seconds=600)  # Single timeout
 
         end_time = time.time()
         eval_time = end_time - start_time
@@ -179,7 +177,7 @@ def evaluate(program_path):
 
         # Combined score - higher is better, positive values that scale with makespan
         # Use reciprocal scaling: higher makespan = lower score, but always positive
-        combined_score = 1000 / (1 + makespan) * 1000 
+        combined_score = 1000 / (1 + makespan) * 1000
 
         print(f"Evaluation: valid={valid}, makespan={makespan}, time={eval_time:.2f}s")
 
@@ -199,6 +197,7 @@ def evaluate(program_path):
             "validity": 0.0,
             "combined_score": 0.0,
         }
+
 
 # Stage-based evaluation for cascade evaluation
 def evaluate_stage1(program_path):

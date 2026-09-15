@@ -2,14 +2,15 @@
 Evaluator for circle packing example (n=26) with improved timeout handling
 """
 
-import numpy as np
-import time
 import os
-import subprocess
-import tempfile
-import traceback
-import sys
 import pickle
+import subprocess
+import sys
+import tempfile
+import time
+import traceback
+
+import numpy as np
 
 
 class TimeoutError(Exception):

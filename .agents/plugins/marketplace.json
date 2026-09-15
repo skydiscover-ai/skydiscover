@@ -1,0 +1,22 @@
+{
+  "name": "skydiscover",
+  "description": "SkyDiscover plugins for Codex. SkySynth builds a system specialized for your workload, hardware, and requirements, and checks it with tests or proofs.",
+  "plugins": [
+    {
+      "name": "skysynth",
+      "version": "0.2.0",
+      "description": "/skysynth: coding agents build a system specialized for your workload, checked by tests or machine-checked proofs. Includes the /skysynth skill and the hook that runs the tests before anything is delivered. Codex plugins cannot ship the agent roles yet: add them with skydiscover init --agent codex. Also install the skydiscover Python package: uv pip install git+https://github.com/skydiscover-ai/skydiscover (or run from a source checkout).",
+      "source": {
+        "source": "local",
+        "path": "./skydiscover/synthesize/workflow"
+      },
+      "policy": {
+        "installation": "AVAILABLE"
+      },
+      "category": "Engineering"
+    }
+  ],
+  "interface": {
+    "displayName": "SkyDiscover"
+  }
+}

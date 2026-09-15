@@ -1,0 +1,64 @@
+---
+title: "Overview"
+description: "You bring an evaluator. SkyDiscover-Optimize searches over algorithms."
+---
+
+Pick anything you can score: an algorithm, a prompt, a GPU kernel, a component of your system.
+You write an evaluator that scores a solution. Optimize proposes candidates, scores them, and keeps
+what scores better.
+
+```bash
+uv run skydiscover optimize evaluator.py --search adaevolve --model gpt-5 -i 100
+# --search can also be evox, openevolve, gepa_native, best_of_n, ... (full list in Configuration)
+```
+
+## How it works
+
+<img src="/img/architecture.png" alt="Optimize's control loop: solution selector, context builder, solution generator, and evaluator" />
+
+Each iteration runs five steps:
+
+1. **Sample**: pick a parent solution from the database.
+2. **Prompt**: build an LLM prompt from the parent, the problem context, and any human feedback.
+3. **Generate**: the LLM produces a candidate solution.
+4. **Evaluate**: your evaluator scores it.
+5. **Add**: store the scored candidate and repeat.
+
+## Results
+
+The two main search algorithms, [AdaEvolve](https://arxiv.org/abs/2602.20133) and
+[EvoX](https://arxiv.org/abs/2602.23413), have the strongest open-source results across ~200
+benchmarks and are used in industry, including at Google and Uber.
+
+- **Frontier-CS (172 problems)**: ~34% higher median score than OpenEvolve, GEPA, and ShinkaEvolve under the same budget
+- **Math and systems (14 tasks)**: matches or exceeds AlphaEvolve and human SOTA on 6/6 systems and 6/8 math tasks
+- **Real-world systems**: 41% lower cross-cloud transfer cost, 14% better GPU load balance for MoE serving, 29% lower KV-cache pressure
+
+Full tables are in the [README](https://github.com/skydiscover-ai/skydiscover#-skydiscover-optimize).
+
+## Guides
+
+- [Quick Start](/docs/optimize/quick-start): a complete worked example
+- [Writing Evaluators](/docs/optimize/evaluators): the one thing you write
+- [Configuration](/docs/optimize/configuration): models, search algorithms (AdaEvolve, EvoX, and ten more), config files, the dashboard, the Python API, the CLI
+- [Benchmarks](/docs/optimize/benchmarks): hundreds of tasks across ten suites, from math to systems to reasoning
+
+## Extending
+
+Everything plugs into the same interface, so anything you add can be compared with what is already
+there. Each extension point has a guide in the repository:
+
+- [New search algorithm](https://github.com/skydiscover-ai/skydiscover/blob/main/skydiscover/optimize/search/README.md): a controller (the search loop) plus a database (what to keep and what to sample next), registered under a name so `--search your_algo` picks it up
+- [New context builder](https://github.com/skydiscover-ai/skydiscover/blob/main/skydiscover/optimize/context_builder/README.md): decides what each LLM prompt contains
+- [New benchmark](https://github.com/skydiscover-ai/skydiscover/blob/main/benchmarks/README.md#adding-a-benchmark): an evaluator, optionally with a seed program and a config
+
+See the [contributing guide](https://github.com/skydiscover-ai/skydiscover/blob/main/CONTRIBUTING.md)
+for development setup and the test suite.
+
+## Related work
+
+Optimize is inspired by
+[AlphaEvolve](https://deepmind.google/discover/blog/alphaevolve-a-gemini-powered-coding-agent-for-designing-advanced-algorithms/)
+and incorporates code from [OpenEvolve](https://github.com/codelion/openevolve). Its interface is
+compatible with the
+[optimize_anything](https://gepa-ai.github.io/gepa/blog/2026/02/18/introducing-optimize-anything/) API.

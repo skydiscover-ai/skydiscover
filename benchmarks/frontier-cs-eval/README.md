@@ -29,7 +29,7 @@ Supported algorithms: `adaevolve`, `evox`, `openevolve`, `gepa`, `shinkaevolve`
 Single problem:
 ```bash
 cd benchmarks/frontier-cs-eval
-FRONTIER_CS_PROBLEM=0 uv run skydiscover-run initial_program.cpp evaluator.py \
+FRONTIER_CS_PROBLEM=0 uv run skydiscover optimize initial_program.cpp evaluator.py \
   -c config.yaml -s [search_algorithm] -i 50
 ```
 

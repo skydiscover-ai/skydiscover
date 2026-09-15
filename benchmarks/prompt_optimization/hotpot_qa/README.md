@@ -33,19 +33,19 @@ These are cached in the `hotpot_qa/` directory and reused on subsequent runs.
 # From the repo root:
 
 # AdaEvolve (multi-island adaptive search)
-uv run skydiscover-run \
+uv run skydiscover optimize \
   benchmarks/prompt_optimization/hotpot_qa/initial_prompt.txt \
   benchmarks/prompt_optimization/hotpot_qa/evaluator.py \
   -c benchmarks/prompt_optimization/hotpot_qa/config_adaevolve.yaml -i 100
 
 # EvoX (co-evolutionary search)
-uv run skydiscover-run \
+uv run skydiscover optimize \
   benchmarks/prompt_optimization/hotpot_qa/initial_prompt.txt \
   benchmarks/prompt_optimization/hotpot_qa/evaluator.py \
   -c benchmarks/prompt_optimization/hotpot_qa/config_evox.yaml -i 100
 
 # Or use the reproduce script (runs AdaEvolve + EvoX in parallel):
-bash scripts/reproduce/prompt_opt.sh
+bash skydiscover/optimize/scripts/reproduce/prompt_opt.sh
 ```
 
 ## Scoring

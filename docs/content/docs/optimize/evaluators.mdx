@@ -1,0 +1,86 @@
+---
+title: "Writing Evaluators"
+description: "The three evaluator formats, scoring, artifacts, and EVOLVE-BLOCK markers."
+---
+
+The evaluator is the one thing you write: a scoring function that Optimize maximizes. Search
+proposes candidate programs, scores them with your evaluator, and keeps what scores better.
+
+## Pick a format
+
+There are three formats. Optimize detects which one you are using from the path you give it:
+
+| Format | When to use | What you point SkyDiscover at |
+|:---|:---|:---|
+| **Python function** | Simple tasks, no system deps | `evaluator.py` |
+| **Containerized** | Custom deps, data files, isolation | `evaluator/` directory (must contain `Dockerfile` + `evaluate.sh`) |
+| **Harbor task** | External benchmark suites | Task directory (must contain `instruction.md` + `tests/` + `environment/Dockerfile`) |
+
+<Callout type="warn">
+  Candidate programs are LLM-generated code. The Python-function format runs them in a
+  subprocess on your host without sandboxing; prefer the containerized or Harbor formats
+  when isolation matters.
+</Callout>
+
+## Python function evaluator
+
+A file with an `evaluate(program_path)` function that returns a dict of metrics:
+
+```python title="evaluator.py"
+def evaluate(program_path):
+    score = run_and_grade(program_path)
+    return {
+        "combined_score": score,       # primary optimization target (maximized)
+        "artifacts": {                 # optional — stored with the solution
+            "feedback": "Off by one in the loop boundary",
+        },
+    }
+```
+
+- **`combined_score`** is what gets maximized. If omitted, Optimize averages all numeric values
+  in the returned dict.
+- **`artifacts`** is optional. Entries are shown to the LLM in the next prompt, so concrete
+  feedback ("off by one in the loop boundary") helps the search.
+
+## Containerized evaluator
+
+A directory containing a `Dockerfile` and an `evaluate.sh` that writes a JSON metrics
+object to stdout. The candidate program is mounted into the container, so the evaluator
+can use arbitrary dependencies and data files without touching your host environment.
+
+<Files>
+  <Folder name="evaluator" defaultOpen>
+    <File name="Dockerfile" />
+    <File name="evaluate.sh" />
+  </Folder>
+</Files>
+
+See the [Quick Start](/docs/optimize/quick-start) for a complete worked example.
+
+## Harbor task
+
+A directory in the [Harbor](https://harborframework.com/) format (`instruction.md`,
+`environment/Dockerfile`, `tests/`). This runs external benchmark suites such as AlgoTune,
+EvoEval, HumanEvalFix, BigCodeBench, LiveCodeBench, and USACO out of the box; see
+[Benchmarks](/docs/optimize/benchmarks#harbor-benchmark-suites) for an example.
+
+## Multi-objective (Pareto) scoring
+
+For `search.type: adaevolve`, you can enable explicit Pareto optimization by
+configuring `search.database.pareto_objectives` and returning those objective metrics
+directly from the evaluator. In that mode `combined_score` becomes optional and is only
+used as a scalar fallback when configured.
+
+## The starting solution
+
+The initial program is optional. Omit it and the LLM starts from scratch. If you provide one,
+mark the region to change with EVOLVE-BLOCK markers; everything outside is left untouched:
+
+```python title="initial_program.py"
+# EVOLVE-BLOCK-START
+def solve(input_data):
+    return input_data  # baseline — SkyDiscover will improve this
+# EVOLVE-BLOCK-END
+```
+
+If no markers are present, the entire file is treated as mutatable.

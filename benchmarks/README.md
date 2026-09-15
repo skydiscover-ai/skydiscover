@@ -30,13 +30,13 @@ Then run:
 export OPENAI_API_KEY="..."
 
 # Containerized benchmark (recommended — evaluator runs in Docker)
-uv run skydiscover-run benchmarks/math/circle_packing_rect/initial_program.py \
+uv run skydiscover optimize benchmarks/math/circle_packing_rect/initial_program.py \
   benchmarks/math/circle_packing_rect/evaluator \
   -c benchmarks/math/circle_packing_rect/config.yaml \
   -s best_of_n -i 50
 
 # Plain Python evaluator (runs on host)
-uv run skydiscover-run benchmarks/math/circle_packing/initial_program.py \
+uv run skydiscover optimize benchmarks/math/circle_packing/initial_program.py \
   benchmarks/math/circle_packing/evaluator.py \
   -c benchmarks/math/circle_packing/config.yaml \
   -s best_of_n -i 100
@@ -117,7 +117,7 @@ benchmark:
 When running such a benchmark, you don't need to provide an `initial_program` argument:
 
 ```bash
-uv run skydiscover-run benchmarks/kernelbench/evaluator/ \
+uv run skydiscover optimize benchmarks/kernelbench/evaluator/ \
   -c benchmarks/kernelbench/config.yaml \
   --search adaevolve \
   --iterations 50
@@ -134,7 +134,7 @@ To add resolver support to a new benchmark:
 ```python
 from pathlib import Path
 from typing import Any, Dict, Tuple
-from skydiscover.benchmarks.base import BenchmarkResolver
+from skydiscover.optimize.benchmarks.base import BenchmarkResolver
 
 class YourBenchmarkResolver(BenchmarkResolver):
     def resolve(self, config: Dict[str, Any], output_dir: Path) -> Tuple[str, str]:
@@ -178,7 +178,7 @@ resolver = YourBenchmarkResolver()
 3. **Use the same CLI pattern** (no initial_program argument needed)
 
 See the implementation in:
-- `skydiscover/benchmarks/base.py` - Base resolver interface
+- `skydiscover/optimize/benchmarks/base.py` - Base resolver interface
 - `benchmarks/kernelbench/resolver.py` - KernelBench example implementation
 
 ## Adding a Benchmark
@@ -247,7 +247,7 @@ ENTRYPOINT ["./evaluate.sh"]
 
 If you have an existing `evaluate(program_path) -> dict` function, you can wrap it with the backwards-compatibility wrapper:
 
-1. Copy `skydiscover/evaluation/wrapper.py` into your `evaluator/` directory.
+1. Copy `skydiscover/optimize/evaluation/wrapper.py` into your `evaluator/` directory.
 2. Add this to the bottom of your `evaluator.py`:
 
 ```python
@@ -263,7 +263,7 @@ The wrapper handles stdout redirection (so debug prints don't corrupt JSON), err
 Point `evaluation_file` at the `evaluator/` directory:
 
 ```bash
-skydiscover-run benchmarks/math/circle_packing_rect/initial_program.py \
+skydiscover optimize benchmarks/math/circle_packing_rect/initial_program.py \
   benchmarks/math/circle_packing_rect/evaluator \
   -c benchmarks/math/circle_packing_rect/config.yaml \
   -s best_of_n -i 50
@@ -329,17 +329,17 @@ This downloads all 154 AlgoTune tasks. Each task is in a subdirectory like `/tmp
 ```bash
 # AlgoTune (algorithm optimization)
 TASK=/tmp/algotune/2HHbpvzVPo2qakaoGyAVS2/algotune-set-cover
-skydiscover-run "$TASK" --model anthropic/claude-sonnet-4-6 -s best_of_n -i 10
+skydiscover optimize "$TASK" --model anthropic/claude-sonnet-4-6 -s best_of_n -i 10
 
 # EvoEval (code generation)
 harbor datasets download evoeval@1.0 -o /tmp/evoeval
 TASK=/tmp/evoeval/<id>/<task-name>
-skydiscover-run "$TASK" --model anthropic/claude-sonnet-4-6 -s best_of_n -i 5
+skydiscover optimize "$TASK" --model anthropic/claude-sonnet-4-6 -s best_of_n -i 5
 
 # HumanEvalFix (code repair)
 harbor datasets download humanevalfix@1.0 -o /tmp/humanevalfix
 TASK=/tmp/humanevalfix/<id>/<task-name>
-skydiscover-run "$TASK" --model anthropic/claude-sonnet-4-6 -s best_of_n -i 5
+skydiscover optimize "$TASK" --model anthropic/claude-sonnet-4-6 -s best_of_n -i 5
 ```
 
 SkyDiscover will build the Docker image from `environment/Dockerfile`, upload `tests/` into the container, and start optimizing.

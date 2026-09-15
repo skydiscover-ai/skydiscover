@@ -1,7 +1,7 @@
 """Tests for Evaluator — result normalization and cascade threshold logic."""
 
-from skydiscover.evaluation.evaluation_result import EvaluationResult
-from skydiscover.evaluation.evaluator import Evaluator
+from skydiscover.optimize.evaluation.evaluation_result import EvaluationResult
+from skydiscover.optimize.evaluation.evaluator import Evaluator
 
 
 def _make_evaluator():

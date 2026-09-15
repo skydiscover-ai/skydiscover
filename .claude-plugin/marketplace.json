@@ -1,0 +1,16 @@
+{
+  "name": "skydiscover",
+  "owner": {
+    "name": "SkyDiscover team"
+  },
+  "plugins": [
+    {
+      "name": "skysynth",
+      "displayName": "SkySynth",
+      "version": "0.2.0",
+      "description": "/skysynth: coding agents build a system specialized for your workload, checked by tests or machine-checked proofs. Includes the /skysynth skill, the agent roles, and the hook that runs the tests before anything is delivered. Also install the skydiscover Python package: uv pip install git+https://github.com/skydiscover-ai/skydiscover (or run from a source checkout).",
+      "source": "./skydiscover/synthesize/workflow"
+    }
+  ],
+  "description": "SkyDiscover plugins for Claude Code. SkySynth builds a system specialized for your workload, hardware, and requirements, and checks it with tests or proofs."
+}

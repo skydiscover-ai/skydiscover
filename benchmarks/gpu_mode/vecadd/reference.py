@@ -4,6 +4,7 @@ C = A + B
 """
 
 import math
+
 try:
     import torch
 except ImportError:
@@ -69,7 +70,7 @@ def check_implementation(data, output, rtol=1e-3, atol=1e-3):
 # Self-contained reference code for Modal execution
 # ---------------------------------------------------------------------------
 
-MODAL_REFERENCE_CODE = '''
+MODAL_REFERENCE_CODE = """
 import torch
 
 def ref_kernel(data):
@@ -93,4 +94,4 @@ def check_implementation(data, output, rtol=1e-3, atol=1e-3):
         return True, "Match"
     diff = torch.abs(output.float() - ref_out.float())
     return False, f"Output mismatch: max_diff={diff.max().item():.6f}"
-'''
+"""

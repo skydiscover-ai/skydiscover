@@ -12,6 +12,7 @@ Or with an external ARC-AGI-2 clone:
   python3 convert_arc_agi2_data.py /path/to/ARC-AGI-2
   # Writes into that path by default; set OUT_DIR to write elsewhere.
 """
+
 import json
 import os
 import sys

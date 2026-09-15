@@ -12,11 +12,12 @@ Where:
 - α₁=0.3, α₂=α₃=0.2, α₄=0.3: Weighting coefficients
 """
 
-import importlib.util
-import numpy as np
-import time
 import concurrent.futures
+import importlib.util
+import time
 import traceback
+
+import numpy as np
 from scipy import signal
 from scipy.stats import pearsonr
 
@@ -266,6 +267,7 @@ def generate_test_signals(num_signals=5):
 # Input: run_signal_processing(noisy_signal, window_size) — full signal array and window size.
 # Scoring: composite of smoothness, tracking accuracy, correlation, and noise reduction.
 
+
 def evaluate(program_path):
     """
     Main evaluation function that tests the signal processing algorithm
@@ -279,7 +281,11 @@ def evaluate(program_path):
 
         # Check if required function exists
         if not hasattr(program, "run_signal_processing"):
-            return {"combined_score": 0.0, "composite_score": 0.0, "error": "Missing run_signal_processing function"}
+            return {
+                "combined_score": 0.0,
+                "composite_score": 0.0,
+                "error": "Missing run_signal_processing function",
+            }
 
         # Generate test signals
         test_signals = generate_test_signals(5)
@@ -458,7 +464,12 @@ def evaluate(program_path):
     except Exception as e:
         print(f"Evaluation failed: {str(e)}")
         print(traceback.format_exc())
-        return {"combined_score": 0.0, "composite_score": 0.0, "overall_score": 0.0, "error": str(e)}
+        return {
+            "combined_score": 0.0,
+            "composite_score": 0.0,
+            "overall_score": 0.0,
+            "error": str(e),
+        }
 
 
 def evaluate_stage1(program_path):

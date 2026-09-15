@@ -1,21 +1,22 @@
-import os
-import yaml
 import json
+import os
+
+import yaml
 
 
 def load_task_as_prompt(task_json, task_num):
-    with open(task_json, 'r') as f:
+    with open(task_json, "r") as f:
         tasks = json.load(f)
-    
+
     task_id = list(tasks.keys())[int(task_num)]
     task = tasks[task_id]
-    train_inputs = [inp["input"] for inp in task['train']]
-    train_outputs = [gt["output"] for gt in task['train']]
+    train_inputs = [inp["input"] for inp in task["train"]]
+    train_outputs = [gt["output"] for gt in task["train"]]
 
     train_pairs = ""
     for i, (inp, out) in enumerate(zip(train_inputs, train_outputs)):
         train_pairs += f"In {i} - {inp}\nOut {i} - {out}\n"
-    
+
     prompt = f"""You are participating in a puzzle solving competition. You are an expert at solving puzzles.
 Find the common pattern that transforms each input grid into its corresponding output grid.
 
@@ -56,8 +57,9 @@ Your task: Write 2 different Python functions that implement the general transfo
 CRITICAL: Write general transformations that discover the underlying rule, not memorize the training examples.
 
 Remember to only output the modified python functions as your solution."""
-    
+
     return prompt
+
 
 def generate_config(task_num, task_file, dataset_root=None, base_config=None):
     if dataset_root is None:
@@ -66,14 +68,14 @@ def generate_config(task_num, task_file, dataset_root=None, base_config=None):
             dataset_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
     task_json = os.path.join(dataset_root, f"arc-agi_{task_file}_challenges.json")
     prompt = load_task_as_prompt(task_json, task_num)
-    
+
     if base_config is None:
         default_base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml")
         base_config = os.getenv("BASE_CONFIG", default_base)
-    with open(base_config, 'r') as file:
+    with open(base_config, "r") as file:
         config = yaml.safe_load(file)
-    
-    config['prompt']['system_message'] = prompt
+
+    config["prompt"]["system_message"] = prompt
     # Use OPENAI_API_KEY at runtime if set (keeps real key out of committed config)
     api_key_env = os.getenv("OPENAI_API_KEY")
     if api_key_env and api_key_env.strip() and api_key_env != "your-gemini-api-key":
@@ -85,17 +87,17 @@ def generate_config(task_num, task_file, dataset_root=None, base_config=None):
             config["max_iterations"] = int(max_iter_env)
         except ValueError:
             pass
-    
+
     # Write to a per-task config file so parallel runs don't conflict
     out_path = os.getenv("CONFIG_OUT", f"./config_task_{task_num}.yaml")
-    with open(out_path, 'w') as file:
+    with open(out_path, "w") as file:
         yaml.dump(config, file)
     return out_path
-        
+
+
 if __name__ == "__main__":
     TASK_FILE = os.getenv("ARC_TASK_FILE", "training")
     TASK_NUM = os.getenv("TASK_NUM", 0)
-    
+
     path = generate_config(TASK_NUM, TASK_FILE)
     print(path)
-    

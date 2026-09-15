@@ -1,4 +1,5 @@
 """Evaluator for Grayscale — delegates to shared evaluator."""
+
 import os
 import sys
 

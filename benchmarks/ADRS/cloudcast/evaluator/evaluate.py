@@ -1,13 +1,14 @@
-from utils import *
-from simulator import *
-from broadcast import BroadCastTopology
-from pathlib import Path
-import networkx as nx
-import subprocess
 import argparse
 import json
-import sys
 import os
+import subprocess
+import sys
+from pathlib import Path
+
+import networkx as nx
+from broadcast import BroadCastTopology
+from simulator import *
+from utils import *
 
 
 def N_dijkstra(src, dsts, G, num_partitions):
@@ -187,7 +188,9 @@ if __name__ == "__main__":
         else:
             raise NotImplementedError(algo)
 
-        bc_t.set_num_partitions(config["num_partitions"])  # simple baseline, don't care about partitions, simply set it
+        bc_t.set_num_partitions(
+            config["num_partitions"]
+        )  # simple baseline, don't care about partitions, simply set it
 
         with open(outf, "w") as outfile:
             outfile.write(

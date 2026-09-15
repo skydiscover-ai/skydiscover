@@ -22,7 +22,7 @@
 Run evolution on a single problem:
 
 ```bash
-uv run skydiscover-run \
+uv run skydiscover optimize \
   benchmarks/ale_bench/ale-bench-lite-problems/ahc025/initial_program.cpp \
   benchmarks/ale_bench/ale-bench-lite-problems/ahc025/evaluator.py \
   -c benchmarks/ale_bench/ale-bench-lite-problems/ahc025/config.yaml \

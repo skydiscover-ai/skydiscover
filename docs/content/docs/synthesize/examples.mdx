@@ -1,0 +1,128 @@
+---
+title: "Examples"
+description: "Working examples you can build with one prompt, and how to write your own."
+---
+
+The examples live in
+[`skydiscover/synthesize/examples/`](https://github.com/skydiscover-ai/skydiscover/tree/main/skydiscover/synthesize/examples).
+Run any of them from the repository root after `uv run skydiscover init` (or from any project directory set up with `skydiscover init --path <dir>`).
+
+| Example | What it builds | Checked by | Needs |
+|---|---|---|---|
+| [Tutorial](#tutorial) | A cache for a workload that defeats FIFO and LRU | Tests | Any machine |
+| [Single-machine KV store](https://github.com/skydiscover-ai/skydiscover/tree/main/skydiscover/synthesize/examples/single-machine-kvstore) | A key-value store for a dataset larger than memory | Tests | Linux with a local SSD |
+| [Formally verified distributed store](https://github.com/skydiscover-ai/skydiscover/tree/main/skydiscover/synthesize/examples/proved-dist-kvstore) | A distributed key-value store with a machine-checked proof of read-your-writes | Rocq proof | Any machine with Rocq |
+| [LLM router](https://github.com/skydiscover-ai/skydiscover/tree/main/skydiscover/synthesize/examples/llm-router) | One model router per tenant, choosing which LLM answers each request | Tests | Any machine |
+| [Inference engine](https://github.com/skydiscover-ai/skydiscover/tree/main/skydiscover/synthesize/examples/inference-engine) | An inference engine for Qwen3-4B where many requests share a prefix | Tests | An NVIDIA L4 GPU |
+
+## Tutorial
+
+Start here. The [tutorial](https://github.com/skydiscover-ai/skydiscover/blob/main/skydiscover/synthesize/examples/tutorial/README.md)
+is one real run, end to end; a notebook replays our session without spending tokens.
+
+The problem: an app re-reads ~100 hot keys, but every 120 operations a batch job scans 140
+one-time keys through a 128-entry cache and flushes the hot set. FIFO and LRU both stall at a 39%
+hit rate.
+
+Drop `workload.py` into an empty directory and send:
+
+```
+/skysynth build me a fast cache for the workload in workload.py
+```
+
+The agents ask their questions, then build, test, benchmark, and audit. A few hours later you have
+a cache tuned for that exact traffic, 2.4x better than FIFO and LRU, which you re-score yourself
+with the same `workload.py`. The tutorial closes with the recipe for a trace from your own system.
+
+## Run an example
+
+Each example is defined by its `task.md`: the full spec of what to build, how it is scored, and
+whether it is checked by tests or a proof. Point `/skysynth` at that file and it builds the system.
+Read the example's README first for any one-time data setup.
+
+<div className="wrap-prompts">
+
+```text title="Single-machine KV store"
+/skysynth build the system specified in skydiscover/synthesize/examples/single-machine-kvstore/task.md
+```
+
+```text title="Formally verified distributed store"
+/skysynth build the system specified in skydiscover/synthesize/examples/proved-dist-kvstore/task.md
+```
+
+```text title="LLM router"
+/skysynth build the system specified in skydiscover/synthesize/examples/llm-router/task.md
+```
+
+```text title="Inference engine"
+/skysynth build the system specified in skydiscover/synthesize/examples/inference-engine/task.md
+```
+
+</div>
+
+## Add your own
+
+You don't need a checked-in example to start. `/skysynth build me <any system>` works from an
+empty directory: the agents write the spec, the interface, a trusted reference implementation, and
+the tests as they go. Checking those in makes a test-driven run repeatable, so every later run
+starts from the same tests and the same baseline. (A proof-driven run is the opposite: keep any
+reference solution out of the task directory, so the agent proves rather than copies.)
+
+Only `task.md` is required:
+
+| Path | What it is |
+|---|---|
+| `task.md` | The input to `/skysynth`: what to build, how it is scored, the interface |
+| `spec/` | Optional. A specification to start from: hardware and workload facts |
+| `evaluator/` | Optional. What a candidate (one built version of the system) is checked and scored against: the interface, the benchmark, a trusted reference implementation (for a proof, the formal spec), and in `tests/` the tests the task ships with the `test.sh` that runs them |
+
+<Steps>
+<Step>
+### Write `task.md`
+
+Copy the closest example and keep the same order: what the system is, how it is scored (workload,
+metric, baseline), the interface, how to build and run it, anything a test writer could not guess,
+and where the files below live.
+</Step>
+
+<Step>
+### Add a benchmark, if you have one
+
+`evaluator/benchmark/` holds the code that measures the objective, the workload or its generator,
+and the baseline to beat. Large or downloaded data goes under `evaluator/benchmark/.data/`
+(gitignored), with the download command in the README.
+</Step>
+
+<Step>
+### Pin what the tests check against (optional)
+
+Usually the interface and a trusted reference implementation (simple and obviously correct) in
+`evaluator/`. A task may also ship tests, in any language, in `evaluator/tests/` with a `test.sh`
+that builds and runs them against the implementation named by `$SKYDISCOVER_IMPL`; the run starts
+its suite from them.
+</Step>
+
+<Step>
+### Write the README and run it once
+
+Say what it builds, the exact `/skysynth` prompt, and what each file is for. The
+[examples index](https://github.com/skydiscover-ai/skydiscover/blob/main/skydiscover/synthesize/examples/README.md#readme-template)
+has the template.
+</Step>
+</Steps>
+
+### Proof-checked examples
+
+Here a proof checker (Rocq, Lean, Dafny, or Verus) replaces the tests: the agent writes the code
+and its proof together, and the spec and theorem statements are read-only so it cannot weaken
+them. `task.md` starts with `checked_by: proof`, the spec goes in `evaluator/` (it is the interface
+the code and the proof are checked against), and the proof check is
+the test the task ships: an `evaluator/tests/test.sh` and one test beside it that, given the agent's files in
+`$SKYDISCOVER_IMPL` and the spec in `$SKYDISCOVER_INTERFACE`, exits 0 only when the proof holds.
+Write it for your prover. The one in the
+[formally verified distributed store](https://github.com/skydiscover-ai/skydiscover/tree/main/skydiscover/synthesize/examples/proved-dist-kvstore)
+(`evaluator/tests/proof.sh`) checks that the spec is byte-for-byte what the task shipped, that the agent's
+files contain no escape hatch (`Admitted`, `Axiom`, ...), that everything type-checks from an
+empty directory, that the theorem depends on nothing beyond what the spec declares
+(`Print Assumptions`), and that a concrete example compiled. Keep any reference solution out of
+the task directory so the agent never sees it.

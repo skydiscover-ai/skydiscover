@@ -1,0 +1,5 @@
+{
+  "title": "Synthesize",
+  "defaultOpen": true,
+  "pages": ["index", "quick-start", "examples"]
+}

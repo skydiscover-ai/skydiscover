@@ -52,7 +52,7 @@ Each benchmark directory contains:
 Run any benchmark from the repo root:
 
 ```bash
-uv run skydiscover-run \
+uv run skydiscover optimize \
   benchmarks/ADRS/cloudcast/initial_program.py \
   benchmarks/ADRS/cloudcast/evaluator.py \
   -c benchmarks/ADRS/cloudcast/config.yaml \

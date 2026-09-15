@@ -1,0 +1,36 @@
+# What every file in the knowledge base must contain.
+#
+# The knowledge base (~/.skydiscover/<domain>/wiki/) is a folder of markdown files, one per thing
+# learned about a kind of system: a source repository that was read, a property such a system
+# guarantees, a benchmark, a known way to cheat the benchmark. Each file starts with a header of
+# `key: value` lines, and the header's `kind:` says which of the things below the file is about.
+# kbtool.py reads this file and rejects any markdown file whose header is missing a field listed
+# for its kind.
+#
+# Keep the shape below (one `key: [list]` per line): the tool reads it without a YAML library.
+
+# fields every header has, whatever the kind
+required: [kind, id, domain, tags]
+
+# fields each kind adds
+kinds:
+  # things that were read, and can be pointed at with a url
+  repo:     [url, sha, license, following, production]     # a source repository
+  pr:       [url, repo, number, changed_paths]             # one pull request in it
+  issue:    [url, repo, number, failure]                   # one bug report in it
+  doc:      [url, publisher]                               # a paper or a manual
+  # things learned from them; each must say which of the above it came from (sources)
+  property: [values, seen_in, sources]                     # something such systems guarantee
+  bench:    [workload, metric, baseline, sources]          # how they are measured
+  roof:     [box, commands, bound, ceiling, confidence, sources]   # the hardware limit on a metric
+  test:     [enforces, command, mutant, confidence, sources]  # a test for one property: the command that runs it,
+                                                             # and the broken copy (mutant) it catches
+  hack:     [tell, killed_by, sources]                     # a way to cheat, and the test that catches it
+  design:   [benchmark, score, outcome, lesson, sources]   # a design that was tried, and how it scored
+
+# the kinds that are sources themselves, so they cite none
+self_source: [repo, pr, issue, doc]
+
+# what `confidence:` may say. `verified` is allowed only when kbtool.py can re-run the domain's
+# tests and they pass; anything the tool cannot re-check stays `source-reported`.
+confidence: [source-reported, verified]

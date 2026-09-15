@@ -1,0 +1,72 @@
+---
+title: "Benchmarks"
+description: "Hundreds of optimization tasks across ten suites: math, systems, algorithms, and reasoning."
+---
+
+The [`benchmarks/`](https://github.com/skydiscover-ai/skydiscover/tree/main/benchmarks)
+directory ships hundreds of tasks across ten suites, each with an evaluator and usually a seed program and config, so
+results are reproducible and comparisons between algorithms are fair.
+
+## Suites
+
+| | Benchmark | Domain | Tasks | Description |
+|-|-----------|--------|------:|-------------|
+| 🔢 | `math/` | Math | 14 | Circle packing, Erdos problems, geometric optimization |
+| 🖥️ | `ADRS/` | Systems | 5 | Cloud scheduling, load balancing, MoE expert placement |
+| ⚡ | `gpu_mode/` | Systems | 4 | GPU kernel optimization |
+| 🔧 | `kernelbench/` | Systems | 250+ | [KernelBench](https://github.com/ScalingIntelligence/KernelBench) GPU kernel speedup optimization |
+| 🧩 | `frontier-cs-eval/` | Algorithms | 172 | [Frontier-CS](https://frontier-cs.org/) competitive programming |
+| 🧠 | `arc_benchmark/` | Reasoning | 1 | ARC-AGI visual reasoning |
+| 💻 | `ale_bench/` | Algorithms | 10 | Algorithmic programming contests |
+| 🎨 | `image_gen/` | Creative | 1 | AI image generation evolution |
+| 💬 | `prompt_optimization/` | NLP | 1 | HotPotQA prompt evolution |
+| ⚛️ | `qnn_circuit_topology/` | Quantum | 1 | QNN ansatz topology discovery |
+
+## Dependency extras
+
+Benchmarks with heavier dependencies are behind optional extras:
+
+```bash
+uv sync                              # Base install
+uv sync --extra math                 # Math benchmarks (SciPy, JAX, PyWavelets, …)
+uv sync --extra adrs                 # ADRS systems benchmarks
+uv sync --extra frontier-cs          # Frontier-CS benchmark tooling
+uv sync --extra external             # OpenEvolve / GEPA backends (ShinkaEvolve is a manual install)
+uv sync --extra prompt-optimization  # HotPotQA prompt optimization
+```
+
+Combine extras as needed: `uv sync --extra external --extra math`. If a benchmark ships
+its own `requirements.txt`, also run `uv pip install -r path/to/requirements.txt`.
+
+## Running a benchmark
+
+Every benchmark is run through the same CLI:
+
+```bash
+uv sync --extra math
+uv run skydiscover optimize benchmarks/math/circle_packing/initial_program.py \
+  benchmarks/math/circle_packing/evaluator.py \
+  --config benchmarks/math/circle_packing/config.yaml \
+  --search adaevolve \
+  --iterations 100
+```
+
+## Harbor benchmark suites
+
+SkyDiscover natively supports [Harbor](https://harborframework.com/)-format tasks, so
+external suites run out of the box: AlgoTune, EvoEval, HumanEvalFix, BigCodeBench,
+LiveCodeBench, USACO, CRUSTBench, CodePDE, and more:
+
+```bash
+uv tool install --python 3.12 harbor   # the Harbor CLI needs Python >= 3.12
+harbor datasets download algotune@1.0 -o /tmp/algotune
+uv run skydiscover optimize /tmp/algotune/<id>/algotune-set-cover \
+  --model anthropic/claude-sonnet-4-6 \
+  --search best_of_n -i 10
+```
+
+## Adding your own
+
+See the
+[adding a benchmark guide](https://github.com/skydiscover-ai/skydiscover/blob/main/benchmarks/README.md#adding-a-benchmark)
+for directory layout, evaluator requirements, and conventions.

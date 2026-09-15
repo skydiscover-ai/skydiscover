@@ -1,5 +1,5 @@
 # QNN circuit topology discovery
-# Usage: skydiscover-run initial_program.py evaluator.py -c config.yaml -s <strategy>
+# Usage: skydiscover optimize initial_program.py evaluator.py -c config.yaml -s <strategy>
 language: python
 diff_based_generation: true
 max_iterations: 50

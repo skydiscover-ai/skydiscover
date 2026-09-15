@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from skydiscover.extras.external.alphaevolve_backend import (
+from skydiscover.optimize.extras.external.alphaevolve_backend import (
     _EVOLVE_BLOCK_END,
     _EVOLVE_BLOCK_MARKER_END,
     _EVOLVE_BLOCK_MARKER_START,
@@ -114,9 +114,7 @@ class TestBuildInitialProgramLanguageAware:
         assert content.startswith("// EVOLVE-BLOCK-START")
         assert content.endswith("// EVOLVE-BLOCK-END")
 
-    def test_cpp_passes_through_existing_cpp_markers(
-        self, tmp_path: Path
-    ) -> None:
+    def test_cpp_passes_through_existing_cpp_markers(self, tmp_path: Path) -> None:
         code = "// EVOLVE-BLOCK-START\nint main() { return 0; }\n// EVOLVE-BLOCK-END"
         seed = tmp_path / "prefetcher.cpp"
         seed.write_text(code)
@@ -136,9 +134,7 @@ class TestBuildInitialProgramLanguageAware:
         assert content.startswith("# EVOLVE-BLOCK-START")
         assert content.endswith("# EVOLVE-BLOCK-END")
 
-    def test_py_passes_through_existing_python_markers(
-        self, tmp_path: Path
-    ) -> None:
+    def test_py_passes_through_existing_python_markers(self, tmp_path: Path) -> None:
         code = "# EVOLVE-BLOCK-START\ndef solve(): return 42\n# EVOLVE-BLOCK-END"
         seed = tmp_path / "solver.py"
         seed.write_text(code)
@@ -159,9 +155,7 @@ class TestBuildInitialProgramLanguageAware:
         assert content.startswith("// EVOLVE-BLOCK-START")
         assert content.endswith("// EVOLVE-BLOCK-END")
 
-    def test_cpp_no_double_wrap_python_markers(
-        self, tmp_path: Path
-    ) -> None:
+    def test_cpp_no_double_wrap_python_markers(self, tmp_path: Path) -> None:
         """A .cpp file that already has # EVOLVE-BLOCK-START should pass through.
 
         The bare marker string is detected regardless of comment prefix,

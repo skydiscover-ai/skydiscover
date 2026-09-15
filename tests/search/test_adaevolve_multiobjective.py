@@ -4,13 +4,16 @@ import math
 
 import pytest
 
-from skydiscover.config import AdaEvolveDatabaseConfig, Config
-from skydiscover.context_builder.adaevolve import AdaEvolveContextBuilder
-from skydiscover.search.adaevolve.archive.unified_archive import ArchiveConfig, UnifiedArchive
-from skydiscover.search.adaevolve.database import AdaEvolveDatabase
-from skydiscover.search.adaevolve.paradigm.generator import ParadigmGenerator
-from skydiscover.search.base_database import Program
-from skydiscover.utils.metrics import normalize_metric_value
+from skydiscover.optimize.config import AdaEvolveDatabaseConfig, Config
+from skydiscover.optimize.context_builder.adaevolve import AdaEvolveContextBuilder
+from skydiscover.optimize.search.adaevolve.archive.unified_archive import (
+    ArchiveConfig,
+    UnifiedArchive,
+)
+from skydiscover.optimize.search.adaevolve.database import AdaEvolveDatabase
+from skydiscover.optimize.search.adaevolve.paradigm.generator import ParadigmGenerator
+from skydiscover.optimize.search.base_database import Program
+from skydiscover.optimize.utils.metrics import normalize_metric_value
 
 
 def _make_program(program_id: str, **metrics) -> Program:
@@ -55,9 +58,7 @@ def _scalar_db(num_islands=1, **extra):
     return AdaEvolveDatabase("test", config)
 
 
-# =========================================================================
 # 1. Core Pareto front logic
-# =========================================================================
 
 
 class TestAdaEvolveMultiobjectiveDatabase:
@@ -116,9 +117,7 @@ class TestAdaEvolveMultiobjectiveDatabase:
         assert [program.id for program in selected] == ["p1", "p2", "p3"]
 
 
-# =========================================================================
 # 2. Pareto front caching
-# =========================================================================
 
 
 class TestGlobalParetoCaching:
@@ -193,9 +192,7 @@ class TestGlobalParetoCaching:
         assert db.best_program_id == "p1"
 
 
-# =========================================================================
 # 3. Dominance logic edge cases
-# =========================================================================
 
 
 class TestDominanceLogic:
@@ -227,9 +224,7 @@ class TestDominanceLogic:
         assert AdaEvolveDatabase._dominates([1.0, 0.4, 1.0], [0.5, 0.5, 0.5]) is False
 
 
-# =========================================================================
 # 4. Island-level Pareto front
-# =========================================================================
 
 
 class TestIslandPareto:
@@ -266,9 +261,7 @@ class TestIslandPareto:
         assert db.get_pareto_front(99) == []
 
 
-# =========================================================================
 # 5. Proxy score and fitness key fallbacks
-# =========================================================================
 
 
 class TestProxyScoreFallbacks:
@@ -349,9 +342,7 @@ class TestProxyScoreFallbacks:
         assert best.id == "zzz_new"
 
 
-# =========================================================================
 # 6. Shared normalize_metric_value utility
-# =========================================================================
 
 
 class TestNormalizeMetricValue:
@@ -383,9 +374,7 @@ class TestNormalizeMetricValue:
         assert normalize_metric_value("latency", float("nan"), {"latency": False}) is None
 
 
-# =========================================================================
 # 7. Unified archive fitness fallbacks
-# =========================================================================
 
 
 class TestUnifiedArchiveFitnessFallbacks:
@@ -417,17 +406,13 @@ class TestUnifiedArchiveFitnessFallbacks:
 
     def test_archive_normalize_delegates_to_shared_utility(self):
         """Verify archive's _normalize_metric_value uses the shared function."""
-        archive = UnifiedArchive(
-            config=ArchiveConfig(higher_is_better={"loss": False})
-        )
+        archive = UnifiedArchive(config=ArchiveConfig(higher_is_better={"loss": False}))
         assert archive._normalize_metric_value("loss", 5.0) == -5.0
         assert archive._normalize_metric_value("acc", 0.9) == 0.9
         assert archive._normalize_metric_value("acc", "string") is None
 
 
-# =========================================================================
 # 8. Prompt builder — Pareto vs scalar mode
-# =========================================================================
 
 
 class TestAdaEvolveMultiobjectivePrompts:
@@ -477,7 +462,9 @@ class TestAdaEvolveMultiobjectivePrompts:
             },
         )
 
-        assert "Pareto trade-offs across: accuracy (maximize), latency (minimize)." in prompt["user"]
+        assert (
+            "Pareto trade-offs across: accuracy (maximize), latency (minimize)." in prompt["user"]
+        )
         assert "Pareto proxy" in prompt["user"]
         assert "COMBINED_SCORE" not in prompt["user"]
 
@@ -509,7 +496,10 @@ class TestAdaEvolveMultiobjectivePrompts:
             previously_tried=[],
         )
 
-        assert "Optimize the Pareto trade-offs across: accuracy (maximize), latency (minimize)." in prompt
+        assert (
+            "Optimize the Pareto trade-offs across: accuracy (maximize), latency (minimize)."
+            in prompt
+        )
         assert '"what_to_optimize": "accuracy, latency"' in prompt
         assert "combined_score" not in prompt
 
@@ -530,9 +520,7 @@ class TestAdaEvolveMultiobjectivePrompts:
         assert "score 0.500000" in prompt or "score: 0.500000" in prompt
 
 
-# =========================================================================
 # 9. Builder progress score edge cases
-# =========================================================================
 
 
 class TestBuilderProgressScore:
@@ -600,9 +588,7 @@ class TestBuilderProgressScore:
         assert "inf" not in result
 
 
-# =========================================================================
 # 10. Format previous attempts in Pareto mode
-# =========================================================================
 
 
 class TestFormatPreviousAttempts:
@@ -658,9 +644,7 @@ class TestFormatPreviousAttempts:
         assert "0.5000" not in result  # low accuracy excluded
 
 
-# =========================================================================
 # 11. Comprehensive iteration stats in Pareto mode
-# =========================================================================
 
 
 class TestComprehensiveStats:
@@ -690,9 +674,7 @@ class TestComprehensiveStats:
         assert global_stats["global_pareto_front_size"] == 0
 
 
-# =========================================================================
 # 12. End-to-end multiobjective flow
-# =========================================================================
 
 
 class TestEndToEndMultiobjective:

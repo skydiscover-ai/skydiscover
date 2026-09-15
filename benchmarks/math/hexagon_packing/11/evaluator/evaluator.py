@@ -12,13 +12,13 @@
 #
 # ===--------------------------------------------------------------------------------------===#
 
-import sys
+import math
 import os
-from importlib import __import__
+import sys
 import time
+from importlib import __import__
 
 import numpy as np
-import math
 
 N_HEX = 11
 BENCHMARK = 1 / 3.930092

@@ -12,13 +12,14 @@
 #
 # ===--------------------------------------------------------------------------------------===#
 
-import time
-import numpy as np
 import itertools
-from scipy.spatial import ConvexHull
-import sys
 import os
+import sys
+import time
 from importlib import __import__
+
+import numpy as np
+from scipy.spatial import ConvexHull
 
 BENCHMARK = 0.027835571458482138
 NUM_POINTS = 14

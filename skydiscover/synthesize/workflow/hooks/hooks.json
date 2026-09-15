@@ -1,0 +1,37 @@
+{
+  "hooks": {
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/delivery_check.sh",
+            "timeout": 3600
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=\"${CLAUDE_PLUGIN_ROOT}/hooks/clone_reuse_guard.py\"; [ -f \"$p\" ] && exec python3 \"$p\" || exit 0",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=\"${CLAUDE_PLUGIN_ROOT}/hooks/framework_edit_guard.py\"; [ -f \"$p\" ] && exec python3 \"$p\" || exit 0",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

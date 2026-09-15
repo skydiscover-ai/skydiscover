@@ -1,5 +1,5 @@
 # GPU Mode: Float16 Vector Addition
-# Usage: uv run skydiscover-run initial_program.py evaluator.py -c config.yaml -s <strategy> -i 50
+# Usage: uv run skydiscover optimize initial_program.py evaluator.py -c config.yaml -s <strategy> -i 50
 
 max_iterations: 100
 checkpoint_interval: 10
@@ -47,4 +47,3 @@ evaluator:
 
 diff_based_generation: true
 max_solution_length: 60000
-random_seed: 42

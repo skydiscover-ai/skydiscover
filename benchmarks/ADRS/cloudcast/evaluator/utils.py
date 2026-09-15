@@ -1,10 +1,10 @@
-import networkx as nx
-from broadcast import *
-import pandas as pd
-import time
 import functools
 import os
+import time
 
+import networkx as nx
+import pandas as pd
+from broadcast import *
 
 GBIT_PER_GBYTE = 8
 
@@ -65,7 +65,12 @@ def make_nx_graph(cost_path=None, throughput_path=None, num_vms=1):
     for _, row in throughput.iterrows():
         if row["src_region"] == row["dst_region"]:
             continue
-        G.add_edge(row["src_region"], row["dst_region"], cost=None, throughput=num_vms * row["throughput_sent"] / 1e9)
+        G.add_edge(
+            row["src_region"],
+            row["dst_region"],
+            cost=None,
+            throughput=num_vms * row["throughput_sent"] / 1e9,
+        )
 
     for _, row in cost.iterrows():
         if row["src"] in G and row["dest"] in G[row["src"]]:
@@ -88,7 +93,9 @@ def push_flow_helper(src, g, ingress_limit=10 * 5, egress_limit=10 * 5):
     """
     for child in list(g.successors(src)):
         dfs_edges = [edge for edge in nx.dfs_edges(g, source=child)]
-        dfs_min = float("inf") if not dfs_edges else min([g[t[0]][t[1]]["throughput"] for t in dfs_edges])
+        dfs_min = (
+            float("inf") if not dfs_edges else min([g[t[0]][t[1]]["throughput"] for t in dfs_edges])
+        )
         min_flow = min([dfs_min, g[src][child]["throughput"], ingress_limit, egress_limit])
 
         # assign flows

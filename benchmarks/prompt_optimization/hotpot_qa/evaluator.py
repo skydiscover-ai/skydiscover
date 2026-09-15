@@ -1,23 +1,20 @@
+import os
+import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import partial
-import os
-import random
 from typing import Callable, List, Type
 
+import bm25s
 import dspy
+import Stemmer
+from datasets import load_dataset
 from dspy import Signature
 from dspy.evaluate import EM
 from dspy.evaluate.metrics import F1
-
-from skydiscover.evaluation.evaluation_result import EvaluationResult
-
 from litellm import completion
 
-import bm25s
-import Stemmer
-
-from datasets import load_dataset
+from skydiscover.optimize.evaluation.evaluation_result import EvaluationResult
 
 dataset_size = {"full": None, "lite": 500, "tiny": 200, "test": 50}
 
@@ -99,12 +96,11 @@ class BenchmarkMeta:
     metric_with_feedback: Callable = None
     feedback_fn_maps: list[dict] = None
 
+
 class HotpotQABench(Benchmark):
     def init_dataset(self):
         raw_datasets = load_dataset("hotpot_qa", "fullwiki")
-        self.dataset = [
-            dspy.Example(**x).with_inputs("question") for x in raw_datasets["train"]
-        ]
+        self.dataset = [dspy.Example(**x).with_inputs("question") for x in raw_datasets["train"]]
 
 
 class DotDict(dict):
@@ -112,9 +108,7 @@ class DotDict(dict):
         try:
             return self[key]
         except KeyError:
-            raise AttributeError(
-                f"'{type(self).__name__}' object has no attribute '{key}'"
-            )
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{key}'")
 
     def __setattr__(self, key, value):
         self[key] = value
@@ -123,9 +117,7 @@ class DotDict(dict):
         try:
             del self[key]
         except KeyError:
-            raise AttributeError(
-                f"'{type(self).__name__}' object has no attribute '{key}'"
-            )
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{key}'")
 
 
 stemmer = None
@@ -133,9 +125,9 @@ retriever = None
 corpus = None
 initialized = False
 
-from diskcache import Cache
-
 import threading
+
+from diskcache import Cache
 
 init_lock = threading.Lock()
 
@@ -158,9 +150,7 @@ def _get_benchmark():
 def initialize_bm25s_retriever_and_corpus(directory):
     from dspy.utils import download
 
-    download(
-        "https://huggingface.co/dspy/cache/resolve/main/wiki.abstracts.2017.tar.gz"
-    )
+    download("https://huggingface.co/dspy/cache/resolve/main/wiki.abstracts.2017.tar.gz")
     # !tar -xzvf wiki.abstracts.2017.tar.gz
     import tarfile
 
@@ -171,9 +161,9 @@ def initialize_bm25s_retriever_and_corpus(directory):
 
     corpus = []
 
-    assert os.path.exists(os.path.join(directory, "wiki.abstracts.2017.jsonl")), (
-        "Corpus file not found. Please ensure the corpus is downloaded and extracted correctly."
-    )
+    assert os.path.exists(
+        os.path.join(directory, "wiki.abstracts.2017.jsonl")
+    ), "Corpus file not found. Please ensure the corpus is downloaded and extracted correctly."
 
     with open(os.path.join(directory, "wiki.abstracts.2017.jsonl")) as f:
         for line in f:
@@ -190,9 +180,9 @@ def initialize_bm25s_retriever_and_corpus(directory):
     retriever.index(corpus_tokens)
 
     retriever.save(os.path.join(directory, "bm25s_retriever"))
-    assert os.path.exists(os.path.join(directory, "bm25s_retriever")), (
-        "Retriever not saved correctly."
-    )
+    assert os.path.exists(
+        os.path.join(directory, "bm25s_retriever")
+    ), "Retriever not saved correctly."
 
 
 def init_retriever():
@@ -207,16 +197,12 @@ def init_retriever():
                 os.path.join(os.path.dirname(__file__), "wiki.abstracts.2017.jsonl")
             ):
                 initialize_bm25s_retriever_and_corpus(os.path.dirname(__file__))
-            retriever = bm25s.BM25.load(
-                os.path.join(os.path.dirname(__file__), "bm25s_retriever")
-            )
+            retriever = bm25s.BM25.load(os.path.join(os.path.dirname(__file__), "bm25s_retriever"))
             stemmer = Stemmer.Stemmer("english")
             import ujson
 
             corpus_data = []
-            with open(
-                os.path.join(os.path.dirname(__file__), "wiki.abstracts.2017.jsonl")
-            ) as f:
+            with open(os.path.join(os.path.dirname(__file__), "wiki.abstracts.2017.jsonl")) as f:
                 for line in f:
                     line = ujson.loads(line)
                     corpus_data.append(f"{line['title']} | {' '.join(line['text'])}")
@@ -322,12 +308,14 @@ def create_lm(lm_config: dict):
     return dspy.LM(**config, **fixed_config)
 
 
-lm_for_optimizer = create_lm({
-    "model": "openai/gpt-5-mini",
-    "temperature": 1,
-    "api_key": os.environ.get("OPENAI_API_KEY"),
-    "api_base": os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1"),
-})
+lm_for_optimizer = create_lm(
+    {
+        "model": "openai/gpt-5-mini",
+        "temperature": 1,
+        "api_key": os.environ.get("OPENAI_API_KEY"),
+        "api_base": os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1"),
+    }
+)
 adapter = dspy.settings.adapter  # if "qwen" not in lm_name else XMLAdapter()
 dspy.configure(lm=lm_for_optimizer, adapter=adapter)
 

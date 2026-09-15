@@ -59,13 +59,21 @@ def validate_packing(centers, radii):
 
 
 def fail(status, reason, elapsed=0.0):
-    print(json.dumps({
-        "status": status,
-        "combined_score": 0.0,
-        "metrics": {"combined_score": 0.0, "sum_radii": 0.0, "validity": 0.0,
-                    "eval_time": elapsed},
-        "artifacts": {"error": reason},
-    }))
+    print(
+        json.dumps(
+            {
+                "status": status,
+                "combined_score": 0.0,
+                "metrics": {
+                    "combined_score": 0.0,
+                    "sum_radii": 0.0,
+                    "validity": 0.0,
+                    "eval_time": elapsed,
+                },
+                "artifacts": {"error": reason},
+            }
+        )
+    )
 
 
 def main():
@@ -102,20 +110,26 @@ def main():
 
     valid, reason = validate_packing(centers, radii)
     sum_radii = float(np.sum(radii)) if valid else 0.0
-    log(f"done in {elapsed:.3f}s — sum_radii={sum_radii:.6f} valid={valid}" +
-        (f" ({reason})" if not valid else ""))
+    log(
+        f"done in {elapsed:.3f}s — sum_radii={sum_radii:.6f} valid={valid}"
+        + (f" ({reason})" if not valid else "")
+    )
 
-    print(json.dumps({
-        "status": "success",
-        "combined_score": sum_radii,
-        "metrics": {
-            "combined_score": sum_radii,
-            "sum_radii": sum_radii,
-            "validity": 1.0 if valid else 0.0,
-            "eval_time": elapsed,
-        },
-        "artifacts": ({} if valid else {"error": reason}),
-    }))
+    print(
+        json.dumps(
+            {
+                "status": "success",
+                "combined_score": sum_radii,
+                "metrics": {
+                    "combined_score": sum_radii,
+                    "sum_radii": sum_radii,
+                    "validity": 1.0 if valid else 0.0,
+                    "eval_time": elapsed,
+                },
+                "artifacts": ({} if valid else {"error": reason}),
+            }
+        )
+    )
 
 
 if __name__ == "__main__":

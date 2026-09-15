@@ -5,6 +5,7 @@ Real-Time Adaptive Signal Processing Algorithm for Non-Stationary Time Series
 This algorithm implements a sliding window approach to filter volatile, non-stationary
 time series data while minimizing noise and preserving signal dynamics.
 """
+
 import numpy as np
 
 

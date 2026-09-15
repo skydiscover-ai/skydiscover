@@ -3,26 +3,32 @@
 Initial MLA Decode submission — optimised baseline with Triton softmax and RoPE kernels.
 """
 
-import os
 import math
+import os
 from typing import Tuple
+
 import torch
 import torch.nn.functional as F
 import triton
 import triton.language as tl
-from reference import KVCache, Config
+from reference import Config, KVCache
 
 
 @triton.jit
 def rope_swap_halves_kernel(
     x_ptr,
-    cos_ptr, sin_ptr,
+    cos_ptr,
+    sin_ptr,
     B: tl.constexpr,
     T: tl.constexpr,
     D: tl.constexpr,
-    stride_xb, stride_xt, stride_xd,
-    stride_cos_t, stride_cos_d,
-    stride_sin_t, stride_sin_d,
+    stride_xb,
+    stride_xt,
+    stride_xd,
+    stride_cos_t,
+    stride_cos_d,
+    stride_sin_t,
+    stride_sin_d,
     BLOCK_HALF: tl.constexpr,
 ):
     pid = tl.program_id(0)
@@ -69,13 +75,18 @@ def rope_inplace_query(q_rope: torch.Tensor, cos_q: torch.Tensor, sin_q: torch.T
 
     rope_swap_halves_kernel[grid](
         q_rope,
-        cos_q, sin_q,
-        B=bs, T=nh, D=d_rope,
+        cos_q,
+        sin_q,
+        B=bs,
+        T=nh,
+        D=d_rope,
         stride_xb=q_rope.stride(0),
         stride_xt=q_rope.stride(1),
         stride_xd=q_rope.stride(2),
-        stride_cos_t=0, stride_cos_d=cos_q.stride(0),
-        stride_sin_t=0, stride_sin_d=sin_q.stride(0),
+        stride_cos_t=0,
+        stride_cos_d=cos_q.stride(0),
+        stride_sin_t=0,
+        stride_sin_d=sin_q.stride(0),
         BLOCK_HALF=BLOCK_HALF,
         num_warps=4,
     )
@@ -105,8 +116,10 @@ def _get_rope_tables(dim: int, max_seq_len: int, device: torch.device):
 
 @triton.jit
 def _softmax_kernel(
-    out_ptr, in_ptr,
-    stride_out, stride_in,
+    out_ptr,
+    in_ptr,
+    stride_out,
+    stride_in,
     n_cols,
     BLOCK_SIZE: tl.constexpr,
     NUM_STAGES: tl.constexpr,
@@ -120,7 +133,7 @@ def _softmax_kernel(
     for start in range(0, n_cols, BLOCK_SIZE):
         cur = start + col
         mask = cur < n_cols
-        val = tl.load(in_ptr + row_off_in + cur, mask=mask, other=-float('inf'))
+        val = tl.load(in_ptr + row_off_in + cur, mask=mask, other=-float("inf"))
         max_val = tl.maximum(max_val, tl.cast(val, tl.float32))
     row_max = tl.max(max_val)
 
@@ -128,7 +141,7 @@ def _softmax_kernel(
     for start in range(0, n_cols, BLOCK_SIZE):
         cur = start + col
         mask = cur < n_cols
-        val = tl.load(in_ptr + row_off_in + cur, mask=mask, other=-float('inf'))
+        val = tl.load(in_ptr + row_off_in + cur, mask=mask, other=-float("inf"))
         exp_val = tl.exp(tl.cast(val, tl.float32) - row_max)
         tl.store(out_ptr + row_off_out + cur, tl.cast(exp_val, tl.bfloat16), mask=mask)
         sum_val += exp_val
@@ -159,8 +172,10 @@ def _triton_softmax(x: torch.Tensor) -> torch.Tensor:
     out = torch.empty_like(x)
     grid = (n_rows,)
     _softmax_kernel[grid](
-        out, x,
-        out.stride(0), x.stride(0),
+        out,
+        x,
+        out.stride(0),
+        x.stride(0),
         n_cols,
         BLOCK_SIZE=BLOCK_SIZE,
         NUM_STAGES=2,
@@ -217,7 +232,7 @@ def custom_kernel(data: Tuple[Config, torch.Tensor, KVCache]) -> Tuple[torch.Ten
 
     wUKV_view = wUKV.view(nh, d_nope + dv, dkv)
     wK = wUKV_view[:, :d_nope, :]
-    q_nope_latent = torch.einsum('bhd,hdk->bhk', q_nope, wK)
+    q_nope_latent = torch.einsum("bhd,hdk->bhk", q_nope, wK)
 
     kv_nope_T = kv_nope_input.transpose(1, 2)
     scores_nope = torch.matmul(q_nope_latent, kv_nope_T)
@@ -235,11 +250,13 @@ def custom_kernel(data: Tuple[Config, torch.Tensor, KVCache]) -> Tuple[torch.Ten
 
     wV = wUKV_view[:, d_nope:, :]
     wV_T = wV.permute(0, 2, 1)
-    y_head = torch.einsum('bhd,hdk->bhk', M, wV_T)
+    y_head = torch.einsum("bhd,hdk->bhk", M, wV_T)
 
     y = y_head.reshape(bs, nh * dv)
     y = y.unsqueeze(1)
     output = F.linear(y, wO)
 
     return output, kv_cache.data
+
+
 # EVOLVE-BLOCK-END

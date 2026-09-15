@@ -1,3 +1,43 @@
 @import 'tailwindcss';
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
+
+/* White pages, brand colors from the logo. */
+:root {
+  --color-fd-background: #ffffff;
+  --color-fd-card: #fafafa;
+  --color-fd-primary: #1e1a38;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-ring: #e08b0b;
+}
+
+#nd-sidebar {
+  --color-fd-background: #ffffff;
+}
+
+.prose img {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Examples-page prompt blocks: a cohesive vertical stack of titled prompt blocks. */
+.wrap-prompts figure {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.wrap-prompts figure:first-child {
+  margin-top: 0;
+}
+.wrap-prompts figure:last-child {
+  margin-bottom: 0;
+}
+
+/* Wrap long paths instead of scrolling them under the copy button. */
+.wrap-prompts pre,
+.wrap-prompts pre code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.wrap-prompts pre {
+  padding-right: 3rem;
+}

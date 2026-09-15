@@ -2,6 +2,7 @@
 
 import numpy as np
 
+
 def transform_grid_attempt_1(grid):
     """
     Example transformation:
@@ -14,6 +15,7 @@ def transform_grid_attempt_1(grid):
     out = np.rot90(arr, k=-1)  # 90 degrees clockwise
     out = (out + 1) % 10
     return out.astype(np.int32)
+
 
 def transform_grid_attempt_2(grid):
     """
@@ -28,7 +30,9 @@ def transform_grid_attempt_2(grid):
     out = 9 - out
     return out.astype(np.int32)
 
+
 # EVOLVE-BLOCK-END
+
 
 def _validate_grid(grid):
     arr = np.asarray(grid)

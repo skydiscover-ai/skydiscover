@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="170" viewBox="0 0 680 170" font-family="Helvetica, Arial, sans-serif">
+  <!-- timeline -->
+  <line x1="24" y1="96" x2="640" y2="96" stroke="#999" stroke-width="1.5"/>
+  <polygon points="640,96 630,91 630,101" fill="#999"/>
+  <text x="648" y="100" font-size="12" fill="#777">time</text>
+
+  <!-- app segment 1 -->
+  <rect x="30" y="52" width="170" height="44" rx="6" fill="#4cc39a" opacity="0.85"/>
+  <text x="115" y="71" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">app traffic</text>
+  <text x="115" y="88" font-size="11" fill="#fff" text-anchor="middle">same ~100 hot keys</text>
+
+  <!-- scan segment 1 -->
+  <rect x="204" y="52" width="120" height="44" rx="6" fill="#e2705d" opacity="0.9"/>
+  <text x="264" y="71" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">scan</text>
+  <text x="264" y="88" font-size="11" fill="#fff" text-anchor="middle">140 one-time keys</text>
+
+  <!-- app segment 2 -->
+  <rect x="328" y="52" width="170" height="44" rx="6" fill="#4cc39a" opacity="0.85"/>
+  <text x="413" y="71" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">app traffic</text>
+  <text x="413" y="88" font-size="11" fill="#fff" text-anchor="middle">same ~100 hot keys</text>
+
+  <!-- scan segment 2 -->
+  <rect x="502" y="52" width="120" height="44" rx="6" fill="#e2705d" opacity="0.9"/>
+  <text x="562" y="71" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">scan</text>
+  <text x="562" y="88" font-size="11" fill="#fff" text-anchor="middle">140 one-time keys</text>
+
+  <text x="636" y="80" font-size="14" fill="#888">...</text>
+
+  <!-- caption -->
+  <text x="340" y="132" font-size="13" fill="#555" text-anchor="middle">the cache holds 128 entries, so every 140-key scan can flush all the hot keys the app needs</text>
+  <text x="340" y="152" font-size="12" fill="#999" text-anchor="middle">what you care about: hit rate on the app traffic (scans are not scored)</text>
+</svg>

@@ -1,0 +1,124 @@
+# AdaEvolve - Adaptive Evolutionary Search Configuration
+#
+# AdaEvolve is an adaptive multi-island evolutionary algorithm that adjusts
+# search intensity per island based on accumulated improvement history.
+#
+# Key features:
+#   - Per-island adaptive exploration/exploitation via accumulated signal (G)
+#   - UCB with decayed magnitude rewards for island selection
+#   - UnifiedArchive per island for quality-diversity balance
+#   - Ring migration for cross-pollination between islands
+#   - Dynamic island spawning when global productivity drops
+#   - Paradigm breakthrough for high-level strategy shifts during stagnation
+#
+# Usage:
+#   Copy this file to your example directory as config_adaevolve.yaml
+#   and fill in the system_message with your problem description.
+
+# General settings
+max_iterations: 100
+checkpoint_interval: 10
+log_level: "INFO"
+
+# LLM configuration
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+  api_base: "https://api.openai.com/v1"
+  temperature: 0.7
+  # top_p: 0.95  # omitted by default; some providers (e.g. Anthropic) reject both temperature and top_p
+  max_tokens: 32000
+  timeout: 600
+  # To use Gemini: comment out models + api_base above, uncomment below
+  # models:
+  #   - name: "gemini-3-pro-preview"
+  # api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  # api_key: ${GEMINI_API_KEY}
+
+# Search configuration
+search:
+  type: "adaevolve"
+  num_context_programs: 4
+  database:
+    # Population settings
+    population_size: 20
+    num_islands: 2
+
+    # --- Adaptive search intensity ---
+    # Controls how search intensity adapts based on improvement signal (G)
+    # High G (productive island) -> low intensity (exploit)
+    # Low G (stagnating island) -> high intensity (explore)
+    decay: 0.9                        # Exponential moving average weight (rho)
+    intensity_min: 0.15               # Minimum search intensity (exploitation)
+    intensity_max: 0.5                # Maximum search intensity (exploration)
+
+    # --- Ablation flags ---
+    # Set to false to disable specific adaptive mechanisms for ablation studies
+    use_adaptive_search: true         # G-based intensity vs fixed_intensity
+    use_ucb_selection: true           # UCB island selection vs round-robin
+    use_migration: true               # Inter-island migration
+    use_unified_archive: true         # Quality-diversity archive vs simple list
+    # fixed_intensity: 0.4            # Used when use_adaptive_search=false
+
+    # --- Migration ---
+    migration_interval: 15            # Migrate every N iterations
+    migration_count: 5                # Number of top programs to migrate
+
+    # --- Archive settings (when use_unified_archive=true) ---
+    fitness_weight: 1.0               # Weight for fitness rank in elite score
+    novelty_weight: 0.0               # Weight for novelty rank in elite score
+    diversity_strategy: "code"        # Diversity metric: "code", "metric", or "hybrid"
+
+    # --- Optional Pareto multiobjective mode ---
+    # Leave pareto_objectives empty to keep the current scalar combined_score behavior.
+    # When enabled, return the raw objective metrics from the evaluator and set:
+    # pareto_objectives:
+    #   - accuracy
+    #   - latency
+    # higher_is_better:
+    #   accuracy: true
+    #   latency: false
+    # fitness_key: accuracy              # Optional scalar proxy for adaptive state / tie-breaking
+    # pareto_objectives_weight: 0.4      # Weight of Pareto percentile in archive elite score
+
+    # --- Dynamic island spawning ---
+    use_dynamic_islands: true
+    max_islands: 5                    # Maximum number of islands
+    spawn_productivity_threshold: 0.015  # Spawn if global productivity below this
+    spawn_cooldown_iterations: 30     # Wait N iterations between spawns
+
+    # --- Paradigm breakthrough ---
+    use_paradigm_breakthrough: true
+    paradigm_window_size: 10          # Window for improvement rate calculation
+    paradigm_improvement_threshold: 0.12  # Stagnation threshold
+    paradigm_max_uses: 2              # Max uses per paradigm
+    paradigm_max_tried: 10            # Max tried paradigms to track
+    paradigm_num_to_generate: 3       # Number of paradigms to generate per trigger
+
+    # --- Error retry ---
+    enable_error_retry: true
+    max_error_retries: 2
+
+# Prompt configuration
+prompt:
+  system_message: |
+    <REPLACE WITH YOUR PROBLEM-SPECIFIC SYSTEM MESSAGE>
+
+    Describe:
+    - What the algorithm/function should do
+    - Input/output format
+    - Optimization objective and metrics
+    - Constraints
+    - Techniques to explore
+
+# Evaluator configuration
+evaluator:
+  timeout: 360
+  max_retries: 3
+  cascade_evaluation: true
+  cascade_thresholds: [0.3, 0.6]
+
+# Generation settings
+diff_based_generation: true
+max_solution_length: 60000

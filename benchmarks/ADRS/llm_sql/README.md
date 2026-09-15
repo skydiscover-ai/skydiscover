@@ -29,7 +29,7 @@ When rows of a table are serialized into LLM prompts sequentially, consecutive r
 From the repo root:
 
 ```bash
-uv run skydiscover-run \
+uv run skydiscover optimize \
   benchmarks/ADRS/llm_sql/initial_program.py \
   benchmarks/ADRS/llm_sql/evaluator.py \
   -c benchmarks/ADRS/llm_sql/config.yaml \

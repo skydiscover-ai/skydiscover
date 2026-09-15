@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from skydiscover.config import EvoxDatabaseConfig
-from skydiscover.context_builder.default.builder import DefaultContextBuilder
-from skydiscover.config import Config, SearchConfig
-from skydiscover.search.base_database import Program
-from skydiscover.search.evox.database.initial_search_strategy import EvolvedProgramDatabase
-from skydiscover.utils.pareto import dominates, nondominated_indices
+from skydiscover.optimize.config import Config, EvoxDatabaseConfig, SearchConfig
+from skydiscover.optimize.context_builder.default.builder import DefaultContextBuilder
+from skydiscover.optimize.search.base_database import Program
+from skydiscover.optimize.search.evox.database.initial_search_strategy import EvolvedProgramDatabase
+from skydiscover.optimize.utils.pareto import dominates, nondominated_indices
 
 
 def _make_program(program_id: str, **metrics) -> Program:
@@ -21,9 +20,7 @@ def _make_program(program_id: str, **metrics) -> Program:
 def _pareto_db(**extra) -> EvolvedProgramDatabase:
     config = EvoxDatabaseConfig(
         pareto_objectives=extra.pop("pareto_objectives", ["accuracy", "latency"]),
-        higher_is_better=extra.pop(
-            "higher_is_better", {"accuracy": True, "latency": False}
-        ),
+        higher_is_better=extra.pop("higher_is_better", {"accuracy": True, "latency": False}),
         fitness_key=extra.pop("fitness_key", "accuracy"),
         pareto_objectives_weight=extra.pop("pareto_objectives_weight", 0.4),
         **extra,

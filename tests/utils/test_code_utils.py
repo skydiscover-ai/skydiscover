@@ -1,4 +1,4 @@
-"""Tests for skydiscover.utils.code_utils — diff parsing, summary generation, and language support."""
+"""Tests for skydiscover.optimize.utils.code_utils — diff parsing, summary generation, and language support."""
 
 import importlib.util
 from pathlib import Path
@@ -7,7 +7,9 @@ import pytest
 
 # Load code_utils directly from file to avoid pulling in the full skydiscover
 # package (which requires openai, yaml, etc. not needed for these unit tests).
-_code_utils_path = Path(__file__).resolve().parents[2] / "skydiscover" / "utils" / "code_utils.py"
+_code_utils_path = (
+    Path(__file__).resolve().parents[2] / "skydiscover" / "optimize" / "utils" / "code_utils.py"
+)
 _spec = importlib.util.spec_from_file_location("code_utils", _code_utils_path)
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
@@ -20,9 +22,7 @@ extract_diffs = _mod.extract_diffs
 format_diff_summary = _mod.format_diff_summary
 
 
-# ---------------------------------------------------------------------------
 # _extract_def_info — Python
-# ---------------------------------------------------------------------------
 
 
 class TestExtractDefInfoPython:
@@ -67,9 +67,7 @@ class TestExtractDefInfoPython:
         assert result == ("function", "k", None)
 
 
-# ---------------------------------------------------------------------------
 # _extract_def_info — CUDA
-# ---------------------------------------------------------------------------
 
 
 class TestExtractDefInfoCUDA:
@@ -150,9 +148,7 @@ __global__ void norm_kernel(float* x, int n) {
         assert "Handles hidden=128 case specifically" in docstring
 
 
-# ---------------------------------------------------------------------------
 # _extract_def_info — C/C++
-# ---------------------------------------------------------------------------
 
 
 class TestExtractDefInfoCCpp:
@@ -205,9 +201,7 @@ class TestExtractDefInfoCCpp:
         assert name == "SharedMemLayout"
 
 
-# ---------------------------------------------------------------------------
 # _extract_def_info — no match
-# ---------------------------------------------------------------------------
 
 
 class TestExtractDefInfoNoMatch:
@@ -216,9 +210,7 @@ class TestExtractDefInfoNoMatch:
         assert _extract_def_info("") is None
 
 
-# ---------------------------------------------------------------------------
 # _extract_first_comment — C-style
-# ---------------------------------------------------------------------------
 
 
 class TestExtractFirstCommentCStyle:
@@ -254,9 +246,7 @@ class TestExtractFirstCommentCStyle:
         assert "Step 1: load data" in result
 
 
-# ---------------------------------------------------------------------------
 # _extract_c_comment
-# ---------------------------------------------------------------------------
 
 
 class TestExtractCComment:
@@ -298,9 +288,7 @@ __global__ void kernel(float* x) {
         assert result is None
 
 
-# ---------------------------------------------------------------------------
 # format_diff_summary — CUDA integration
-# ---------------------------------------------------------------------------
 
 
 class TestFormatDiffSummaryCUDA:
@@ -348,9 +336,7 @@ class TestFormatDiffSummaryCUDA:
         assert "Renamed" in summary
 
 
-# ---------------------------------------------------------------------------
 # format_diff_summary — Python (preserve existing behavior)
-# ---------------------------------------------------------------------------
 
 
 class TestFormatDiffSummaryPython:
@@ -388,9 +374,7 @@ class TestFormatDiffSummaryPython:
         assert "Change 1" in summary
 
 
-# ---------------------------------------------------------------------------
 # extract_diffs and apply_diff (existing functionality)
-# ---------------------------------------------------------------------------
 
 
 class TestExtractDiffs:

@@ -26,10 +26,10 @@ The system must generate a floating sky-festival image where many details must m
 cd benchmarks/image_gen/sky_festival
 
 # AdaEvolve
-uv run skydiscover-run evaluator.py -c config.yaml -s adaevolve -o sky_festival_output
+uv run skydiscover optimize evaluator.py -c config.yaml -s adaevolve -o sky_festival_output
 
 # EvoX
-uv run skydiscover-run evaluator.py -c config.yaml -s evox -o sky_festival_output
+uv run skydiscover optimize evaluator.py -c config.yaml -s evox -o sky_festival_output
 ```
 
 ## Files

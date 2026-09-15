@@ -1,0 +1,92 @@
+---
+title: "Installation"
+description: "Install SkyDiscover once, then set up the half you need."
+---
+
+SkyDiscover has two halves, Optimize and Synthesize. They share one install: clone the repo and run
+`uv sync`. From there, Optimize needs an LLM API key and Synthesize needs a coding agent. Install
+once below, then set up the half you need.
+
+## Requirements
+
+- Python 3.10 to 3.13
+- [uv](https://docs.astral.sh/uv/)
+- For Optimize: an LLM API key (OpenAI, Anthropic, Gemini, or a local server)
+- For Synthesize: a coding agent (Claude Code, Codex, Cursor, or pi)
+- Optional: [Docker](https://docs.docker.com/get-docker/), for containerized evaluators and Harbor tasks
+
+## Install SkyDiscover
+
+```bash
+git clone https://github.com/skydiscover-ai/skydiscover.git
+cd skydiscover
+uv sync
+```
+
+Check it works:
+
+```bash
+uv run skydiscover --help
+```
+
+If you only use Synthesize from Claude Code, you can install it as a plugin instead of cloning:
+
+```
+/plugin marketplace add skydiscover-ai/skydiscover
+/plugin install skysynth
+```
+
+The plugin ships the `/skysynth` skill but not the Python package, so also run
+`uv pip install git+https://github.com/skydiscover-ai/skydiscover` to get the tooling it calls.
+
+## For Optimize
+
+Optimize works with any OpenAI-compatible endpoint. Set the key for the provider you use:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+# export ANTHROPIC_API_KEY="..."
+# export GEMINI_API_KEY="..."
+```
+
+See [Configuration](/docs/optimize/configuration#pick-a-model) for other providers and running
+fully local. Some benchmarks need extra dependencies:
+
+```bash
+uv sync --extra math                 # Math benchmarks
+uv sync --extra adrs                 # ADRS systems benchmarks
+uv sync --extra frontier-cs          # Frontier-CS
+uv sync --extra external             # OpenEvolve / GEPA backends
+uv sync --extra prompt-optimization  # HotPotQA prompt optimization
+```
+
+Extras can be combined: `uv sync --extra external --extra math`.
+
+Then evolve a program against your scoring function:
+
+```bash
+uv run skydiscover optimize evaluator.py --search adaevolve --model gpt-5 -i 100
+# --search can also be evox, openevolve, gepa_native, best_of_n, ... (full list in Configuration)
+```
+
+[Configuration](/docs/optimize/configuration#pick-an-algorithm) lists every search algorithm.
+The [Optimize Quick Start](/docs/optimize/quick-start) walks through your first search.
+
+## For Synthesize
+
+Synthesize runs inside a coding agent. Install one of Claude Code, Codex, Cursor, or pi, then
+wire it up:
+
+```bash
+uv run skydiscover init   # wires every coding agent found on PATH; or --agent claude|cursor|codex|pi
+```
+
+If you installed the Claude Code plugin above, skip `init`: the plugin already provides
+`/skysynth`. Then prompt the agent:
+
+```
+/skysynth build a fast inference engine serving Qwen2.5-0.5B on this machine
+```
+
+The [Synthesize Quick Start](/docs/synthesize/quick-start) sets up your coding agent and walks you
+through your first build.

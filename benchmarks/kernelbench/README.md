@@ -63,7 +63,7 @@ Then, run optimization on this problem:
 
 ```bash
 # algo can be "adaevolve", "evox", "topk", "beam_search", "best_of_n", etc.
-uv run skydiscover-run benchmarks/kernelbench/evaluator/ \
+uv run skydiscover optimize benchmarks/kernelbench/evaluator/ \
   -c benchmarks/kernelbench/config.yaml \
   --search <algo> \
   --iterations 50
@@ -102,7 +102,7 @@ benchmark:
 
 ```bash
 # algo can be "adaevolve", "evox", "topk", "beam_search", "best_of_n", etc.
-uv run skydiscover-run benchmarks/kernelbench/evaluator/ \
+uv run skydiscover optimize benchmarks/kernelbench/evaluator/ \
   -c benchmarks/kernelbench/config.yaml \
   --search <algo> \
   --iterations 50
@@ -182,7 +182,7 @@ You can still provide an initial program manually if needed:
 
 ```bash
 # Run with explicit initial program
-uv run skydiscover-run my_kernel.py benchmarks/kernelbench/evaluator/ \
+uv run skydiscover optimize my_kernel.py benchmarks/kernelbench/evaluator/ \
   -c benchmarks/kernelbench/config.yaml \
   --search <algo>
 ```

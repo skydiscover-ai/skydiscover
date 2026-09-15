@@ -185,7 +185,9 @@ def _predict(x: np.ndarray, topology: list[dict[str, Any]], params: np.ndarray) 
     return np.where(z >= 0.0, 1.0, -1.0)
 
 
-def _accuracy(x: np.ndarray, y: np.ndarray, topology: list[dict[str, Any]], params: np.ndarray) -> float:
+def _accuracy(
+    x: np.ndarray, y: np.ndarray, topology: list[dict[str, Any]], params: np.ndarray
+) -> float:
     preds = _predict(x, topology, params)
     return float(np.mean(preds == y))
 
@@ -220,7 +222,9 @@ def _fit_once(
     return params
 
 
-def _fit(topology: list[dict[str, Any]], x: np.ndarray, y: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+def _fit(
+    topology: list[dict[str, Any]], x: np.ndarray, y: np.ndarray, rng: np.random.Generator
+) -> np.ndarray:
     compiled = _compile(topology)
     encoded = _encode_features(x)
     n_params = _n_params(topology)
@@ -279,6 +283,10 @@ def evaluate(program_path: str) -> dict[str, Any]:
 
 
 if __name__ == "__main__":
-    path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "initial_program.py")
+    path = (
+        sys.argv[1]
+        if len(sys.argv) > 1
+        else os.path.join(os.path.dirname(__file__), "initial_program.py")
+    )
     result = evaluate(path)
     print(result)

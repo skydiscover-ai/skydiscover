@@ -3,402 +3,121 @@
     <source media="(prefers-color-scheme: dark)" srcset="assets/lockup-dark-bg.svg">
     <source media="(prefers-color-scheme: light)" srcset="assets/lockup-light-bg.svg">
     <img src="assets/lockup-light-bg.svg" height="80" alt="SkyDiscover logo" style="vertical-align: middle;">
-  </picture>&nbsp;
+  </picture>
 </h1>
 
+<p align="center">AI-driven scientific, algorithmic, and end-to-end systems discovery</p>
 
- <p align="center">A Framework for AI-Driven System Synthesis and Scientific Discovery</p>
-  <p align="center">
-  <a href="https://skydiscover-ai.github.io/blog.html"><img src="https://img.shields.io/badge/blog-SkyDiscover-orange?style=flat-square" alt="Blog" /></a>
- <a href="https://arxiv.org/abs/2605.23109"><img src="https://img.shields.io/badge/paper-IDS-blueviolet?style=flat-square" alt="IDS Paper" /></a>
-  <a href="https://arxiv.org/abs/2605.24096"><img src="https://img.shields.io/badge/paper-Just--in--Time%20Systems-yellow?style=flat-square" alt="Jitski Paper" /></a>
-  <a href="https://arxiv.org/abs/2602.20133"><img src="https://img.shields.io/badge/paper-AdaEvolve-red?style=flat-square" alt="AdaEvolve Paper" /></a>
-  <a href="https://arxiv.org/abs/2602.23413"><img src="https://img.shields.io/badge/paper-EvoX-lightblue?style=flat-square" alt="EvoX Paper" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-green?style=flat-square" /></a>
-  </p>
+<div align="center">
 
-SkyDiscover is an open source project from UC Berkeley providing state-of-the-art tooling for scientific discovery and end-to-end system synthesis.
+[![Blog](https://img.shields.io/badge/Blog-FF6F00?logo=rss&logoColor=white)](https://skydiscover-ai.github.io/blogs.html)
+[![Documentation](https://img.shields.io/badge/Documentation-blue?logo=readthedocs&logoColor=white)](docs/)
+[![Slack](https://img.shields.io/badge/Slack-4A154B?logo=data%3Aimage/svg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0NDggNTEyIj48cGF0aCBmaWxsPSJ3aGl0ZSIgZD0iTTk0LjEyIDMxNS4xYzAgMjUuOS0yMS4xNiA0Ny4wNi00Ny4wNiA0Ny4wNlMwIDM0MSAwIDMxNS4xYzAtMjUuOSAyMS4xNi00Ny4wNiA0Ny4wNi00Ny4wNmg0Ny4wNnY0Ny4wNnptMjMuNzIgMGMwLTI1LjkgMjEuMTYtNDcuMDYgNDcuMDYtNDcuMDZzNDcuMDYgMjEuMTYgNDcuMDYgNDcuMDZ2MTE3Ljg0YzAgMjUuOS0yMS4xNiA0Ny4wNi00Ny4wNiA0Ny4wNnMtNDcuMDYtMjEuMTYtNDcuMDYtNDcuMDZWMzE1LjF6bTQ3LjA2LTE4OC45OGMtMjUuOSAwLTQ3LjA2LTIxLjE2LTQ3LjA2LTQ3LjA2UzEzOSAzMiAxNjQuOSAzMnM0Ny4wNiAyMS4xNiA0Ny4wNiA0Ny4wNnY0Ny4wNkgxNjQuOXptMCAyMy43MmMyNS45IDAgNDcuMDYgMjEuMTYgNDcuMDYgNDcuMDZzLTIxLjE2IDQ3LjA2LTQ3LjA2IDQ3LjA2SDQ3LjA2QzIxLjE2IDI0My45NiAwIDIyMi44IDAgMTk2LjlzMjEuMTYtNDcuMDYgNDcuMDYtNDcuMDZIMTY0Ljl6bTE4OC45OCA0Ny4wNmMwLTI1LjkgMjEuMTYtNDcuMDYgNDcuMDYtNDcuMDYgMjUuOSAwIDQ3LjA2IDIxLjE2IDQ3LjA2IDQ3LjA2cy0yMS4xNiA0Ny4wNi00Ny4wNiA0Ny4wNmgtNDcuMDZWMTk2Ljl6bS0yMy43MiAwYzAgMjUuOS0yMS4xNiA0Ny4wNi00Ny4wNiA0Ny4wNi0yNS45IDAtNDcuMDYtMjEuMTYtNDcuMDYtNDcuMDZWNzkuMDZjMC0yNS45IDIxLjE2LTQ3LjA2IDQ3LjA2LTQ3LjA2IDI1LjkgMCA0Ny4wNiAyMS4xNiA0Ny4wNiA0Ny4wNlYxOTYuOXpNMjgzLjEgMzg1Ljg4YzI1LjkgMCA0Ny4wNiAyMS4xNiA0Ny4wNiA0Ny4wNiAwIDI1LjktMjEuMTYgNDcuMDYtNDcuMDYgNDcuMDYtMjUuOSAwLTQ3LjA2LTIxLjE2LTQ3LjA2LTQ3LjA2di00Ny4wNmg0Ny4wNnptMC0yMy43MmMtMjUuOSAwLTQ3LjA2LTIxLjE2LTQ3LjA2LTQ3LjA2IDAtMjUuOSAyMS4xNi00Ny4wNiA0Ny4wNi00Ny4wNmgxMTcuODRjMjUuOSAwIDQ3LjA2IDIxLjE2IDQ3LjA2IDQ3LjA2IDAgMjUuOS0yMS4xNiA0Ny4wNi00Ny4wNiA0Ny4wNkgyODMuMXoiLz48L3N2Zz4%3D)](https://join.slack.com/t/skydiscover/shared_invite/zt-48y5bloat-iZCMDv98OQTo3TXX97s80g)
+[![License](https://img.shields.io/badge/License-Apache%202.0-2EA44F)](LICENSE)
 
-SkyDiscover provides tools for two broad classes of tasks:
- 1. **Optimization**: given an evaluator and problem description, apply evolutionary techniques to incrementally discover better solutions.
- 2. **Synthesis**: starting from a formal specification or text description of a system, full end-to-end synthesis of compliant and highly-performant systems. 
+</div>
 
-See the getting started page for quickstart guides for each.
+SkyDiscover is an open-source framework from UC Berkeley that uses AI to discover better algorithms and build complete systems.
 
-> 🚧 This project is under active development.
+1. **Optimize**: improve an algorithm or a component of your system. You provide a way to score solutions, and evolutionary search finds programs that score better and better.
+2. **Synthesize**: build an end-to-end system. You describe it in plain text or a formal spec, and coding agents build it specialized Just-in-Time for your workload, hardware, and requirements.
 
-
-## SkyDiscover Optimize
+SkyDiscover works with Claude Code, Codex, Cursor, and Pi, and with any OpenAI-compatible model.
 
 <p align="center">
-  <img src="assets/architecture.png" width="720" alt="SkyDiscover Optimize architecture"><br>
+  <img src="assets/skydiscover_overview.png" width="900" alt="SkyDiscover: Optimize evolves algorithms, prompts, and system components; Synthesize builds end-to-end specialized systems">
 </p>
 
-**SkyDiscover Optimize** is a modular framework for AI-driven scientific and algorithmic discovery, providing a unified interface for implementing, running, and fairly comparing discovery algorithms across 200+ optimization tasks.
+## 📰 News
 
-We ship with two SOTA adaptive optimization algorithms built by the SkyDiscover team, [AdaEvolve](https://arxiv.org/abs/2602.20133) and [EvoX](https://arxiv.org/abs/2602.23413). SkyDiscover Optimize also supports OpenEvolve, ShinkaEvolve and GEPA to quickly benchmark these algorithms using their own source code. 
+- **[2026/09]** 🎉 We released SkyDiscover-Synthesize (SkySynth), which lets you build trustworthy Just-in-Time systems specialized for your workload! [[Blog](https://skydiscover-ai.github.io/blog-skysynth.html)]
+- **[2026/07]** 🎉 EvoX is accepted to COLM 2026!
+- **[2026/05]** 🎉 We released two papers on synthesizing end-to-end systems that are correct by proof [[Paper](https://arxiv.org/abs/2605.23109)] or by test [[Paper](https://arxiv.org/abs/2605.24096)]!
+- **[2026/03]** 🎉 SkyDiscover is accepted as an Industrial Spotlight paper at CAIS '26! [[Paper](https://doi.org/10.1145/3786335.3813221)]
+- **[2026/02]** 🎉 We open-sourced SkyDiscover, along with our two adaptive optimization algorithms, AdaEvolve [[Paper](https://arxiv.org/abs/2602.20133)] and EvoX [[Paper](https://arxiv.org/abs/2602.23413)]!
 
-SkyDiscover Optimize natively supports [Harbor](https://harborframework.com/)-format benchmarks, so you can run external benchmark suites out of the box, including [AlgoTune](https://github.com/oripress/AlgoTune), [EvoEval](https://github.com/evo-eval/evoeval), [HumanEvalFix](https://github.com/bigcode-project/octopack), [BigCodeBench](https://github.com/bigcode-project/bigcodebench), [LiveCodeBench](https://livecodebench.github.io/), [USACO](https://usaco.org/), [CRUSTBench](https://github.com/AInfinity/CRUSTBench), and [CodePDE](https://github.com/).
+## 📦 Installation
 
-Get started with our [quick start guide here](link-to-quickstart).
-
-## SkyDiscover Synthesize
-
-<p align="center">
-<img width="870" height="376" alt="SkyDiscover Synthesize Architecture" src="https://github.com/user-attachments/assets/285cee92-3eba-47b3-a8b8-fcfee586afcc" />
-</p>
-
-**SkyDiscover Synthesize** is a set of tooling that enables full, end-to-end synthesis of compliant and highly-performant systems, such as LLM inference systems, model routing, or key-value stores. 
-
-Our synthesis tooling is built on two published techniques introduced by the SkyDiscover team:
-1. [Inductive-Deductive Synthesis](https://arxiv.org/abs/2605.23109): when a formal specification in Rocq for the target system is provided, Synthesize jointly generates implementation and corresponding proofs in stages, optimizing for performance in the process.
-2. [Test-Driven Synthesis](https://arxiv.org/abs/2605.24096): when the system is described by natural language and tests, Synthesize iterates on implementations with a collection of planning, coding, critiquing, and auditing agents.
-
-SkyDiscover Synthesize is provided as a Claude Code and Codex-compatible skill, and has been used to produce a wide range of systems. 
-
-See the [Quick Start guide here](link-to-quick-s).
-
-<!-- ![Inductive Deductive Synthesis](image.png) -->
-
-## Optimization Results
-
-SkyDiscover Optimize has been used across industry including Google, Uber, and more; the algorithms released by the SkyDiscover team, AdaEvolve and EvoX, achieve the strongest open-source results across ~200 optimization benchmarks: matching or exceeding AlphaEvolve and human SOTA, and outperforming OpenEvolve, GEPA, and ShinkaEvolve under identical generation budgets.
-
-- **Frontier-CS (172 problems)**: ~34% median score improvement over OpenEvolve, GEPA, and ShinkaEvolve  
-- **Math + Systems Optimization (14 tasks evaluated)**: Matches or exceeds AlphaEvolve and human-designed SOTA on 6/6 systems and 6/8 math tasks
-- **Real-world systems impact**: 41% lower cross-cloud transfer cost, 14% better GPU load balance for MoE serving, and 29% lower KV-cache pressure via GPU model placement
-
-<p align="center">
-  <img src="assets/benchmarks.png" width="900" alt="SkyDiscover benchmarks">
-</p>
-
-<details>
-<summary><b>📊 Complete results of AdaEvolve and EvoX (100 iterations)</b></summary>
-
-> AdaEvolve and EvoX are **complementary**: AdaEvolve adapts search *parameters* for fast early gains; EvoX evolves the search *strategy itself* for stronger long-horizon gains. Both are built on SkyDiscover.
-
-<p align="center">
-  <img src="assets/comparison.png" width="900" alt="Main results for systems and math problems">
-</p>
-
-</details>
-
-<details>
-<summary><b>📈 Scaling behavior of AdaEvolve and EvoX</b></summary>
-
-The scaling behavior of AdaEvolve and EvoX shows a **complementary crossover**. AdaEvolve's per-iteration parameter adaptation yields fast early gains in low-budget runs (T≤50), while EvoX's demand-driven strategy evolution unlocks step-change improvements in longer runs (T≥50).
-
-<p align="center">
-  <img src="assets/scaling_comparison.png" width="900" alt="Scaling behavior of AdaEvolve vs EvoX across 500 iterations">
-  <br><em>Best-so-far score vs. iteration for Signal Processing, Heilbronn Convex, Prism, and Cloudcast (500 iterations, GPT-5).</em>
-</p>
-
-</details>
-
-<details>
-<summary><b>🔗 Evolving AdaEvolve's policy with EvoX (coming soon)</b></summary>
-
-The two methods are **composable**: EvoX can evolve using AdaEvolve as its starting strategy, achieving the best results on 3 out of 4 benchmarks (100 iterations, GPT-5). This combined mode will be available in SkyDiscover soon.
-
-| Benchmark | AdaEvolve | EvoX (Random Init) | EvoX (AdaEvolve Init) |
-|:--|--:|--:|--:|
-| Signal Proc. (↑) | 0.718 | 0.721 | **0.760** |
-| Heilbronn Cvx. (↑) | 0.0290 | 0.0270 | **0.0291** |
-| Cloudcast (↓) | 640.5 | 637.1 | **623.4** |
-| Prism (↑) | 26.37 | **30.52** | 26.27 |
-
-</details>
-
-<details>
-<summary><b>Task breakdown across math, systems, and programming challenges</b></summary>
-
-| | Benchmark | Domain | Tasks | Description |
-|-|-----------|--------|------:|-------------|
-| 🔢 | [math/](benchmarks/math/) | Math | 14 | Circle packing, Erdos problems, geometric optimization |
-| 🖥️ | [ADRS/](benchmarks/ADRS/) | Systems | 5 | Cloud scheduling, load balancing, MoE expert placement |
-| ⚡ | [gpu_mode/](benchmarks/gpu_mode/) | Systems | 4 | GPU kernel optimization |
-| 🔧 | [kernelbench/](benchmarks/kernelbench/) | Systems | 250+ | [KernelBench](https://github.com/ScalingIntelligence/KernelBench) GPU kernel speedup optimization |
-| 🧩 | [frontier-cs-eval/](benchmarks/frontier-cs-eval/) | Algorithms | 172 | [Frontier-CS](https://frontier-cs.org/) competitive programming |
-| 🧠 | [arc_benchmark/](benchmarks/arc_benchmark/) | Reasoning | — | ARC-AGI visual reasoning |
-| 💻 | [ale_bench/](benchmarks/ale_bench/) | Algorithms | 10 | Algorithmic programming contests |
-| 🎨 | [image_gen/](benchmarks/image_gen/) | Creative | 1 | AI image generation evolution |
-| 💬 | [prompt_optimization/](benchmarks/prompt_optimization/) | NLP | 1 | HotPotQA prompt evolution |
-
-See [Dependency extras](#dependency-extras) for install commands per benchmark.
-
-</details>
-
-## 🚀 Optimization Quick Start
-
-**Prerequisites:** Python >= 3.10, [uv](https://docs.astral.sh/uv/)
+Requires Python 3.10 to 3.13 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-# Install
+git clone https://github.com/skydiscover-ai/skydiscover.git
+cd skydiscover
 uv sync
-export OPENAI_API_KEY="<your-key>"
-
-# Try the circle packing benchmark
-uv sync --extra math
-uv run skydiscover-run benchmarks/math/circle_packing/initial_program.py \
-  benchmarks/math/circle_packing/evaluator.py \
-  --config benchmarks/math/circle_packing/config.yaml \
-  --search evox \
-  --iterations 100
-
-uv run skydiscover-run benchmarks/math/circle_packing/initial_program.py \
-  benchmarks/math/circle_packing/evaluator.py \
-  --config benchmarks/math/circle_packing/config.yaml \
-  --search adaevolve \
-  --iterations 100
-
-# Or run on your own problem
-# algo can be "evox", "adaevolve", "openevolve", "gepa", "shinkaevolve"
-uv run skydiscover-run initial_program.py evaluator.py \
-  --search <algo> \
-  --model gpt-5 \
-  --iterations 100
-
-# initial_program is optional — omit it to let the LLM start from scratch
-uv run skydiscover-run evaluator.py \
-  --search <algo> \
-  --model gpt-5 \
-  --iterations 100
-
-# Run a Harbor benchmark (e.g. AlgoTune) — no seed program needed
-pip install harbor
-harbor datasets download algotune@1.0 -o /tmp/algotune
-uv run skydiscover-run /tmp/algotune/<id>/algotune-set-cover \
-  --model anthropic/claude-sonnet-4-6 \
-  --search best_of_n -i 10
 ```
 
-Or use the Python API:
+Optimize needs an LLM API key; Synthesize needs a coding agent (each set up in its section below).
 
-```python
-from skydiscover import run_discovery
+More setup options are in the [installation guide](docs/content/docs/installation.mdx).
 
-result = run_discovery(
-    initial_program="initial_program.py",
-    evaluator="evaluator.py",
-    search=[algo], # algo can be "adaevolve", "evox", "openevolve", "gepa", "shinkaevolve"
-    model="gpt-5",
-    iterations=100,
-)
+## 🧬 SkyDiscover-Optimize
 
-print(result.best_score, result.best_solution)
+SkyDiscover-Optimize evolves programs against your scoring function. Its two search algorithms, AdaEvolve and EvoX, achieve the strongest open-source results across ~200 benchmarks, and are used across industry including Google and Uber.
+
+- **Frontier-CS (172 problems)**: ~34% higher median score than OpenEvolve, GEPA, and ShinkaEvolve under the same budget
+- **Math + systems (14 tasks)**: matches or exceeds AlphaEvolve and human SOTA on 6/6 systems and 6/8 math tasks
+- **Real-world systems**: 41% lower cross-cloud transfer cost, 14% better GPU load balance for MoE serving, 29% lower KV-cache pressure
+
+### Quick start
+
+Set the API key for your model provider, then evolve a program against your scoring function:
+
+```bash
+export OPENAI_API_KEY=<your-key>   # or ANTHROPIC_API_KEY / GEMINI_API_KEY
+uv run skydiscover optimize evaluator.py --search adaevolve --model gpt-5 -i 100
+# uv run skydiscover optimize evaluator.py --search evox --model gpt-5 -i 100
 ```
-
-
-## ✏️ What You Write
-
-### Scoring Function (required)
-
-SkyDiscover supports three evaluator formats — pick whichever fits your use case:
-
-| Format | When to use | What you point `evaluation_file` at |
-|:---|:---|:---|
-| **Python function** | Simple tasks, no system deps | `evaluator.py` |
-| **Containerized** | Custom deps, data files, isolation | `evaluator/` directory (must contain `Dockerfile` + `evaluate.sh`) |
-| **Harbor task** | External benchmark suites (AlgoTune, EvoEval, HumanEvalFix, BigCodeBench, LiveCodeBench, USACO, CRUSTBench, CodePDE, and more) | Task directory (must contain `instruction.md` + `tests/` + `environment/Dockerfile`) |
-
-SkyDiscover auto-detects the format. See [`benchmarks/README.md`](benchmarks/README.md#adding-a-benchmark) for full setup instructions.
-
-**Python evaluator** — a file with an `evaluate(program_path)` function:
-
-```python
-def evaluate(program_path):
-    score = run_and_grade(program_path)
-    return {
-        "combined_score": score,       # primary optimization target (maximized)
-        "artifacts": {                 # optional — stored with the solution for future context
-            "feedback": "Off by one in the loop boundary",
-        },
-    }
-```
-
-**Containerized evaluator** — a directory with a `Dockerfile` and `evaluate.sh` that writes JSON to stdout. Runs in Docker, so it can have arbitrary dependencies.
-
-**Harbor task** — a directory following the [Harbor](https://harborframework.com/) format (`instruction.md`, `environment/Dockerfile`, `tests/test.sh`). Works out of the box with 8+ tested benchmark suites (see [benchmarks/README.md](benchmarks/README.md#tested-harbor-datasets) for the full list).
-
-- **combined_score** drives evolution. If omitted, SkyDiscover averages all numeric values in the dict.
-- **artifacts** is optional — entries are injected into the next LLM prompt as context.
-
-For `search.type: adaevolve`, you can also enable explicit Pareto optimization by configuring `search.database.pareto_objectives` and returning those objective metrics directly from the evaluator. In that mode, `combined_score` becomes optional and is only used as a scalar fallback/proxy when configured.
-
-### Starting Solution (optional)
-
-The initial program is **optional**. When omitted, the LLM generates a solution from scratch. If provided, it marks the region to mutate with EVOLVE-BLOCK markers. Everything outside is left untouched.
-
-```python
-# EVOLVE-BLOCK-START
-def solve(input_data):
-    return input_data  # baseline — SkyDiscover will improve this
-# EVOLVE-BLOCK-END
-```
-
-If no markers are present, the entire file is treated as mutatable.
-
-
-## 🧬 Pick an Algorithm
-
-See [Benchmark Performance](#-benchmark-performance) for a detailed comparison of AdaEvolve and EvoX against other algorithms.
 
 | Algorithm | Flag | Description |
 |:---|:---|:---|
-| ⭐&nbsp;**AdaEvolve** | `--search adaevolve` | Multi-island adaptive search with UCB, migration, and paradigm breakthroughs |
-| 🧠&nbsp;**EvoX** | `--search evox` | Self-evolving paradigm that co-adapts solution generation and experience management |
-| 📊&nbsp;**Top-K** | `--search topk` | Selects top-K solutions to refine |
-| 🔍&nbsp;**Beam&nbsp;Search** | `--search beam_search` | Breadth-first expansion of a beam of top solutions |
-| 🎲&nbsp;**Best-of-N** | `--search best_of_n` | Generates N variants per iteration, keeps the best |
-| 🧪&nbsp;**GEPA&nbsp;Native** | `--search gepa_native` | Pareto-efficient search with reflective prompting and LLM-mediated merge |
-| 🗺️&nbsp;**OpenEvolve&nbsp;Native** | `--search openevolve_native` | MAP-Elites + island-based evolutionary search |
+| ⭐&nbsp;**AdaEvolve** | `--search adaevolve` | Adaptive search that tunes its own settings as it runs |
+| 🧠&nbsp;**EvoX** | `--search evox` | AI that optimizes its own optimization process |
 
-### External backends
+The [full Optimize guide](skydiscover/optimize/README.md) covers six more algorithms, evaluator formats, the Python API, and complete benchmark results.
 
-Install with `uv sync --extra external`, then use the corresponding flag:
+## 🏗️ SkyDiscover-Synthesize
 
-| Backend | Flag | Source |
+SkyDiscover-Synthesize lets you build a system specialized for your own hardware, workload, and requirements, instead of adopting a one-size-fits-all one.
+
+It has synthesized key-value stores up to 2.3x faster than Redis and FASTER (plus formally verified distributed ones), LLM inference engines with up to 2.2x the throughput of vLLM and SGLang, and model routers at up to 48% lower cost; each is a checked-in [example](skydiscover/synthesize/examples/README.md) you can run.
+
+| Approach | Use it when | How it works |
 |:---|:---|:---|
-| **OpenEvolve** | `--search openevolve` | [codelion/openevolve](https://github.com/codelion/openevolve) |
-| **GEPA** | `--search gepa` | [gepa-ai/gepa](https://github.com/gepa-ai/gepa) |
-| **ShinkaEvolve** | `--search shinkaevolve` | [SakanaAI/ShinkaEvolve](https://github.com/SakanaAI/ShinkaEvolve) (manual install) |
+| [Formal-proof-driven](https://arxiv.org/abs/2605.23109) | You have a formal spec (e.g. Rocq) | Synthesizes the code and its machine-checked proof together, step by step |
+| [Test-driven](https://arxiv.org/abs/2605.24096) | You have a plain-text description | Agents iterate on the implementation; an auditor turns every reward hack it finds (a change that raises the score while breaking what you meant) into a new test |
 
-<details>
-<summary>ShinkaEvolve manual install</summary>
+### Quick start
 
-```bash
-git clone --depth 1 https://github.com/SakanaAI/ShinkaEvolve.git external_repos/ShinkaEvolve
-uv pip install -e external_repos/ShinkaEvolve
-```
-
-</details>
-
-
-## ⚙️ Configuration
-
-Pass a YAML config with `-c`. See [configs/](configs/) for full annotated templates.
-
-```yaml
-max_iterations: 100
-llm:
-  models: [{ name: "gemini/gemini-3-pro-preview", weight: 1.0 }]
-search:
-  type: "adaevolve"                  # or "evox", "topk", "beam_search", "best_of_n"
-prompt:
-  system_message: |
-    You are an expert at optimizing algorithms.
-```
-
-API keys (OPENAI_API_KEY, GEMINI_API_KEY, etc.) are resolved from environment variables automatically. 
-
-### 📊 Live Monitor & Human Feedback
-
-Add `monitor: { enabled: true }` to your config. The dashboard URL prints at run start — scatter plot of all programs, code diffs, metrics, and AI summaries. A **Human Feedback** panel lets you steer evolution in real time.
-Replay a completed run:
+Install the `/skysynth` skill into the coding agent of your choice:
 
 ```bash
-uv run skydiscover-viewer /path/to/checkpoints/checkpoint_100
+uv run skydiscover init   # wires every coding agent found on PATH; or --agent claude|cursor|codex|pi
 ```
 
-
-## 📖 Reference
-
-<details>
-<summary><b>CLI flags</b></summary>
+Then prompt the agent:
 
 ```
-uv run skydiscover-run [INITIAL_PROGRAM] EVALUATOR [options]
+/skysynth build me a fast in-memory key-value store
 ```
 
-| Flag | Description |
-|:---|:---|
-| `-c, --config FILE` | Config YAML |
-| `-i, --iterations N` | Number of iterations |
-| `-m, --model MODEL` | LLM model (overrides config) |
-| `-s, --search TYPE` | Search algorithm |
-| `-o, --output DIR` | Output directory |
-| `--api-base URL` | Override LLM API endpoint |
-| `--checkpoint DIR` | Resume from checkpoint |
-| `--agentic` | Enable agentic mode (LLM can read your files) |
-| `-l, --log-level LEVEL` | DEBUG, INFO, WARNING, or ERROR |
-
-</details>
-
-<details>
-<summary><b>Python API — discover_solution() (convenience wrapper)</b></summary>
-
-`discover_solution()` is a convenience wrapper around `run_discovery()` (shown in [Quick Start](#-quick-start)) for inline string solutions and callable evaluators:
-
-```python
-from skydiscover import discover_solution
-
-result = discover_solution(
-    initial_solution="def solve(x): return x",  # optional — omit to start from scratch
-    evaluator=lambda path: {"combined_score": run_tests(path)},
-    iterations=50,
-    search="evox",
-)
-```
-
-</details>
-
-<details>
-<summary><b>Model providers</b></summary>
-
-Any [LiteLLM](https://docs.litellm.ai/)-compatible model works using `provider/model` format:
+On Claude Code or Codex you can also install it as a plugin:
 
 ```bash
---model gpt-5                                               # OpenAI (default)
---model gemini/gemini-3-pro-preview                          # Gemini
---model anthropic/claude-sonnet-4-20250514                   # Anthropic
---model ollama/llama3 --api-base http://localhost:11434/v1   # Local (Ollama, vLLM, etc.)
+/plugin marketplace add skydiscover-ai/skydiscover   # Claude Code
+/plugin install skysynth
+codex plugin marketplace add skydiscover-ai/skydiscover   # Codex
+codex plugin add skysynth
 ```
 
-Multi-model pools with weighted sampling are supported in config:
+Your system lands in `outputs/synthesize/<slug>_<timestamp>/best/artifact/` (`<slug>` is a short name made from your prompt), with `spec.md` beside it saying what it guarantees and how it scored. The [full Synthesize guide](skydiscover/synthesize/README.md) covers how the agents work, both approaches, and adding a domain. The [tutorial](skydiscover/synthesize/examples/tutorial/) walks through a full synthesis; its notebook replays our run.
 
-```yaml
-llm:
-  models:
-    - name: "gpt-5-mini"
-      weight: 0.7
-    - name: "gemini/gemini-2.0-flash"
-      weight: 0.3
-```
+## 🤝 Contributing
 
-</details>
-
-<details id="dependency-extras">
-<summary><b>Benchmark dependency extras</b></summary>
-
-```bash
-uv sync                              # Base install
-uv sync --extra math                 # Math benchmarks (SciPy, JAX, PyWavelets, …)
-uv sync --extra adrs                 # ADRS systems benchmarks
-uv sync --extra frontier-cs          # Frontier-CS benchmark tooling
-uv sync --extra external             # OpenEvolve / GEPA / ShinkaEvolve backends
-uv sync --extra prompt-optimization  # HotPotQA prompt optimization
-```
-
-Combine extras as needed: `uv sync --extra external --extra math`
-
-If a benchmark ships its own `requirements.txt`, also run: `uv pip install -r path/to/requirements.txt`
-
-</details>
-
----
-
-## 🛠️ Extending SkyDiscover
-
-- **New benchmark** → [`benchmarks/README.md`](benchmarks/README.md#adding-a-benchmark)
-- **New search algorithm** → [`skydiscover/search/README.md`](skydiscover/search/README.md)
-- **New context builder** → [`skydiscover/context_builder/README.md`](skydiscover/context_builder/README.md)
-
----
-
-## 🔗 Related Work
-SkyDiscover is inspired by [AlphaEvolve](https://deepmind.google/discover/blog/alphaevolve-a-gemini-powered-coding-agent-for-designing-advanced-algorithms/) and incorporates useful code components from open-source efforts such as [OpenEvolve](https://github.com/codelion/openevolve). Its interface is compatible with the [optimize_anything](https://gepa-ai.github.io/gepa/blog/2026/02/18/introducing-optimize-anything/) API.
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and pull request guidelines.
 
 ## ✍️ Citation
+
+If you use SkyDiscover, please cite the framework paper:
 
 ```bibtex
 @inproceedings{liu2026skydiscover,
@@ -414,6 +133,86 @@ SkyDiscover is inspired by [AlphaEvolve](https://deepmind.google/discover/blog/a
 }
 ```
 
+If you use SkyDiscover-Synthesize, please also cite:
+
+```bibtex
+@misc{liu2026skysynth,
+  author       = {Shu Liu and Shubham Agarwal and Alexander Krentsel and Mert Cemri and Sidharth Sankhe and Ziming Mao and Alexandros G. Dimakis and Matei Zaharia and Ion Stoica},
+  title        = {Building Specialized Systems that We Can Trust with Agents},
+  year         = {2026},
+  month        = sep,
+  howpublished = {SkyDiscover Blog},
+  url          = {https://skydiscover-ai.github.io/blog-skysynth.html}
+}
+```
+
+<details>
+<summary><b>Citations for the papers behind SkyDiscover-Optimize</b></summary>
+
+If you use the **AdaEvolve** search algorithm:
+
+```bibtex
+@misc{cemri2026adaevolve,
+  author        = {Mert Cemri and Shubham Agrawal and Akshat Gupta and Shu Liu and Audrey Cheng and Qiuyang Mang and Ashwin Naren and Lutfi Eren Erdogan and Koushik Sen and Matei Zaharia and Alex Dimakis and Ion Stoica},
+  title         = {AdaEvolve: Adaptive LLM Driven Zeroth-Order Optimization},
+  year          = {2026},
+  eprint        = {2602.20133},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.NE},
+  url           = {https://arxiv.org/abs/2602.20133}
+}
+```
+
+If you use the **EvoX** search algorithm:
+
+```bibtex
+@misc{liu2026evox,
+  author        = {Shu Liu and Shubham Agarwal and Monishwaran Maheswaran and Mert Cemri and Zhifei Li and Qiuyang Mang and Ashwin Naren and Ethan Boneh and Audrey Cheng and Melissa Z. Pan and Alexander Du and Kurt Keutzer and Alvin Cheung and Alexandros G. Dimakis and Koushik Sen and Matei Zaharia and Ion Stoica},
+  title         = {EvoX: Meta-Evolution for Automated Discovery},
+  year          = {2026},
+  eprint        = {2602.23413},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.LG},
+  url           = {https://arxiv.org/abs/2602.23413}
+}
+```
+
+</details>
+
+<details>
+<summary><b>Citations for the papers behind SkyDiscover-Synthesize</b></summary>
+
+If you use **formal-proof-driven synthesis** (Inductive Deductive Synthesis):
+
+```bibtex
+@misc{agarwal2026ids,
+  author        = {Shubham Agarwal and Alexander Krentsel and Shu Liu and Mert Cemri and Audrey Cheng and Rui Meng and Tomas Pfister and Chun-Liang Li and Sylvia Ratnasamy and Aditya Parameswaran and Matei Zaharia and Ion Stoica and Mohsen Lesani},
+  title         = {Inductive Deductive Synthesis: Enabling AI to Generate Formally Verified Systems},
+  year          = {2026},
+  eprint        = {2605.23109},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.AI},
+  url           = {https://arxiv.org/abs/2605.23109}
+}
+```
+
+If you use **test-driven synthesis** (Just-in-Time Systems):
+
+```bibtex
+@misc{liu2026jitsystems,
+  author        = {Shu Liu and Alexander Krentsel and Shubham Agarwal and Mert Cemri and Ziming Mao and Soujanya Ponnapalli and Alexandros G. Dimakis and Sylvia Ratnasamy and Matei Zaharia and Aditya Parameswaran and Ion Stoica},
+  title         = {The Time is Here for Just-in-Time Systems: Challenges and Opportunities},
+  year          = {2026},
+  eprint        = {2605.24096},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.DB},
+  url           = {https://arxiv.org/abs/2605.24096}
+}
+```
+
+</details>
+
 ## 📬 Contact Us
-For questions or feedback, reach out to us:
-[lshu@berkeley.edu](mailto:lshu@berkeley.edu) · [akrentsel@berkeley.edu](mailto:akrentsel@berkeley.edu) · [mert_cemri@berkeley.edu](mailto:mert_cemri@berkeley.edu) · [shubham3@berkeley.edu](mailto:shubham3@berkeley.edu)
+
+Join our [Slack community](https://join.slack.com/t/skydiscover/shared_invite/zt-48y5bloat-iZCMDv98OQTo3TXX97s80g) for questions and discussion, or reach out to us directly:
+[lshu@berkeley.edu](mailto:lshu@berkeley.edu) · [akrentsel@berkeley.edu](mailto:akrentsel@berkeley.edu) · [mert_cemri@berkeley.edu](mailto:mert_cemri@berkeley.edu) · [shubham3@berkeley.edu](mailto:shubham3@berkeley.edu) · [sidharth_sankhe@berkeley.edu](mailto:sidharth_sankhe@berkeley.edu)

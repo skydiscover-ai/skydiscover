@@ -32,7 +32,7 @@ Mathematical optimization and algorithm evolution problems.
 ## Run
 
 ```bash
-uv run skydiscover-run \
+uv run skydiscover optimize \
   benchmarks/math/signal_processing/initial_program.py \
   benchmarks/math/signal_processing/evaluator.py \
   -c benchmarks/math/signal_processing/config.yaml \

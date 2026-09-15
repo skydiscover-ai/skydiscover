@@ -23,7 +23,7 @@ The evaluator tests on 5 synthetic signals: sinusoidal, multi-frequency, non-sta
 
 ```bash
 # From repo root
-uv run skydiscover-run \
+uv run skydiscover optimize \
   benchmarks/math/signal_processing/initial_program.py \
   benchmarks/math/signal_processing/evaluator.py \
   -c benchmarks/math/signal_processing/config.yaml \

@@ -13,7 +13,7 @@ Pack 26 non-overlapping circles in a unit square to maximize the sum of their ra
 
 ```bash
 # From repo root
-uv run skydiscover-run \
+uv run skydiscover optimize \
   benchmarks/math/circle_packing/initial_program.py \
   benchmarks/math/circle_packing/evaluator.py \
   -c benchmarks/math/circle_packing/config.yaml \

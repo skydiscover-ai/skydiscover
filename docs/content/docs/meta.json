@@ -1,7 +1,4 @@
 {
   "title": "Documentation",
-  "pages": [
-    "index",
-    "getting-started"
-  ]
+  "pages": ["index", "installation", "optimize", "synthesize"]
 }

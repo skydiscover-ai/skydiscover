@@ -1,0 +1,47 @@
+{
+  "title": "FASTER Key Design Principles (derived from source, code-to-spec)",
+  "source": "microsoft/FASTER @ 7f71289 (cc/src). Transferable mechanisms — the canonical reference for a high-throughput synthesized store.",
+
+  "principle_1_epoch_sync": {
+    "name": "Epoch-based synchronization (locks replaced by a safe-epoch counter)",
+    "summary": "Avoid coordination on the hot path with a shared monotonic epoch counter. Each thread keeps a thread-local epoch and refreshes it periodically; an epoch is 'safe' once every thread has advanced past it. Arbitrary callbacks (trigger actions) can be attached to an epoch and fire exactly once when it becomes safe — giving lazy, lock-free propagation of global changes (page flush, eviction, GC, checkpoint). Threads never block each other for these.",
+    "tradeoff": "Zero hot-path coordination + lazy global updates  VS  changes propagate only at epoch boundaries (eventual, not immediate).",
+    "evidence": "cc/src/core/light_epoch.h Protect/Unprotect/BumpCurrentEpoch; ComputeNewSafeToReclaimEpoch:268"
+  },
+  "principle_2_latchfree_index": {
+    "name": "Cache-aligned latch-free hash index",
+    "summary": "The index is an array of 64-byte cache-line buckets, each holding 7 eight-byte entries (48-bit address + 14-bit tag) plus an overflow pointer. Every operation is a 64-bit atomic CAS — no latches. A tentative-bit two-phase insert prevents duplicate entries without locking (CAS a tentative entry, re-scan for conflicts, then clear the bit). Tags add hashing resolution beyond bucket count. Keys live in records, not the index, so the index stays small enough to be fully resident.",
+    "tradeoff": "Lock-free, cache-friendly, tiny index  VS  CAS-retry under heavy contention; collision chains walk the log.",
+    "evidence": "cc/src/index/hash_bucket.h:26 HashBucketEntry, :319 HotLogIndexHashBucket; AtomicHashBucketEntry::compare_exchange_strong:86"
+  },
+  "principle_3_inplace_updates": {
+    "name": "In-place updates for hot records",
+    "summary": "Update a record at its current location instead of allocating a new one + copying + swapping the index pointer. For a mutable in-memory record, RMW becomes a single atomic instruction and Upsert a single atomic store — no allocation, no index change. Read-copy-update to the tail is used only for records that have aged out of the mutable region. This is the dominant reason FASTER's RMW throughput is so high.",
+    "tradeoff": "Minimal-cost hot updates  VS  needs a mutable region + careful versioning during checkpoints.",
+    "evidence": "cc/src/core/faster.h:285 InternalUpsert (in-place atomic path), :288 InternalRmw"
+  },
+  "principle_4_hybridlog": {
+    "name": "HybridLog: mutable tail + read-only cache + on-disk, in one address space",
+    "summary": "Divide the logical log into three contiguous regions: a mutable tail in memory (fast in-place updates), a read-only region in memory (a second-chance cache; updates here copy to the tail), and a stable on-disk region (async I/O). The mutable/read-only boundary lags the tail by a fixed amount and is tracked via epochs to avoid lost updates. The in-memory part is a fixed circular buffer of page frames — this is how FASTER serves larger-than-memory at near-memory speed.",
+    "tradeoff": "Hot-in-RAM + cold-on-disk in one structure  VS  records can be pending on a disk miss (async API needed).",
+    "evidence": "cc/src/core/persistent_memory_malloc.h (HybridLog regions, circular page buffer)"
+  },
+  "principle_5_natural_caching": {
+    "name": "Caching with no per-record statistics",
+    "summary": "Get effective caching for free: hot records stay at high logical addresses because they're updated in place; a cold record, when accessed, is copied to the mutable tail (a fresh chance); if not re-accessed before the read-only boundary passes it, it's evicted to disk. This is a second-chance FIFO that performs like LRU-K — but with zero bookkeeping (no LRU lists, no reference bits, no counters). Cheaper than Redis's sampling.",
+    "tradeoff": "Zero caching overhead, no metadata  VS  approximate (not exact) recency; tied to the HybridLog layout.",
+    "evidence": "cc/src/core/persistent_memory_malloc.h (read-only boundary / second-chance)"
+  },
+  "principle_6_epoch_reclamation": {
+    "name": "Epoch-based safe memory reclamation",
+    "summary": "Free a page only once no thread can still be reading it: advance the head/begin offset, then attach an epoch trigger action that reclaims the page when that epoch becomes safe (all threads have passed it). No thread ever pins a page or takes a buffer latch; no per-access refcounting or hazard pointers. Index GC similarly CAS-deletes stale entries and defers frees to a safe epoch.",
+    "tradeoff": "No per-op reclamation overhead, no latches  VS  reclamation is batched/deferred to epoch boundaries.",
+    "evidence": "cc/src/core/light_epoch.h (trigger actions); cc/src/core/faster.h ShiftBeginAddress (GC), mem_index GarbageCollect"
+  },
+  "principle_7_cpr_checkpoint": {
+    "name": "CPR: fuzzy checkpoint with per-thread consistent-prefix recovery",
+    "summary": "Persist without a WAL and without stopping the world. A version number stamped on each record separates writes before/after the checkpoint; threads transition through phases (PREPARE→IN_PROGRESS→WAIT_FLUSH) bumping their version, so the captured state is a consistent PREFIX of each thread's operations — if op N is recovered, all that thread's earlier ops are too. Recovery restores the index checkpoint and scans the HybridLog, dropping any record newer than the checkpoint version.",
+    "tradeoff": "No per-write logging, no stalls, exact per-thread monotonicity  VS  loses everything since the last checkpoint; no cross-thread total order.",
+    "evidence": "cc/src/core/faster.h:3307 Checkpoint, :3436 Recover; cc/src/core/state_transitions.h, phase.h; record checkpoint_version"
+  }
+}

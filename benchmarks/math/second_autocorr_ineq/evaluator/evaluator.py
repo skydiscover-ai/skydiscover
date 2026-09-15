@@ -11,10 +11,11 @@
 #
 # ===--------------------------------------------------------------------------------------===#
 
-import sys
 import os
-from importlib import __import__
+import sys
 import time
+from importlib import __import__
+
 import numpy as np
 
 BENCHMARK = 0.8962799441554086

@@ -21,7 +21,7 @@ BENCH_WALL_TIMEOUT_NS = 120e9
 BENCH_NO_GRAD = False
 BENCH_MAX_REPEATS = 100
 BENCH_MAX_TIME_NS = 10e9
-BENCH_WARMUP_STYLE = 'tiny_benchmark'
+BENCH_WARMUP_STYLE = "tiny_benchmark"
 
 # ---------------------------------------------------------------------------
 # Test / benchmark cases
@@ -76,7 +76,7 @@ def check_implementation(data, submission_output, rtol=1e-4, atol=1e-4):
 # Self-contained reference code for Modal remote execution
 # ---------------------------------------------------------------------------
 
-MODAL_REFERENCE_CODE = r'''
+MODAL_REFERENCE_CODE = r"""
 import torch
 
 def ref_kernel(data):
@@ -100,4 +100,4 @@ def check_implementation(data, submission_output, rtol=1e-4, atol=1e-4):
         return True, "Match"
     diff = torch.abs(submission_output.float() - ref_output.float())
     return False, f"Output mismatch: max_diff={diff.max().item():.6f}"
-'''
+"""

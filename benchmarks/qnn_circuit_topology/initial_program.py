@@ -4,6 +4,7 @@ Evolve ``build_topology`` to discover a better ansatz. The evaluator angle-encod
 2D inputs, applies this topology with trainable parameters, and scores accuracy.
 """
 
+
 # EVOLVE-BLOCK-START
 def build_topology():
     """Return a list of gate dicts defining the variational ansatz topology.

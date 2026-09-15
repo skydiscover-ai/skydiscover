@@ -1,0 +1,65 @@
+# EvoX - Label-guided Evolutionary Search Configuration
+#
+# EvoX is a co-evolutionary search strategy that uses label-guided
+# exploration and exploitation to evolve programs.
+#
+# Usage:
+#   Copy this file to your example directory as config_evox.yaml
+#   and fill in the system_message with your problem description.
+
+# General settings
+max_iterations: 100
+checkpoint_interval: 10
+log_level: "INFO"
+
+# LLM configuration
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+  api_base: "https://api.openai.com/v1"
+  temperature: 0.7
+  # top_p: 0.95  # omitted by default; some providers (e.g. Anthropic) reject both temperature and top_p
+  max_tokens: 32000
+  timeout: 600
+  # To use Gemini: comment out models + api_base above, uncomment below
+  # models:
+  #   - name: "gemini-3-pro-preview"
+  # api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  # api_key: ${GEMINI_API_KEY}
+
+# Search configuration
+search:
+  type: "evox"
+  database:
+    auto_generate_variation_operators: true
+    # Opt-in multiobjective (issue #42). Leave empty for scalar combined_score.
+    # pareto_objectives: ["accuracy", "latency"]
+    # higher_is_better:
+    #   accuracy: true
+    #   latency: false
+    # fitness_key: accuracy
+    # pareto_objectives_weight: 0.4
+
+# Prompt configuration
+prompt:
+  system_message: |
+    <REPLACE WITH YOUR PROBLEM-SPECIFIC SYSTEM MESSAGE>
+
+    Describe:
+    - What the algorithm/function should do
+    - Input/output format
+    - Optimization objective and metrics
+    - Constraints
+    - Techniques to explore
+
+# Evaluator configuration
+evaluator:
+  timeout: 360
+  max_retries: 3
+  cascade_evaluation: true
+  cascade_thresholds: [0.3, 0.6]
+
+# Generation settings
+diff_based_generation: true
+max_solution_length: 60000

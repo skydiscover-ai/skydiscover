@@ -1,0 +1,12 @@
+{
+  "name": "skysynth",
+  "displayName": "SkySynth",
+  "version": "0.2.0",
+  "description": "/skysynth: coding agents build a system specialized for your workload, checked by tests or machine-checked proofs. Includes the /skysynth skill, the agent roles (Spec Builder, Planner, Coding Agent, Evaluator, Critic, Auditor), and the hook that runs the tests before anything is delivered. Also install the skydiscover Python package: uv pip install git+https://github.com/skydiscover-ai/skydiscover (or run from a source checkout).",
+  "author": {
+    "name": "SkyDiscover team"
+  },
+  "license": "Apache-2.0",
+  "keywords": ["synthesis", "agents", "systems", "correctness", "jit"],
+  "commands": "./adapters/claude/commands/"
+}

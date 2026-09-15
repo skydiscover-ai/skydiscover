@@ -22,13 +22,13 @@ def example_constrained_optimization():
 
     # --- Objective: negative sum of sizes (we minimize, so negate to maximize) ---
     def objective(x):
-        sizes = x[2 * n:]
+        sizes = x[2 * n :]
         return -np.sum(sizes)
 
     # --- Constraints as a single function returning array of values >= 0 ---
     def constraints_fn(x):
-        positions = x[:2 * n].reshape(n, 2)
-        sizes = x[2 * n:]
+        positions = x[: 2 * n].reshape(n, 2)
+        sizes = x[2 * n :]
 
         c = []
         # Pairwise non-overlap: dist(i,j) - size_i - size_j >= 0
@@ -39,10 +39,10 @@ def example_constrained_optimization():
 
         # Boundary: each object stays inside [0, 1] x [0, 1]
         for i in range(n):
-            c.append(positions[i, 0] - sizes[i])      # left
-            c.append(1 - positions[i, 0] - sizes[i])   # right
-            c.append(positions[i, 1] - sizes[i])        # bottom
-            c.append(1 - positions[i, 1] - sizes[i])    # top
+            c.append(positions[i, 0] - sizes[i])  # left
+            c.append(1 - positions[i, 0] - sizes[i])  # right
+            c.append(positions[i, 1] - sizes[i])  # bottom
+            c.append(1 - positions[i, 1] - sizes[i])  # top
 
         return np.array(c)
 
@@ -66,8 +66,8 @@ def example_constrained_optimization():
         options={"maxiter": 1000, "ftol": 1e-9},
     )
 
-    opt_positions = result.x[:2 * n].reshape(n, 2)
-    opt_sizes = result.x[2 * n:]
+    opt_positions = result.x[: 2 * n].reshape(n, 2)
+    opt_sizes = result.x[2 * n :]
     return opt_positions, opt_sizes, -result.fun  # return positive sum
 
 

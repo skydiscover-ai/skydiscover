@@ -1,14 +1,15 @@
 """Tests for HarborEvaluator — solution path extraction, task.toml parsing, reward reading, and detection."""
 
 import json
+import tempfile
 import textwrap
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from skydiscover.config import EvaluatorConfig
-from skydiscover.evaluation import _is_harbor_task, _is_containerized
-from skydiscover.evaluation.harbor_evaluator import HarborEvaluator, _DEFAULT_SOLUTION_PATH
+from skydiscover.optimize.config import EvaluatorConfig
+from skydiscover.optimize.evaluation import _is_containerized, _is_harbor_task
+from skydiscover.optimize.evaluation.harbor_evaluator import _DEFAULT_SOLUTION_PATH, HarborEvaluator
 
 
 def _make_evaluator(task_dir: str) -> HarborEvaluator:
@@ -18,9 +19,7 @@ def _make_evaluator(task_dir: str) -> HarborEvaluator:
     return inst
 
 
-# ------------------------------------------------------------------
 # task.toml timeout parsing
-# ------------------------------------------------------------------
 
 
 class TestTaskTomlTimeout:
@@ -59,9 +58,7 @@ class TestTaskTomlTimeout:
         assert config.timeout == 360
 
 
-# ------------------------------------------------------------------
 # Solution path extraction: solve.sh (tier 1)
-# ------------------------------------------------------------------
 
 
 class TestExtractPathFromSolveSh:
@@ -84,7 +81,9 @@ class TestExtractPathFromSolveSh:
         assert inst._extract_path_from_solve_sh() == "/app/src/main.rs"
 
     def test_cpp_extension(self, tmp_path):
-        inst = self._write_solve_sh(tmp_path, "cat > /solution/solve.cpp << 'EOF'\nint main(){}\nEOF\n")
+        inst = self._write_solve_sh(
+            tmp_path, "cat > /solution/solve.cpp << 'EOF'\nint main(){}\nEOF\n"
+        )
         assert inst._extract_path_from_solve_sh() == "/solution/solve.cpp"
 
     def test_relative_path_with_cd(self, tmp_path):
@@ -126,9 +125,7 @@ class TestExtractPathFromSolveSh:
         assert inst._extract_path_from_solve_sh() == ""
 
 
-# ------------------------------------------------------------------
 # Solution path extraction: instruction.md (tier 2)
-# ------------------------------------------------------------------
 
 
 class TestExtractPathFromInstruction:
@@ -143,7 +140,9 @@ class TestExtractPathFromInstruction:
         assert inst._extract_path_from_instruction() == "/workspace/solve.py"
 
     def test_preposition_path(self, tmp_path):
-        (tmp_path / "instruction.md").write_text("Place your solution at /opt/solution.py and run it.\n")
+        (tmp_path / "instruction.md").write_text(
+            "Place your solution at /opt/solution.py and run it.\n"
+        )
         inst = _make_evaluator(str(tmp_path))
         assert inst._extract_path_from_instruction() == "/opt/solution.py"
 
@@ -157,9 +156,7 @@ class TestExtractPathFromInstruction:
         assert inst._extract_path_from_instruction() == ""
 
 
-# ------------------------------------------------------------------
 # Full solution path extraction (tier priority)
-# ------------------------------------------------------------------
 
 
 class TestExtractSolutionPath:
@@ -180,9 +177,7 @@ class TestExtractSolutionPath:
         assert inst._extract_solution_path() == _DEFAULT_SOLUTION_PATH
 
 
-# ------------------------------------------------------------------
 # _read_reward
-# ------------------------------------------------------------------
 
 
 def _mock_docker_exec(outputs: dict):
@@ -191,6 +186,7 @@ def _mock_docker_exec(outputs: dict):
     Args:
         outputs: mapping from container path to (returncode, stdout) tuples.
     """
+
     def side_effect(cmd, **kwargs):
         # Detect "docker exec <cid> cat <path>" calls.
         if cmd[:2] == ["docker", "exec"] and "cat" in cmd:
@@ -199,30 +195,49 @@ def _mock_docker_exec(outputs: dict):
                 rc, stdout = outputs[path]
                 return MagicMock(returncode=rc, stdout=stdout)
         return MagicMock(returncode=1, stdout="")
+
     return side_effect
 
 
 class TestReadReward:
     def _make_inst(self):
-        inst = object.__new__(HarborEvaluator)
-        inst.container_id = "fake_container"
+        """A real HarborEvaluator with only the Docker calls stubbed, so the object is fully formed
+        whatever attributes the method under test reads."""
+        with (
+            tempfile.TemporaryDirectory() as task_dir,
+            patch.object(HarborEvaluator, "_build_image", return_value="fake:latest"),
+            patch.object(HarborEvaluator, "_start_container", return_value="fake_container"),
+            patch.object(HarborEvaluator, "_init_container", return_value=None),
+        ):
+            inst = HarborEvaluator(task_dir, EvaluatorConfig())
+        assert inst.container_id == "fake_container"
         return inst
 
     def test_reads_reward_txt(self):
         inst = self._make_inst()
-        with patch("subprocess.run", side_effect=_mock_docker_exec({
-            "/logs/verifier/reward.json": (1, ""),
-            "/logs/verifier/reward.txt": (0, "0.75\n"),
-        })):
+        with patch(
+            "subprocess.run",
+            side_effect=_mock_docker_exec(
+                {
+                    "/logs/verifier/reward.json": (1, ""),
+                    "/logs/verifier/reward.txt": (0, "0.75\n"),
+                }
+            ),
+        ):
             result = inst._read_reward()
         assert result.metrics["combined_score"] == 0.75
 
     def test_reads_reward_json_with_reward_key(self):
         inst = self._make_inst()
         payload = json.dumps({"reward": 0.9, "time_ms": 123})
-        with patch("subprocess.run", side_effect=_mock_docker_exec({
-            "/logs/verifier/reward.json": (0, payload),
-        })):
+        with patch(
+            "subprocess.run",
+            side_effect=_mock_docker_exec(
+                {
+                    "/logs/verifier/reward.json": (0, payload),
+                }
+            ),
+        ):
             result = inst._read_reward()
         assert result.metrics["combined_score"] == 0.9
         assert result.metrics["time_ms"] == 123.0
@@ -230,64 +245,92 @@ class TestReadReward:
     def test_reads_reward_json_with_score_key(self):
         inst = self._make_inst()
         payload = json.dumps({"score": 0.5})
-        with patch("subprocess.run", side_effect=_mock_docker_exec({
-            "/logs/verifier/reward.json": (0, payload),
-        })):
+        with patch(
+            "subprocess.run",
+            side_effect=_mock_docker_exec(
+                {
+                    "/logs/verifier/reward.json": (0, payload),
+                }
+            ),
+        ):
             result = inst._read_reward()
         assert result.metrics["combined_score"] == 0.5
 
     def test_json_preferred_over_txt(self):
         inst = self._make_inst()
         payload = json.dumps({"reward": 0.9})
-        with patch("subprocess.run", side_effect=_mock_docker_exec({
-            "/logs/verifier/reward.json": (0, payload),
-            "/logs/verifier/reward.txt": (0, "0.1\n"),
-        })):
+        with patch(
+            "subprocess.run",
+            side_effect=_mock_docker_exec(
+                {
+                    "/logs/verifier/reward.json": (0, payload),
+                    "/logs/verifier/reward.txt": (0, "0.1\n"),
+                }
+            ),
+        ):
             result = inst._read_reward()
         assert result.metrics["combined_score"] == 0.9
 
     def test_missing_reward_key_defaults_to_zero(self):
         inst = self._make_inst()
         payload = json.dumps({"time_ms": 500})
-        with patch("subprocess.run", side_effect=_mock_docker_exec({
-            "/logs/verifier/reward.json": (0, payload),
-        })):
+        with patch(
+            "subprocess.run",
+            side_effect=_mock_docker_exec(
+                {
+                    "/logs/verifier/reward.json": (0, payload),
+                }
+            ),
+        ):
             result = inst._read_reward()
         assert result.metrics["combined_score"] == 0.0
 
     def test_no_reward_files_returns_zero(self):
         inst = self._make_inst()
-        with patch("subprocess.run", side_effect=_mock_docker_exec({
-            "/logs/verifier/reward.json": (1, ""),
-            "/logs/verifier/reward.txt": (1, ""),
-        })):
+        with patch(
+            "subprocess.run",
+            side_effect=_mock_docker_exec(
+                {
+                    "/logs/verifier/reward.json": (1, ""),
+                    "/logs/verifier/reward.txt": (1, ""),
+                }
+            ),
+        ):
             result = inst._read_reward()
         assert result.metrics["combined_score"] == 0.0
         assert "error" in result.artifacts
 
     def test_malformed_json_falls_back_to_txt(self):
         inst = self._make_inst()
-        with patch("subprocess.run", side_effect=_mock_docker_exec({
-            "/logs/verifier/reward.json": (0, "{bad json"),
-            "/logs/verifier/reward.txt": (0, "0.42\n"),
-        })):
+        with patch(
+            "subprocess.run",
+            side_effect=_mock_docker_exec(
+                {
+                    "/logs/verifier/reward.json": (0, "{bad json"),
+                    "/logs/verifier/reward.txt": (0, "0.42\n"),
+                }
+            ),
+        ):
             result = inst._read_reward()
         assert result.metrics["combined_score"] == 0.42
 
     def test_non_numeric_txt_falls_through(self):
         inst = self._make_inst()
-        with patch("subprocess.run", side_effect=_mock_docker_exec({
-            "/logs/verifier/reward.json": (1, ""),
-            "/logs/verifier/reward.txt": (0, "not a number"),
-        })):
+        with patch(
+            "subprocess.run",
+            side_effect=_mock_docker_exec(
+                {
+                    "/logs/verifier/reward.json": (1, ""),
+                    "/logs/verifier/reward.txt": (0, "not a number"),
+                }
+            ),
+        ):
             result = inst._read_reward()
         assert result.metrics["combined_score"] == 0.0
         assert "error" in result.artifacts
 
 
-# ------------------------------------------------------------------
 # Harbor task detection
-# ------------------------------------------------------------------
 
 
 def _make_harbor_dir(tmp_path):

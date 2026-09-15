@@ -9,7 +9,7 @@ Core operation for AlphaFold3, Chai, Protenix protein structure models.
 From the repo root:
 
 ```bash
-uv run skydiscover-run \
+uv run skydiscover optimize \
   benchmarks/gpu_mode/trimul/initial_program.py \
   benchmarks/gpu_mode/trimul/evaluator.py \
   -c benchmarks/gpu_mode/trimul/config.yaml \
@@ -26,7 +26,7 @@ uv run skydiscover-run \
 
 ```bash
 GPUMODE_USE_MODAL=true GPUMODE_MODAL_GPU=H100 \
-  uv run skydiscover-run \
+  uv run skydiscover optimize \
   benchmarks/gpu_mode/trimul/initial_program.py \
   benchmarks/gpu_mode/trimul/evaluator.py \
   -c benchmarks/gpu_mode/trimul/config.yaml \

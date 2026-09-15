@@ -11,9 +11,13 @@ import triton.language as tl
 
 @triton.jit
 def grayscale_kernel(
-    rgb_ptr, out_ptr,
-    H, W,
-    stride_h, stride_w, stride_c,
+    rgb_ptr,
+    out_ptr,
+    H,
+    W,
+    stride_h,
+    stride_w,
+    stride_c,
     BLOCK_SIZE: tl.constexpr,
 ):
     pid = tl.program_id(0)
@@ -49,9 +53,16 @@ def custom_kernel(data):
     BLOCK_SIZE = 1024
     grid = (triton.cdiv(n_pixels, BLOCK_SIZE),)
     grayscale_kernel[grid](
-        rgb, output, H, W,
-        stride_h, stride_w, stride_c,
+        rgb,
+        output,
+        H,
+        W,
+        stride_h,
+        stride_w,
+        stride_c,
         BLOCK_SIZE=BLOCK_SIZE,
     )
     return output
+
+
 # EVOLVE-BLOCK-END

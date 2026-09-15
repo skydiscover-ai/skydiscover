@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from skydiscover.cli import _find_latest_checkpoint
+from skydiscover.optimize.cli import _find_latest_checkpoint
 
 
 def test_returns_highest_iteration(tmp_path: Path):

@@ -101,6 +101,7 @@ def _get_client():
     global _client
     if _client is None:
         from openai import OpenAI
+
         _client = OpenAI()
     return _client
 
@@ -116,7 +117,12 @@ def _judge_image(image_path: str) -> Dict[str, Union[float, str]]:
     b64 = _encode_image(image_path)
 
     ext = os.path.splitext(image_path)[1].lstrip(".").lower()
-    mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}.get(ext, "image/png")
+    mime = {
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "webp": "image/webp",
+    }.get(ext, "image/png")
     data_url = f"data:{mime};base64,{b64}"
 
     messages = [

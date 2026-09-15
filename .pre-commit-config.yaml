@@ -1,0 +1,50 @@
+# Mirrors the lint job in .github/workflows/ci.yml, so a clean commit is a green CI run.
+#
+# The formatter hooks are `repo: local` and shell out to `uv run` on purpose: that uses the
+# versions pinned in uv.lock rather than a second set pinned here, so local and CI cannot
+# drift apart. tests/repo/test_pre_commit_matches_ci.py fails if a lint tool is added to one and
+# not the other.
+#
+#   uv run pre-commit install     # once, to enable
+#   uv run pre-commit run --all-files
+default_language_version:
+  python: python3
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # Validators only -- nothing here rewrites source, so enabling this does not
+      # produce a reformatting diff.
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=2048]
+
+  - repo: local
+    hooks:
+      - id: black
+        name: black
+        entry: uv run black
+        language: system
+        types: [python]
+        files: ^(skydiscover|tests|benchmarks)/
+
+      - id: isort
+        name: isort
+        entry: uv run isort
+        language: system
+        types: [python]
+        files: ^(skydiscover|tests|benchmarks)/
+
+      - id: mypy
+        name: mypy
+        # Whole-package, not per-file: mypy needs the full import graph, and this is
+        # exactly what CI runs. Enforced against everything outside the baseline in
+        # pyproject.toml.
+        entry: uv run mypy skydiscover/
+        language: system
+        types: [python]
+        pass_filenames: false

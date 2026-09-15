@@ -1,11 +1,11 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=62.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "skydiscover"
 dynamic = ["version"]
-description = "A Flexible Framework for AI-Driven Scientific and Algorithmic Discovery"
+description = "A Flexible Framework for AI-Driven Scientific, Algorithmic, and End-to-End Systems Discovery"
 readme = "README.md"
 requires-python = ">=3.10, <3.14"
 license = {text = "Apache-2.0"}
@@ -15,6 +15,7 @@ dependencies = [
     "tqdm>=4.64.0",
     "numpy>=1.22.0",
     "python-dotenv>=1.2.1",
+    "tomli>=1.1.0; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]
@@ -53,7 +54,9 @@ dev = [
     "black>=22.0.0",
     "isort>=5.10.0",
     "mypy>=0.950",
+    "pre-commit>=3.5.0",
     "requests>=2.28.0",
+    "types-PyYAML>=6.0",
 ]
 frontier-cs = [
     "anthropic>=0.74.0",
@@ -93,15 +96,68 @@ profile = "black"
 line_length = 100
 
 [tool.mypy]
+# Strictness is raised per-module as modules are annotated.
 python_version = "3.10"
-warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
+ignore_missing_imports = true  # optional backends ship no stubs
+# Synthesize examples are domain fixtures read by the agents, not package API; their
+# hyphenated directory names are not importable as modules in any case.
+exclude = 'skydiscover/synthesize/examples/'
+
+# ── mypy baseline ────────────────────────────────────────────────────────────
+# Modules that do not type-check yet. CI checks everything else, so the set can
+# only shrink: fix a module, delete its line. Do not add to this list.
+[[tool.mypy.overrides]]
+module = [
+    "skydiscover.optimize.context_builder.adaevolve.builder",
+    "skydiscover.optimize.context_builder.base",
+    "skydiscover.optimize.context_builder.default.builder",
+    "skydiscover.optimize.context_builder.evox.builder",
+    "skydiscover.optimize.context_builder.evox.formatters",
+    "skydiscover.optimize.context_builder.gepa_native.builder",
+    "skydiscover.optimize.evaluation.container_evaluator",
+    "skydiscover.optimize.evaluation.evaluator",
+    "skydiscover.optimize.evaluation.llm_judge",
+    "skydiscover.optimize.extras.external.gepa_backend",
+    "skydiscover.optimize.llm.llm_pool",
+    "skydiscover.optimize.llm.openai",
+    "skydiscover.optimize.search.adaevolve.adaptation",
+    "skydiscover.optimize.search.adaevolve.controller",
+    "skydiscover.optimize.search.adaevolve.database",
+    "skydiscover.optimize.search.base_database",
+    "skydiscover.optimize.search.beam_search.database",
+    "skydiscover.optimize.search.best_of_n.database",
+    "skydiscover.optimize.search.claude_code.controller",
+    "skydiscover.optimize.search.default_discovery_controller",
+    "skydiscover.optimize.search.evox.controller",
+    "skydiscover.optimize.search.evox.database.initial_search_strategy",
+    "skydiscover.optimize.search.evox.database.search_strategy_db",
+    "skydiscover.optimize.search.evox.database.search_strategy_evaluator",
+    "skydiscover.optimize.search.evox.utils.coevolve_logging",
+    "skydiscover.optimize.search.evox.utils.search_scorer",
+    "skydiscover.optimize.search.evox.utils.variation_operator_generator",
+    "skydiscover.optimize.search.gepa_native.controller",
+    "skydiscover.optimize.search.gepa_native.database",
+    "skydiscover.optimize.search.gepa_native.pareto_utils",
+    "skydiscover.optimize.search.openevolve_native.database",
+    "skydiscover.optimize.search.registry",
+    "skydiscover.optimize.search.topk.database",
+    "skydiscover.optimize.search.utils.discovery_utils",
+    "skydiscover.optimize.utils.code_utils",
+    "skydiscover.optimize.utils.metrics",
+    "skydiscover.synthesize.spec.build",
+    "skydiscover.synthesize.spec.decisions",
+    "skydiscover.synthesize.spec.failure_patterns",
+    "skydiscover.synthesize.spec.kept_tests",
+    "skydiscover.synthesize.spec.run",
+    "skydiscover.synthesize.workflow.scripts.cpprun",
+    "skydiscover.synthesize.workflow.scripts.run_tests",
+    "skydiscover.synthesize.workflow.scripts.kb.kbtool",
+]
+ignore_errors = true
 
 [project.scripts]
-skydiscover-run = "skydiscover.cli:main"
-skydiscover-viewer = "skydiscover.extras.monitor.viewer:main"
+skydiscover = "skydiscover.main:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -113,14 +169,37 @@ addopts = "--strict-markers"
 
 [tool.setuptools.packages.find]
 include = ["skydiscover*"]
+exclude = ["*.__pycache__", "*.__pycache__.*"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["*.pyc", "*.pyo", "**/*.pyc", "**/*.pyo", "__pycache__/*", "**/__pycache__/*"]
 
 [tool.setuptools.package-data]
 skydiscover = [
-    "context_builder/*/templates/*.txt",
-    "search/evox/config/*.yaml",
-    "search/evox/config/*.txt",
-    "extras/external/defaults/*.yaml",
-    "extras/monitor/dashboard.html",
+    "py.typed",
+    "synthesize/*.md",
+    "synthesize/config.toml",
+    "synthesize/workflow/**/*.md",
+    "synthesize/workflow/**/*.yaml",
+    "synthesize/workflow/**/*.py",
+    "synthesize/workflow/**/*.sh",
+    "synthesize/scripts/install.sh",
+    "synthesize/workflow/**/*.ts",
+    "synthesize/workflow/**/*.json",
+    "synthesize/workflow/.claude-plugin/*.json",
+    "synthesize/workflow/.codex-plugin/*.json",
+    "synthesize/examples/**",
+    "synthesize/spec/**/*.md",
+    "optimize/configs/*.yaml",
+    "optimize/configs/*.md",
+    "optimize/examples/**",
+    "optimize/context_builder/*/templates/*.txt",
+    "optimize/llm/tool_schemas/*.json",
+    "optimize/search/evox/config/*.yaml",
+    "optimize/search/evox/config/*.txt",
+    "optimize/search/claude_code/runner_image/*",
+    "optimize/extras/external/defaults/*.yaml",
+    "optimize/extras/monitor/dashboard.html",
 ]
 
 [tool.setuptools.dynamic]

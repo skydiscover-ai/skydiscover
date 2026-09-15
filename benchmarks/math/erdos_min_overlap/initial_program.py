@@ -1,9 +1,10 @@
 # EVOLVE-BLOCK-START
+from dataclasses import dataclass
+
 import jax
 import jax.numpy as jnp
-import optax
 import numpy as np
-from dataclasses import dataclass
+import optax
 import tqdm
 
 

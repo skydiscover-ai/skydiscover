@@ -1,0 +1,70 @@
+# OpenEvolve Native — MAP-Elites + Island-based Evolutionary Search
+#
+# A faithful port of the OpenEvolve search algorithm:
+#   - MAP-Elites grid per island for quality-diversity
+#   - Island-based population with round-robin rotation
+#   - Ring-topology migration between islands
+#   - Exploration / exploitation / random parent sampling
+#   - Greedy-diverse context program sampling from nearby MAP-Elites cells
+#
+# Usage:
+#   skydiscover optimize initial_program.py evaluator.py \
+#       -s openevolve_native -m gpt-5-mini -i 100
+
+# General settings
+max_iterations: 100
+checkpoint_interval: 10
+log_level: "INFO"
+
+# LLM configuration
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+  api_base: "https://api.openai.com/v1"
+  temperature: 0.7
+  # top_p: 0.95  # omitted by default; some providers (e.g. Anthropic) reject both temperature and top_p
+  max_tokens: 32000
+  timeout: 600
+
+# Search configuration
+search:
+  type: "openevolve_native"
+  num_context_programs: 5
+  database:
+    num_islands: 5
+    population_size: 40
+    archive_size: 100
+    exploration_ratio: 0.2          # P(explore) — random from current island
+    exploitation_ratio: 0.7         # P(exploit) — archive elite, prefer current island
+    # remaining 0.1 = P(random)     — any program in population
+    elite_selection_ratio: 0.1      # fraction of context programs from top elites
+    feature_dimensions: ["complexity", "diversity"]
+    feature_bins: 10
+    diversity_reference_size: 20
+    migration_interval: 10          # migrate every N island-generations
+    migration_rate: 0.1             # fraction of island to migrate
+    random_seed: 42
+
+# Prompt configuration
+prompt:
+  system_message: |
+    <REPLACE WITH YOUR PROBLEM-SPECIFIC SYSTEM MESSAGE>
+
+    Describe:
+    - What the algorithm/function should do
+    - Input/output format
+    - Optimization objective and metrics
+    - Constraints
+    - Techniques to explore
+
+# Evaluator configuration
+evaluator:
+  timeout: 360
+  max_retries: 3
+  cascade_evaluation: true
+  cascade_thresholds: [0.3, 0.6]
+
+# Generation settings
+diff_based_generation: true
+max_solution_length: 60000

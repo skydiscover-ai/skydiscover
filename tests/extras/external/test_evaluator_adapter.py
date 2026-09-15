@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 
 import pytest
 
-from skydiscover.extras.external.alphaevolve_backend import (
+from skydiscover.optimize.extras.external.alphaevolve_backend import (
     _extract_best_program,
     _make_alphaevolve_evaluator,
 )
@@ -82,9 +82,7 @@ class TestEvaluatorSuffix:
         assert _seen_paths(tmp_path)[0].endswith(".cpp")
 
     def test_python_default(self, tmp_path: Path) -> None:
-        evaluator = _make_alphaevolve_evaluator(
-            _write_evaluator(tmp_path, _PATH_ECHO_EVALUATOR)
-        )
+        evaluator = _make_alphaevolve_evaluator(_write_evaluator(tmp_path, _PATH_ECHO_EVALUATOR))
 
         evaluator(_candidate("seed.py"))
 
@@ -95,15 +93,11 @@ class TestEvaluatorAdapter:
     """Behaviour of the wrapped evaluator closure."""
 
     def test_scores_are_pre_wrapped(self, tmp_path: Path) -> None:
-        evaluator = _make_alphaevolve_evaluator(
-            _write_evaluator(tmp_path, _PATH_ECHO_EVALUATOR)
-        )
+        evaluator = _make_alphaevolve_evaluator(_write_evaluator(tmp_path, _PATH_ECHO_EVALUATOR))
 
         result = evaluator(_candidate("seed.py", "abc"))
 
-        assert result["scores"]["scores"] == [
-            {"metric": "combined_score", "score": 3.0}
-        ]
+        assert result["scores"]["scores"] == [{"metric": "combined_score", "score": 3.0}]
 
     def test_monitor_callback_gets_run_language(self, tmp_path: Path) -> None:
         seen: List[Any] = []
@@ -121,9 +115,7 @@ class TestEvaluatorAdapter:
         assert seen[0].language == "cuda"
 
     def test_evaluator_error_returns_insight(self, tmp_path: Path) -> None:
-        evaluator = _make_alphaevolve_evaluator(
-            _write_evaluator(tmp_path, _FAILING_EVALUATOR)
-        )
+        evaluator = _make_alphaevolve_evaluator(_write_evaluator(tmp_path, _FAILING_EVALUATOR))
 
         result = evaluator(_candidate("seed.py"))
 
@@ -131,21 +123,15 @@ class TestEvaluatorAdapter:
         assert "boom" in result["insights"]["error"]
 
     def test_no_files_returns_insight(self, tmp_path: Path) -> None:
-        evaluator = _make_alphaevolve_evaluator(
-            _write_evaluator(tmp_path, _PATH_ECHO_EVALUATOR)
-        )
+        evaluator = _make_alphaevolve_evaluator(_write_evaluator(tmp_path, _PATH_ECHO_EVALUATOR))
 
         result = evaluator({"content": {"files": []}})
 
         assert result["scores"]["scores"] == []
         assert "error" in result["insights"]
 
-    def test_temp_file_is_cleaned_up(
-        self, tmp_path: Path, isolated_tmpdir: Path
-    ) -> None:
-        evaluator = _make_alphaevolve_evaluator(
-            _write_evaluator(tmp_path, _PATH_ECHO_EVALUATOR)
-        )
+    def test_temp_file_is_cleaned_up(self, tmp_path: Path, isolated_tmpdir: Path) -> None:
+        evaluator = _make_alphaevolve_evaluator(_write_evaluator(tmp_path, _PATH_ECHO_EVALUATOR))
 
         evaluator(_candidate("seed.py"))
 
@@ -154,9 +140,7 @@ class TestEvaluatorAdapter:
     def test_temp_file_is_cleaned_up_on_evaluator_error(
         self, tmp_path: Path, isolated_tmpdir: Path
     ) -> None:
-        evaluator = _make_alphaevolve_evaluator(
-            _write_evaluator(tmp_path, _FAILING_EVALUATOR)
-        )
+        evaluator = _make_alphaevolve_evaluator(_write_evaluator(tmp_path, _FAILING_EVALUATOR))
 
         evaluator(_candidate("seed.py"))
 
@@ -174,9 +158,7 @@ class _FakeExperiment:
 def _program(code: str, score: float) -> Dict[str, Any]:
     return {
         "content": {"files": [{"path": "p.py", "content": code}]},
-        "evaluation": {
-            "scores": {"scores": [{"metric": "combined_score", "score": score}]}
-        },
+        "evaluation": {"scores": {"scores": [{"metric": "combined_score", "score": score}]}},
     }
 
 

@@ -1,12 +1,14 @@
-import importlib.util
-import numpy as np
-import time
 import concurrent.futures
+import importlib.util
+import time
 import traceback
 from dataclasses import dataclass
 
-GPU_MEM_SIZE = 80 # GB
-MIN_INT = float('-inf')  # Define MIN_INT as negative infinity
+import numpy as np
+
+GPU_MEM_SIZE = 80  # GB
+MIN_INT = float("-inf")  # Define MIN_INT as negative infinity
+
 
 @dataclass
 class Model:
@@ -38,6 +40,7 @@ def safe_float(value):
         return float(value)
     except (TypeError, ValueError):
         return 0.0
+
 
 def verify_gpu_mem_constraint(placement_data: dict[int, list[Model]]) -> bool:
     """
@@ -82,15 +85,24 @@ def generate_test_gpu_models(num_tests=50):
     for i in range(num_tests):
         gpu_num = np.random.randint(5, 10)
         gpu_models = []
-        for j in range(gpu_num*2):
+        for j in range(gpu_num * 2):
             model_size = np.random.randint(10, 30)
             req_rate = np.random.randint(1, 10)
             slo = np.random.randint(5, 10)
-            gpu_models.append(Model(model_name=f"model_{j}", model_size=model_size, req_rate=req_rate, slo=slo, cur_gpu_id=j))
+            gpu_models.append(
+                Model(
+                    model_name=f"model_{j}",
+                    model_size=model_size,
+                    req_rate=req_rate,
+                    slo=slo,
+                    cur_gpu_id=j,
+                )
+            )
 
         test_cases.append((gpu_num, gpu_models))
 
     return test_cases
+
 
 def evaluate(program_path):
     """
@@ -110,7 +122,7 @@ def evaluate(program_path):
                 "success_rate": 0.0,
                 "combined_score": 0.0,
                 "error": "Missing compute_model_placement function",
-                }
+            }
 
         # Generate test gpu and models
         test_gpu_models = generate_test_gpu_models()
@@ -128,11 +140,8 @@ def evaluate(program_path):
                 # Call the program's main function
                 result = run_with_timeout(
                     program.compute_model_placement,
-                    kwargs={
-                        'gpu_num': gpu_num,
-                        'models': gpu_models
-                    },
-                    timeout_seconds=10
+                    kwargs={"gpu_num": gpu_num, "models": gpu_models},
+                    timeout_seconds=10,
                 )
 
                 execution_time = time.time() - start_time
@@ -200,8 +209,8 @@ def evaluate(program_path):
 
                 # Store metrics
                 metrics = {
-                    'max_kvpr': safe_float(max_kvpr),
-                    'execution_time': safe_float(execution_time),
+                    "max_kvpr": safe_float(max_kvpr),
+                    "execution_time": safe_float(execution_time),
                 }
 
                 all_kvpr.append(safe_float(max_kvpr))
@@ -218,36 +227,31 @@ def evaluate(program_path):
         # If no successful runs, return minimal scores
         if successful_runs == 0:
             return {
-                    "max_kvpr": 0.0,
-                    "success_rate": 0.0,
-                    "combined_score": 0.0,
-                    "error": "All test signals failed"
-                }
+                "max_kvpr": 0.0,
+                "success_rate": 0.0,
+                "combined_score": 0.0,
+                "error": "All test signals failed",
+            }
 
         print(all_metrics)
         # Calculate aggregate metrics
         avg_kvpr = np.mean(all_kvpr)
         if avg_kvpr != 0:
             avg_kvpr = 1.0 / avg_kvpr
-        avg_execution_time = np.mean([m['execution_time'] for m in all_metrics])
+        avg_execution_time = np.mean([m["execution_time"] for m in all_metrics])
         success_rate = successful_runs / len(test_gpu_models)
 
         return {
-                "max_kvpr": safe_float(avg_kvpr),
-                "execution_time": safe_float(avg_execution_time),
-                "success_rate": safe_float(success_rate),
-                "combined_score": safe_float(avg_kvpr) + safe_float(success_rate),
-            }
+            "max_kvpr": safe_float(avg_kvpr),
+            "execution_time": safe_float(avg_execution_time),
+            "success_rate": safe_float(success_rate),
+            "combined_score": safe_float(avg_kvpr) + safe_float(success_rate),
+        }
 
     except Exception as e:
         print(f"Evaluation failed: {str(e)}")
         print(traceback.format_exc())
-        return {
-                "max_kvpr": 0.0,
-                "success_rate": 0.0,
-                "combined_score": 0.0,
-                "error": str(e)
-            }
+        return {"max_kvpr": 0.0, "success_rate": 0.0, "combined_score": 0.0, "error": str(e)}
 
 
 if __name__ == "__main__":

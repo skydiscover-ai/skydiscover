@@ -1,0 +1,39 @@
+# The words a wiki page may be tagged with. A page's header has `tags: [...]`, and kbtool.py
+# rejects a tag that is not listed, so a typo cannot become a new tag by accident. The words
+# below come up for almost every kind of system. A word one kind of system needs goes in that
+# domain's own <kb>/<domain>/wiki/tags.yaml (same `tags:` shape); this file is part of the
+# framework and is not edited by a run.
+
+tags:
+  # correctness and behavior
+  - correctness
+  - determinism
+  - idempotence
+  - ordering
+  - atomicity
+  - consistency
+  - concurrency
+  - race
+  - lifecycle
+  # durability and recovery
+  - durability
+  - recovery
+  - crash
+  - data-loss
+  # resources and performance
+  - throughput
+  - latency
+  - memory
+  - bandwidth
+  - compute
+  - contention
+  - capacity-bound
+  - scalability
+  # safety and failure
+  - overflow
+  - resource-leak
+  - validation
+  - security
+  # evidence provenance
+  - production
+  - paper

@@ -11,13 +11,10 @@ import modal
 
 app = modal.App("gpu-mode-triton-eval")
 
-cuda_image = (
-    modal.Image.debian_slim(python_version="3.11")
-    .pip_install(
-        "torch>=2.2.0",
-        "triton>=3.0.0",
-        "numpy",
-    )
+cuda_image = modal.Image.debian_slim(python_version="3.11").pip_install(
+    "torch>=2.2.0",
+    "triton>=3.0.0",
+    "numpy",
 )
 
 
@@ -33,22 +30,22 @@ def _eval_triton_impl(
     bench_no_grad: bool = False,
     bench_max_repeats: int = 100,
     bench_max_time_ns: float = 10e9,
-    bench_warmup_style: str = 'tiny_benchmark',
+    bench_warmup_style: str = "tiny_benchmark",
 ) -> dict:
     """
     Core evaluation logic that runs inside a Modal GPU container.
 
     Returns dict with: combined_score, correctness, geom_mean_us, error
     """
+    import contextlib
+    import copy
+    import dataclasses
+    import gc
+    import math
     import os
     import sys
-    import gc
-    import copy
-    import math
-    import time
-    import contextlib
-    import dataclasses
     import tempfile
+    import time
 
     # Help with memory fragmentation for large models (MLA bs=128)
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
@@ -72,7 +69,7 @@ def _eval_triton_impl(
             return type(data)(**fields)
         elif isinstance(data, torch.nn.Module):
             cloned = copy.deepcopy(data)
-            if hasattr(data, 'seq_len'):
+            if hasattr(data, "seq_len"):
                 cloned.seq_len = data.seq_len
             return cloned
         return data
@@ -130,12 +127,15 @@ def _eval_triton_impl(
             gc.collect()
             torch.cuda.empty_cache()
             if not passed:
-                return {"combined_score": 0.0, "correctness": 0.0,
-                        "error": f"Test {i} failed: {msg}"}
+                return {
+                    "combined_score": 0.0,
+                    "correctness": 0.0,
+                    "error": f"Test {i} failed: {msg}",
+                }
 
         # Warmup
         wb = benchmark_cases[0]
-        if bench_warmup_style == 'timed_calls':
+        if bench_warmup_style == "timed_calls":
             wdata = generate_input(**wb)
             start = time.perf_counter()
             while time.perf_counter() - start < 0.2:
@@ -169,8 +169,11 @@ def _eval_triton_impl(
                 gc.collect()
                 torch.cuda.empty_cache()
             if not passed:
-                return {"combined_score": 0.0, "correctness": 1.0,
-                        "error": f"Benchmark correctness: {msg}"}
+                return {
+                    "combined_score": 0.0,
+                    "correctness": 1.0,
+                    "error": f"Benchmark correctness: {msg}",
+                }
 
             # Regenerate data for timed runs (was freed during correctness check)
             data = generate_input(**bench_args)
@@ -206,8 +209,10 @@ def _eval_triton_impl(
                             break
                         if st["mean"] * st["runs"] > bench_max_time_ns:
                             break
-                        if bench_wall_timeout_ns is not None and \
-                           (time.perf_counter_ns() - bm_start) > bench_wall_timeout_ns:
+                        if (
+                            bench_wall_timeout_ns is not None
+                            and (time.perf_counter_ns() - bm_start) > bench_wall_timeout_ns
+                        ):
                             break
 
             bench_means_ns.append(stats(durations_ns)["mean"])
@@ -226,11 +231,15 @@ def _eval_triton_impl(
             "bench_means_us": bench_means_us,
         }
     except Exception as e:
-        return {"combined_score": 0.0, "correctness": 0.0,
-                "error": f"{e}\n{traceback.format_exc()}"}
+        return {
+            "combined_score": 0.0,
+            "correctness": 0.0,
+            "error": f"{e}\n{traceback.format_exc()}",
+        }
     finally:
         sys.path.remove(tmpdir)
         import shutil
+
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 

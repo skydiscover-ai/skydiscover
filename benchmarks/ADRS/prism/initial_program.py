@@ -1,6 +1,7 @@
-GPU_MEM_SIZE = 80 # GB
+GPU_MEM_SIZE = 80  # GB
 
 # EVOLVE-BLOCK-START
+
 
 def compute_model_placement(gpu_num, models):
     """
@@ -21,12 +22,12 @@ def compute_model_placement(gpu_num, models):
     # 2) Initialize per-GPU states
     placement = {gpu_id: [] for gpu_id in range(gpu_num)}
     shared_kv = [GPU_MEM_SIZE for _ in range(gpu_num)]  # remaining memory per GPU
-    weighted_req_rate = [0.0 for _ in range(gpu_num)]   # sum of r_j / s_j per GPU
+    weighted_req_rate = [0.0 for _ in range(gpu_num)]  # sum of r_j / s_j per GPU
 
     # 3) Assign each model to the GPU that minimizes current KVPR while fitting in memory
     for model in sorted_models:
         best_idx = None
-        best_ratio = float('inf')
+        best_ratio = float("inf")
 
         for gpu_id in range(gpu_num):
             if model.model_size <= shared_kv[gpu_id] and shared_kv[gpu_id] > 0:
@@ -48,16 +49,15 @@ def compute_model_placement(gpu_num, models):
 
     return placement
 
+
 # EVOLVE-BLOCK-END
 
 
 if __name__ == "__main__":
     # Test the algorithm
 
-    from evaluator import generate_test_gpu_models
-    from evaluator import calculate_kvcache_pressure
-    from evaluator import safe_float
     import numpy as np
+    from evaluator import calculate_kvcache_pressure, generate_test_gpu_models, safe_float
 
     test_cases = generate_test_gpu_models()
     all_kvpr = []
@@ -70,6 +70,5 @@ if __name__ == "__main__":
     avg_kvpr = np.mean(all_kvpr)
     if avg_kvpr != 0:
         avg_kvpr = 1.0 / avg_kvpr
-
 
     print(f"Max KVPR: {avg_kvpr:.3f}")

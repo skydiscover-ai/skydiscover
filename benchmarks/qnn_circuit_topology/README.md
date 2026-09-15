@@ -19,7 +19,7 @@ Each topology entry is a dict, e.g. `{"gate": "RY", "qubit": 0}` or `{"gate": "C
 ## Run
 
 ```bash
-uv run skydiscover-run \
+uv run skydiscover optimize \
   benchmarks/qnn_circuit_topology/initial_program.py \
   benchmarks/qnn_circuit_topology/evaluator.py \
   -c benchmarks/qnn_circuit_topology/config.yaml \
@@ -29,7 +29,7 @@ uv run skydiscover-run \
 Containerized:
 
 ```bash
-uv run skydiscover-run \
+uv run skydiscover optimize \
   benchmarks/qnn_circuit_topology/initial_program.py \
   benchmarks/qnn_circuit_topology/evaluator \
   -c benchmarks/qnn_circuit_topology/config.yaml \

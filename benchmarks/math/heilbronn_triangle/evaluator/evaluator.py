@@ -12,12 +12,13 @@
 #
 # ===--------------------------------------------------------------------------------------===#
 
-import time
-import numpy as np
-import sys
-import os
-from importlib import __import__
 import itertools
+import os
+import sys
+import time
+from importlib import __import__
+
+import numpy as np
 
 BENCHMARK = 0.036529889880030156
 TOL = 1e-6

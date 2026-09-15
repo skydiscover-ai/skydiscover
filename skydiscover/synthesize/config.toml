@@ -1,0 +1,11 @@
+# Where SkyDiscover-Synthesize keeps its files. Every setting is optional; the environment
+# variables SKYDISCOVER_RUNS, SKYDISCOVER_OUTPUTS, and SKYDISCOVER_HOME override them.
+
+# Working files for each run, under <runs>/<slug>/.
+runs = ".skydiscover"
+
+# Published results, one <slug>_<timestamp>/ folder per run.
+outputs = "outputs/synthesize"
+
+# The knowledge base: what earlier runs learned, one folder per domain (tests, decisions, wiki).
+home = "~/.skydiscover"

@@ -33,10 +33,17 @@ def main(program_path: str, problem_id: str) -> dict:
             num_workers=13,
         )
 
-        code = Path(program_path).read_text().replace("# EVOLVE-BLOCK-START", "").replace("# EVOLVE-BLOCK-END", "").strip()
+        code = (
+            Path(program_path)
+            .read_text()
+            .replace("# EVOLVE-BLOCK-START", "")
+            .replace("# EVOLVE-BLOCK-END", "")
+            .strip()
+        )
 
         private_result, final_rank, final_performance = session.private_eval(
-            code, code_language="cpp20",
+            code,
+            code_language="cpp20",
         )
         # Store the private_result as JSON in the results directory
 
@@ -71,7 +78,7 @@ def main(program_path: str, problem_id: str) -> dict:
         # Monitor resource consumption
         print(f"Current Resource Usage: {session.current_resource_usage}")
         print(f"Remaining Resources: {session.remaining_resource_usage}")
-        
+
         return metrics
     except Exception as e:
         print(f"Evaluation failed completely: {str(e)}")
@@ -91,9 +98,7 @@ def main(program_path: str, problem_id: str) -> dict:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Agent evaluation script using shinka.eval"
-    )
+    parser = argparse.ArgumentParser(description="Agent evaluation script using shinka.eval")
     parser.add_argument(
         "--program-path",
         type=str,
@@ -108,37 +113,37 @@ if __name__ == "__main__":
         help="Problem ID",
     )
     parsed_args = parser.parse_args()
-    
+
     # Collect results from 3 runs
     all_results = []
     for i in range(3):
         print(f"\n{'='*60}")
         print(f"Running evaluation {i+1} of 3")
-        print('='*60)
+        print("=" * 60)
         result = main(
             parsed_args.program_path,
             parsed_args.problem_id,
         )
         all_results.append(result)
-        print('='*60)
-    
+        print("=" * 60)
+
     # Compute averages
     print(f"\n{'='*60}")
     print("FINAL AVERAGED RESULTS ACROSS 3 RUNS")
-    print('='*60)
-    
+    print("=" * 60)
+
     private_scores = [r["private"]["private_score"] for r in all_results]
     private_performances = [r["private"]["private_performance"] for r in all_results]
     private_ranks = [r["private"]["private_rank"] for r in all_results]
     passed_cases = [r["private"]["num_private_passed_cases"] for r in all_results]
     failed_cases = [r["private"]["num_private_failed_cases"] for r in all_results]
-    
+
     avg_private_score = sum(private_scores) / len(private_scores)
     avg_private_performance = sum(private_performances) / len(private_performances)
     avg_private_rank = sum(private_ranks) / len(private_ranks)
     avg_passed_cases = sum(passed_cases) / len(passed_cases)
     avg_failed_cases = sum(failed_cases) / len(failed_cases)
-    
+
     print(f"\nAverage Private Score: {avg_private_score:.2f}")
     print(f"  Individual scores: {private_scores}")
     print(f"\nAverage Private Performance: {avg_private_performance:.4f}")
@@ -147,15 +152,15 @@ if __name__ == "__main__":
     print(f"  Individual ranks: {private_ranks}")
     print(f"\nAverage Passed Cases: {avg_passed_cases:.2f}")
     print(f"Average Failed Cases: {avg_failed_cases:.2f}")
-    print('='*60)
-    
+    print("=" * 60)
+
     # Return summary
     summary = {
         "avg_private_score": avg_private_score,
         "avg_private_performance": avg_private_performance,
         "avg_private_rank": avg_private_rank,
-        "all_results": all_results
+        "all_results": all_results,
     }
-    
+
     print(f"\nFinal Summary:")
     print(json.dumps(summary, indent=2))

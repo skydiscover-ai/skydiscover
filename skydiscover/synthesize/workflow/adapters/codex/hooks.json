@@ -1,0 +1,29 @@
+{
+  "description": "skysynth correctness tests (Codex plugin wiring; scripts live in the plugin root's hooks/ directory, shared with every other install channel)",
+  "hooks": {
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=\"${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-.}}/hooks/delivery_check.sh\"; [ -f \"$p\" ] && exec bash \"$p\"; echo 'skysynth delivery check: delivery_check.sh not found from plugin hook; run skydiscover init --agent codex for project-level wiring' >&2; exit 0",
+            "timeout": 3600
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=\"${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-.}}/hooks/clone_reuse_guard.py\"; [ -f \"$p\" ] && exec python3 \"$p\"; exit 0",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

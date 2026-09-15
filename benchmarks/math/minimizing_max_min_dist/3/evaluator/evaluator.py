@@ -12,12 +12,13 @@
 #
 # ===--------------------------------------------------------------------------------------===#
 
-import sys
 import os
-from importlib import __import__
-import scipy as sp
+import sys
 import time
+from importlib import __import__
+
 import numpy as np
+import scipy as sp
 
 NUM_POINTS = 14
 DIMENSION = 3

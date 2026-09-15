@@ -1,0 +1,29 @@
+# Matches the formatters so an editor gets it right before black has to.
+# https://editorconfig.org
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.py]
+indent_style = space
+indent_size = 4
+max_line_length = 100
+
+[*.{yaml,yml,json,toml,jsonc}]
+indent_style = space
+indent_size = 2
+
+[*.{js,jsx,ts,tsx,mjs,css}]
+indent_style = space
+indent_size = 2
+
+[*.{md,mdx}]
+# Markdown gives two trailing spaces meaning, so leave them alone here.
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab

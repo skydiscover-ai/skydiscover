@@ -6,7 +6,6 @@
 max_iterations: 30
 checkpoint_interval: 10
 log_level: "INFO"
-random_seed: 42
 diff_based_generation: true
 max_solution_length: 50000
 

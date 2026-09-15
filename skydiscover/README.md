@@ -1,50 +1,38 @@
-# SkyDiscover
+# skydiscover
 
-SkyDiscover is an iterative LLM-driven discovery engine. Each iteration runs a
-four-step loop:
+Source for the `skydiscover` command. The package is split into two tools that share the same CLI
+entry point.
+
+## Optimize
+
+Use `optimize/` when you already have a scoring function and want search to improve a program.
+
+```bash
+uv run skydiscover optimize <program> <evaluator> --search evox
+uv run skydiscover viewer <checkpoint>
+```
+
+See [`optimize/README.md`](optimize/README.md) for flags, evaluator formats, and the Python API.
+
+## Synthesize
+
+Use `synthesize/` when you want a full system built from a description or a formal spec, with
+correctness enforced by deterministic tests.
+
+```bash
+uv run skydiscover init                 # wires /skysynth into every coding agent found on PATH
+uv run skydiscover init --agent codex   # or just one
+```
+
+See [`synthesize/README.md`](synthesize/README.md) for the pipeline, supported agents, and how to
+add a domain.
+
+## Layout
 
 ```
-sample → prompt → generate → evaluate → add
-  ↑                                       │
-  └───────────────────────────────────────┘
+skydiscover/
+├── optimize/     improve a program with evolutionary search
+├── synthesize/   build a whole system with coding agents
+├── main.py       the `skydiscover` command
+└── __init__.py   public Python API: run_discovery, discover_solution, Runner, DiscoveryResult
 ```
-
-1. **Sample** — the search algorithm (`search/`) picks a parent solution and
-   any relevant context solutions from the database.
-2. **Prompt** — the context builder (`context_builder/`) turns the parent solution,
-   relevant context solutions (if any), and problem spec into system + user messages.
-3. **Generate** — the LLM (`llm/`) produces a candidate solution (code, text,
-   or image).
-4. **Evaluate** — the evaluator (`evaluation/`) scores the candidate and
-   returns metrics.
-5. **Add** — the scored candidate is stored back in the database, closing the
-   loop.
-
-The `DiscoveryController` (`search/default_discovery_controller.py`) orchestrates
-this loop. Search algorithms that need custom orchestration (e.g. co-evolution)
-subclass it and override `run_discovery()`.
-
-## Components
-
-| Component | Subfolder | What it does | Extend by |
-|:---|:---|:---|:---|
-| **Context Builder** | `context_builder/` | Assembles LLM prompts from the problem spec, prior solutions, and feedback | Subclass `ContextBuilder` ([README](context_builder/README.md)) |
-| **Solution Generator** | `llm/` | Produces candidates via LLM calls, with optional tool use | Subclass `LLMInterface` |
-| **Evaluator** | `evaluation/` | Scores candidates and logs metadata back into the solution database | Provide an `evaluate.py` script |
-| **Solution Selector** | `search/` | Maintains the solution database and picks parents for the next iteration | Subclass `ProgramDatabase` ([README](search/README.md)) |
-
-## Additional subfolders
-
-| Subfolder | What it does |
-|:---|:---|
-| `extras/` | External backends (OpenEvolve, GEPA, ShinkaEvolve) and the live monitor dashboard |
-| `utils/` | Shared helpers — code parsing, metrics, formatting, async utilities, repo mapping |
-
-## Entry points
-
-| Entry point | Use case |
-|:---|:---|
-| `api.py` | Python API — `run_discovery()`, `discover_solution()` |
-| `cli.py` | CLI — `skydiscover-run` |
-| `runner.py` | Setup and run (used by both API and CLI) |
-| `config.py` | Configuration loading and overrides |

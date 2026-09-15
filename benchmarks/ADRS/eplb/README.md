@@ -28,7 +28,7 @@ This benchmark uses SkyDiscover to optimize the Expert Parallelism Load Balancer
 From the repo root:
 
 ```bash
-uv run skydiscover-run \
+uv run skydiscover optimize \
   benchmarks/ADRS/eplb/initial_program.py \
   benchmarks/ADRS/eplb/evaluator.py \
   -c benchmarks/ADRS/eplb/config.yaml \
@@ -40,7 +40,7 @@ uv run skydiscover-run \
 Or from this directory:
 
 ```bash
-uv run skydiscover-run initial_program.py evaluator.py \
+uv run skydiscover optimize initial_program.py evaluator.py \
   -c config.yaml \
   -s [your_algorithm] \
   -i 100

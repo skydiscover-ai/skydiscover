@@ -8,8 +8,8 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
-from skydiscover.benchmarks.base import BenchmarkResolution, BenchmarkResolver
-from skydiscover.utils.prepare import prepare_program
+from skydiscover.optimize.benchmarks.base import BenchmarkResolution, BenchmarkResolver
+from skydiscover.optimize.utils.prepare import prepare_program
 
 logger = logging.getLogger(__name__)
 

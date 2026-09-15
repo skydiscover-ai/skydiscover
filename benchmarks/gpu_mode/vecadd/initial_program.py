@@ -10,7 +10,9 @@ import triton.language as tl
 
 @triton.jit
 def vecadd_kernel(
-    a_ptr, b_ptr, c_ptr,
+    a_ptr,
+    b_ptr,
+    c_ptr,
     n_elements,
     BLOCK_SIZE: tl.constexpr,
 ):
@@ -36,4 +38,6 @@ def custom_kernel(data):
     grid = (triton.cdiv(n_elements, BLOCK_SIZE),)
     vecadd_kernel[grid](a, b, c, n_elements, BLOCK_SIZE=BLOCK_SIZE)
     return c
+
+
 # EVOLVE-BLOCK-END
