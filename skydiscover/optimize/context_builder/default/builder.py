@@ -11,7 +11,9 @@ User message (populated from a template, all templates share this layout):
     2. Previous attempts        — top recent programs with their changes, metrics,
                                  and whether they improved/regressed.
     3. context programs     — other programs from the database
-                                 shown with their metrics and code.
+                                 shown with their metrics and code. Fixed code
+                                 outside the EVOLVE-BLOCK markers that matches
+                                 the current program is replaced by a placeholder.
     4. Current program          — the current program's code, metrics, score
                                  breakdown, and evaluator feedback (if any).
     5. Task instructions        — how to respond (diff format, full rewrite, or
@@ -23,7 +25,7 @@ _format_previous_attempts, _format_other_context_programs, _format_current_progr
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from skydiscover.optimize.config import Config
 from skydiscover.optimize.context_builder.base import ContextBuilder
@@ -34,10 +36,81 @@ logger = logging.getLogger(__name__)
 
 _TEMPLATES_DIR = str(Path(__file__).parent / "templates")
 _TEXT_LANGUAGES = {"text", "prompt", "text/plain"}
+_EVOLVE_BLOCK_START = "EVOLVE-BLOCK-START"
+_EVOLVE_BLOCK_END = "EVOLVE-BLOCK-END"
+_OMITTED_FIXED_CODE = (
+    "... code outside EVOLVE-BLOCK omitted (identical to the Current Solution) ..."
+)
 
 
 def _filter_other_metrics(metrics: dict) -> dict:
     return {k: v for k, v in metrics.items() if k not in {"combined_score", "error"}}
+
+
+def _split_evolve_blocks(solution: str) -> Optional[Tuple[List[List[str]], List[List[str]]]]:
+    """Split a solution into its fixed code and its EVOLVE-BLOCK regions.
+
+    Returns ``(fixed, blocks)``: ``blocks`` holds the lines of each region
+    (marker lines included) and ``fixed[i]`` the lines before ``blocks[i]``,
+    with ``fixed[-1]`` holding the lines after the last region. Returns None
+    when the solution has no markers or they are unbalanced.
+    """
+    fixed: List[List[str]] = [[]]
+    blocks: List[List[str]] = []
+    in_block = False
+    for line in solution.split("\n"):
+        if _EVOLVE_BLOCK_START in line:
+            if in_block:
+                return None
+            blocks.append([line])
+            in_block = True
+        elif _EVOLVE_BLOCK_END in line:
+            if not in_block:
+                return None
+            blocks[-1].append(line)
+            fixed.append([])
+            in_block = False
+        elif in_block:
+            blocks[-1].append(line)
+        else:
+            fixed[-1].append(line)
+    if in_block or not blocks:
+        return None
+    return fixed, blocks
+
+
+def _omit_shared_fixed_code(solution: str, current_solution: Optional[str]) -> str:
+    """Replace fixed code that ``solution`` shares with ``current_solution`` by a placeholder.
+
+    Code outside the EVOLVE-BLOCK markers is not evolved, so a context program
+    usually repeats the current solution's boilerplate verbatim, and the prompt
+    already shows that code in full under the current solution. A fixed segment
+    is replaced only when it matches the current solution's segment at the same
+    position and the placeholder is shorter; otherwise the code is kept as is.
+    """
+    if not solution or not current_solution:
+        return solution
+    parsed = _split_evolve_blocks(solution)
+    parsed_current = _split_evolve_blocks(current_solution)
+    if parsed is None or parsed_current is None:
+        return solution
+    fixed, blocks = parsed
+    current_fixed, _ = parsed_current
+    if len(fixed) != len(current_fixed):
+        return solution
+
+    # Reuse the marker line's comment syntax (e.g. "# " or "// ") for the placeholder.
+    placeholder = blocks[0][0].replace(_EVOLVE_BLOCK_START, _OMITTED_FIXED_CODE)
+    lines: List[str] = []
+    for i, segment in enumerate(fixed):
+        code = "\n".join(segment).strip()
+        if code == "\n".join(current_fixed[i]).strip() and len(placeholder) < len(code):
+            lines.append(placeholder)
+        else:
+            lines.extend(segment)
+        if i < len(blocks):
+            lines.extend(blocks[i])
+    return "\n".join(lines)
 
 
 class DefaultContextBuilder(ContextBuilder):
@@ -94,20 +167,22 @@ class DefaultContextBuilder(ContextBuilder):
         language = self.config.language or "python"
         diff_based_generation = self.config.diff_based_generation
 
-        # Format experiences
-        metrics_str = self._format_metrics(program_metrics)
-        previous_attempts_section = self._format_previous_attempts(previous_programs)
-        other_context_section = self._format_other_context_programs(
-            other_context_programs, language
-        )
-        current_program_section = self._format_current_program(current_program, language)
-        has_current_program = bool(current_program_section)
-
         if isinstance(current_program, dict) and current_program:
             actual_program = list(current_program.values())[0]
             current_solution = prog_attr(actual_program, "solution")
         else:
             current_solution = prog_attr(current_program, "solution")
+
+        # Format experiences
+        metrics_str = self._format_metrics(program_metrics)
+        previous_attempts_section = self._format_previous_attempts(previous_programs)
+        # The current solution is shown in full, so context programs can omit
+        # the fixed code they share with it.
+        other_context_section = self._format_other_context_programs(
+            other_context_programs, language, current_solution=current_solution
+        )
+        current_program_section = self._format_current_program(current_program, language)
+        has_current_program = bool(current_program_section)
 
         improvement_areas = self._identify_improvement_areas(
             current_solution, program_metrics, previous_programs
@@ -300,9 +375,17 @@ class DefaultContextBuilder(ContextBuilder):
         return "\n".join(f"- {area}" for area in improvement_areas)
 
     def _format_single_context_program(
-        self, program: Program, index: int, language: str, lines: list
+        self,
+        program: Program,
+        index: int,
+        language: str,
+        lines: list,
+        current_solution: Optional[str] = None,
     ) -> None:
-        """Append one context program's header, metrics, and code to lines."""
+        """Append one context program's header, metrics, and code to lines.
+
+        Fixed code shared with ``current_solution`` is replaced by a placeholder.
+        """
         if program is None:
             return
 
@@ -331,6 +414,7 @@ class DefaultContextBuilder(ContextBuilder):
                 lines.append("\n")
 
         if language != "image":
+            solution = _omit_shared_fixed_code(solution, current_solution)
             lines.append(f"\n```{language}\n{solution}\n```\n")
         lines.append("\n")
 
@@ -338,6 +422,7 @@ class DefaultContextBuilder(ContextBuilder):
         self,
         other_context_programs: Union[List[Program], Dict[str, List[Program]]],
         language: str,
+        current_solution: Optional[str] = None,
     ) -> str:
         """Format all context programs, grouped by key when dict-wrapped."""
         if not other_context_programs:
@@ -353,13 +438,15 @@ class DefaultContextBuilder(ContextBuilder):
                     "These programs represent diverse approaches and creative solutions that may be relevant to the current task:\n\n"
                 )
                 for i, program in enumerate(programs, start=1):
-                    self._format_single_context_program(program, i, language, lines)
+                    self._format_single_context_program(
+                        program, i, language, lines, current_solution
+                    )
         else:
             lines.append(
                 "These programs represent diverse approaches and creative solutions that may inspire new ideas:\n"
             )
             for i, program in enumerate(other_context_programs, start=1):
-                self._format_single_context_program(program, i, language, lines)
+                self._format_single_context_program(program, i, language, lines, current_solution)
 
         return "".join(lines)
 
