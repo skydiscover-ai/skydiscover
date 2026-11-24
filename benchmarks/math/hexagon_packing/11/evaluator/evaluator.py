@@ -161,8 +161,16 @@ def verify_construction(
     outer_hex_angle_degrees: Rotation angle of the outer hexagon in degrees.
     tol: Numerical tolerance for geometric checks (default: 1e-6).
     Raises:
-    AssertionError if the construction is not valid.
+    ValueError if any parameter is non-finite or the outer side length is not positive.
+    AssertionError if the geometry is not valid.
     """
+    if not np.isfinite(inner_hex_data).all():
+        raise ValueError("Inner hexagon parameters must be finite.")
+    if not np.isfinite((*outer_hex_center, outer_hex_angle_degrees)).all():
+        raise ValueError("Outer hexagon center and angle must be finite.")
+    if not np.isfinite(outer_hex_side_length) or outer_hex_side_length <= 0:
+        raise ValueError("Outer hexagon side length must be finite and positive.")
+
     inner_hex_params_list = [
         (x, y, 1, angle) for x, y, angle in inner_hex_data
     ]  # Sets the side length to 1.
