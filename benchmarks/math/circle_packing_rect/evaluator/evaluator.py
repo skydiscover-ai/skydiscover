@@ -97,6 +97,9 @@ def evaluate(program_path: str):
                 f"Invalid shapes: circles = {circles.shape}, expected {(NUM_CIRCLES,3)}"
             )
 
+        if not np.isfinite(circles).all():
+            raise ValueError("Circle coordinates and radii must be finite.")
+
         validate_packing_radii(circles[:, -1])
         validate_packing_overlap_wtol(circles, TOL)
         validate_packing_inside_rect_wtol(circles, TOL)
